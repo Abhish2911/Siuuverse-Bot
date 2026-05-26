@@ -33,6 +33,21 @@ function stripTeamPrefix(value) {
   return text.includes('-') ? text.split('-').slice(1).join('-').trim() : text;
 }
 
+function addTeamPrefix(playerName, shortName) {
+  const player = String(playerName || '').trim();
+  const short = String(shortName || '').trim().toUpperCase();
+
+  if (!player) return 'Unknown Player';
+  if (!short || short === 'FA') return player;
+
+  const upperPlayer = player.toUpperCase();
+  if (upperPlayer.startsWith(`${short}-`) || upperPlayer.startsWith(`${short} -`)) {
+    return player;
+  }
+
+  return `${short}-${player}`;
+}
+
 function rankBadge(rank) {
   const n = Number(rank);
   if (n === 1) return '🥇';
@@ -245,8 +260,10 @@ function buildMystatsSummary(inputName, teamData, leagueRecord, goals, assists, 
   const impactScore = goals.value * 3 + assists.value * 2 + mvp.value * 3;
   const badgeCount = badgeText === 'No badges yet' ? 0 : badgeText.split('\n').length;
 
+  const displayPlayer = addTeamPrefix(inputName, shortName);
+
   return {
-    player: inputName,
+    player: displayPlayer,
     teamName,
     shortName,
     winRate: leagueRecord.winRate,
@@ -395,11 +412,11 @@ module.exports = {
           inline: true
         },
         {
-          name: `${safeEmoji(E.rank, '🏅')} Impact Score`,
+          name: `${safeEmoji(E.fire, '🔥')} Profile Snapshot`,
           value:
-            `**G/A:** ${totalGA}\n` +
-            `**Score:** ${winContribution}\n` +
-            `**Badges:** ${summary.badgeCount}`,
+            `${safeEmoji(E.goal, '⚽')} **Goals + Assists:** ${summary.totalGA}\n` +
+            `${safeEmoji(E.rank, '🏅')} **Impact Score:** ${summary.impactScore}\n` +
+            `${safeEmoji(E.Badge, '🏅')} **Badge Count:** ${summary.badgeCount}`,
           inline: true
         },
         {
@@ -409,7 +426,7 @@ module.exports = {
             `${safeEmoji(E.assist, '🎯')} **Assists:** ${assists.value} (#${assists.rank}) ${rankBadge(assists.rank)}\n` +
             `${safeEmoji(E.fire, '🔥')} **G/A:** ${ga.value} (#${ga.rank}) ${rankBadge(ga.rank)}\n` +
             `${safeEmoji(E.mvp, '⭐')} **MVP:** ${mvp.value} (#${mvp.rank}) ${rankBadge(mvp.rank)}`,
-          inline: false
+          inline: true
         },
         {
           name: `${safeEmoji(E.defense, '🛡️')} Defensive Stats`,
@@ -417,15 +434,7 @@ module.exports = {
             `${safeEmoji(E.tackle, '🛡️')} **Tackles:** ${extraStats.tackles}\n` +
             `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions}\n` +
             `${safeEmoji(E.save, '🧤')} **Saves:** ${extraStats.saves}`,
-          inline: false
-        },
-        {
-          name: `${safeEmoji(E.fire, '🔥')} Profile Snapshot`,
-          value:
-            `${safeEmoji(E.goal, '⚽')} **Goals + Assists:** ${summary.totalGA}\n` +
-            `${safeEmoji(E.rank, '🏅')} **Impact Score:** ${summary.impactScore}\n` +
-            `${safeEmoji(E.Badge, '🏅')} **Badge Count:** ${summary.badgeCount}`,
-          inline: false
+          inline: true
         },
         {
           name: `${safeEmoji(E.Badge, '🏅')} Badges`,
