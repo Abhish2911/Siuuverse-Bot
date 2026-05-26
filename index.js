@@ -5,6 +5,27 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 
+const express = require('express');
+
+function startHealthServer() {
+  const app = express();
+  const port = process.env.PORT || 10000;
+
+  app.get('/', (req, res) => {
+    res.status(200).send('SiuuVerse bot is running.');
+  });
+
+  app.get('/health', (req, res) => {
+    res.status(200).json({ ok: true, service: 'siuuverse-bot' });
+  });
+
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`🌐 Health server listening on port ${port}`);
+  });
+}
+
+startHealthServer();
+
 function ensureGoogleCredentialsFile() {
   const credentials = process.env.GOOGLE_CREDENTIALS;
 
@@ -67,22 +88,53 @@ async function connectMongo() {
 client.commands = new Collection();
 
 async function safeReply(interaction, payload) {
-  if (interaction.deferred || interaction.replied) {
-    return interaction.editReply(payload);
-  }
+  try {
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply(payload);
+    }
 
-  return interaction.reply(payload);
+    return await interaction.reply(payload);
+  } catch (error) {
+    if (error?.code === 10062 || error?.code === 40060) {
+      console.warn(`⚠️ Interaction reply skipped: ${error.message}`);
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 async function safeDeferReply(interaction) {
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply();
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply();
+    }
+
+    return true;
+  } catch (error) {
+    if (error?.code === 10062 || error?.code === 40060) {
+      console.warn(`⚠️ Interaction defer skipped: ${error.message}`);
+      return false;
+    }
+
+    throw error;
   }
 }
 
 async function safeDeferUpdate(interaction) {
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferUpdate();
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferUpdate();
+    }
+
+    return true;
+  } catch (error) {
+    if (error?.code === 10062 || error?.code === 40060) {
+      console.warn(`⚠️ Interaction update defer skipped: ${error.message}`);
+      return false;
+    }
+
+    throw error;
   }
 }
 
@@ -109,7 +161,7 @@ for (const file of commandFiles) {
 client.once('clientReady', async () => {
   console.log(`🚀 Bot ready: ${client.user.tag}`);
   console.log(`📢 Weekly summary channel: ${process.env.WEEKLY_SUMMARY_CHANNEL_ID || 'NOT SET'}`);
-  console.log(`📝 Audit log channel: ${process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || 'NOT SET'}`);
+  console.log(`📝 Audit log config: ${process.env.AUDIT_LOG_CHANNELS || process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || process.env.AUDIT_LOG_CHANNEL_ID || 'NOT SET'}`);
 
   const restoreCommands = [
     'setlivestats',
@@ -140,7 +192,9 @@ client.on('interactionCreate', async interaction => {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
 
-      await safeDeferReply(interaction);
+      const deferred = await safeDeferReply(interaction);
+      if (!deferred) return;
+
       const result = await command.execute(interaction);
 
       if (result) {
@@ -178,7 +232,9 @@ client.on('interactionCreate', async interaction => {
         const command = client.commands.get('replaceteam');
         if (!command || !command.buttonHandler) return;
 
-        await safeDeferUpdate(interaction);
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
           await interaction.message.edit(result);
@@ -191,7 +247,9 @@ client.on('interactionCreate', async interaction => {
         const command = client.commands.get('addteamlogo');
         if (!command || !command.buttonHandler) return;
 
-        await safeDeferUpdate(interaction);
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
           await interaction.message.edit(result);
@@ -202,7 +260,9 @@ client.on('interactionCreate', async interaction => {
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
-      await safeDeferUpdate(interaction);
+      const deferred = await safeDeferUpdate(interaction);
+      if (!deferred) return;
+
       const result = await command.buttonHandler(interaction, action, value, extra);
 
       if (result) {
@@ -215,7 +275,8 @@ client.on('interactionCreate', async interaction => {
     // Dropdowns
     // =========================
     if (interaction.isStringSelectMenu()) {
-      await safeDeferUpdate(interaction);
+      const deferred = await safeDeferUpdate(interaction);
+      if (!deferred) return;
 
       // stats dropdown handler
       if (interaction.customId === 'stats_select') {
@@ -300,11 +361,11 @@ client.on('interactionCreate', async interaction => {
           content: `❌ Error occurred while executing command\n\`${error.message || 'Unknown error'}\``
         });
       } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
-        if (interaction.message?.editable) {
+        if (interaction.deferred || interaction.replied) {
           await interaction.followUp({
             content: `❌ Action failed: ${error.message || 'Unknown error'}`,
             ephemeral: true
-          });
+          }).catch(() => null);
         }
       }
     } catch (replyError) {
