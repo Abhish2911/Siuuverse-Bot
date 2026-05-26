@@ -655,7 +655,7 @@ module.exports = {
 
     if (!currentRoundFixtures.length) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} No ${currentRoundLabel} fixtures found in ${config.label} fixtures sheet.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} No ${currentRoundLabel} fixtures found in ${config.label} fixtures.`
       };
     }
 
