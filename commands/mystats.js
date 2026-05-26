@@ -420,6 +420,11 @@ module.exports = {
           inline: true
         },
         {
+          name: '━━━━━━━━━━━━━━━━━━━━',
+          value: '\u200B',
+          inline: false
+        },
+        {
           name: `${safeEmoji(E.Stats, '📊')} Attacking Stats`,
           value:
             `${safeEmoji(E.goal, '⚽')} **Goals:** ${goals.value} (#${goals.rank}) ${rankBadge(goals.rank)}\n` +
@@ -435,6 +440,11 @@ module.exports = {
             `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions}\n` +
             `${safeEmoji(E.save, '🧤')} **Saves:** ${extraStats.saves}`,
           inline: true
+        },
+        {
+          name: '━━━━━━━━━━━━━━━━━━━━',
+          value: '\u200B',
+          inline: false
         },
         {
           name: `${safeEmoji(E.Badge, '🏅')} Badges`,
