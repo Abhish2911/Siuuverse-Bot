@@ -135,8 +135,26 @@ registerCacheInvalidator(payload => {
   }
 });
 
+function getAuditLogChannelId(interaction) {
+  const guildId = String(interaction?.guild?.id || '').trim();
+  const mappedChannels = String(process.env.AUDIT_LOG_CHANNELS || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  for (const item of mappedChannels) {
+    const [mappedGuildId, mappedChannelId] = item.split(':').map(value => String(value || '').trim());
+
+    if (mappedGuildId && mappedChannelId && mappedGuildId === guildId) {
+      return mappedChannelId;
+    }
+  }
+
+  return process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || process.env.AUDIT_LOG_CHANNEL_ID || '';
+}
+
 async function sendAuditLog(interaction, payload = {}) {
-  const channelId = process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || process.env.AUDIT_LOG_CHANNEL_ID;
+  const channelId = getAuditLogChannelId(interaction);
   if (!channelId || !interaction?.client) return false;
 
   try {
@@ -213,6 +231,7 @@ module.exports = {
   buildMixedPrefixList,
   cachedGetData,
   invalidateSheetCache,
+  getAuditLogChannelId,
   sendAuditLog,
   getAllowedMatchday
 };
