@@ -288,12 +288,7 @@ function buildMystatsDescription(summary, mention, stadium) {
     `${safeEmoji(E.blueIcon, '🔵')} **User:** ${mention}\n` +
     `${safeEmoji(E.team, '👥')} **Team:** ${summary.teamName} • **${summary.shortName}**\n` +
     `🏟️ **Stadium:** ${stadium}\n` +
-    `${safeEmoji(E.fire, '🔥')} **Win Rate:** ${summary.winRate}%\n\n` +
-    `${safeEmoji(E.played, '🎮')} **Record:** ${summary.record}\n` +
-    `${safeEmoji(E.goldenBoot || E.goal, '🥇')} **Best Rank:** ${summary.leaderGoal}\n` +
-    `${safeEmoji(E.assist, '🎯')} **Playmaker Rank:** ${summary.leaderAssist}\n` +
-    `${safeEmoji(E.fire, '🔥')} **G/A Rank:** ${summary.leaderGa}\n` +
-    `${safeEmoji(E.mvp, '⭐')} **MVP Rank:** ${summary.leaderMvp}`
+    `${safeEmoji(E.fire, '🔥')} **Win Rate:** ${summary.winRate}%\n\n`
   );
 }
 
