@@ -340,7 +340,7 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
   }
 
   if (!team) {
-    return { content: `${safeEmoji(E.wrong, '❌')} Could not find a team for **${targetText || 'you'}**. Check Teams sheet player name / Discord ID.` };
+    return { content: `${safeEmoji(E.wrong, '❌')} Could not find a team for **${targetText || 'you'}**. Check Teams player name / Discord ID.` };
   }
 
   const teamKey = normalize(team.teamName);
