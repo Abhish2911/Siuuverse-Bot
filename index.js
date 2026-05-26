@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const express = require('express');
+const { sendAuditLog } = require('./utils/helpers');
 
 function startHealthServer() {
   const app = express();
@@ -196,6 +197,15 @@ client.on('interactionCreate', async interaction => {
       if (!deferred) return;
 
       const result = await command.execute(interaction);
+
+      sendAuditLog(interaction, {
+        title: '📝 Command Used',
+        description:
+          `**Command:** /${interaction.commandName}\n` +
+          `**User:** ${interaction.user} (${interaction.user.id})\n` +
+          `**Channel:** <#${interaction.channelId}>`,
+        color: 0x5865F2
+      }).catch(error => console.error('❌ Audit log failed:', error));
 
       if (result) {
         await safeReply(interaction, result);
