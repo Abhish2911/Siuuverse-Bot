@@ -297,6 +297,12 @@ module.exports = {
         .setName('name')
         .setDescription('Player name. Leave empty to show your linked player')
         .setRequired(false)
+    )
+    .addUserOption(opt =>
+      opt
+        .setName('user')
+        .setDescription('Mention a user to show their linked player stats')
+        .setRequired(false)
     ),
 
   async execute(interaction) {
@@ -308,14 +314,27 @@ module.exports = {
     ]);
 
     let inputName = interaction.options.getString('name');
+    const targetUser = interaction.options.getUser('user');
     let teamData = null;
+
+    if (targetUser) {
+      teamData = getTeamDataFromUserId(teams, targetUser.id);
+
+      if (!teamData) {
+        return {
+          content: `${safeEmoji(E.wrong, '❌')} No coop player linked to ${targetUser}. Add their Discord ID in **Teams** first.`
+        };
+      }
+
+      inputName = teamData.player;
+    }
 
     if (!inputName) {
       teamData = getTeamDataFromUserId(teams, interaction.user.id);
 
       if (!teamData) {
         return {
-          content: `${safeEmoji(E.wrong, '❌')} No coop player linked to you. Use \`/player name:<player>\` or add your Discord ID in **Teams**.`
+          content: `${safeEmoji(E.wrong, '❌')} No coop player linked to you. Use \`/mystats name:<player>\` or add your Discord ID in **Teams**.`
         };
       }
 
