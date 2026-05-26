@@ -541,7 +541,7 @@ module.exports = {
       const standingsSheet = await cachedGetData(config.groupStandingsSheet).catch(() => []);
 
       if (!Array.isArray(standingsSheet) || standingsSheet.length <= 1) {
-        return { content: `${safeEmoji(E.wrong || E.error, '❌')} UCL group standings sheet is empty.` };
+        return { content: `${safeEmoji(E.wrong || E.error, '❌')} UCL group standings is empty.` };
       }
 
       const qualifiedResult = getUclQualifiedTeamsFromStandings(standingsSheet);
