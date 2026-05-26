@@ -127,7 +127,7 @@ module.exports = {
     ]);
 
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
-      return { content: `${safeEmoji(E.wrong, '❌')} Fixtures sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong, '❌')} Fixtures is empty.` };
     }
 
     const active = getAllowedMatchday(fixtures);
