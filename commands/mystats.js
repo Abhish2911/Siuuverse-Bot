@@ -112,7 +112,6 @@ function buildBadges(goals, assists, ga, mvp, extraStats) {
   if (extraStats.tackles >= 25 && extraStats.interceptions >= 25) badges.push(`${safeEmoji(E.defense, '🛡️')} Defensive Wall`);
   if (extraStats.tackles >= 50 && extraStats.interceptions >= 50) badges.push(`🚫 Lockdown Defender`);
 
-  if (extraStats.saves >= 10) badges.push(`${safeEmoji(E.save, '🧤')} Shot Stopper`);
 
   return badges.length ? badges.join('\n') : 'No badges yet';
 }
@@ -180,7 +179,7 @@ function findHeaderIndex(headers, keywords) {
 }
 
 function sumExtraStats(matchesEntry, playerName, teamData = null) {
-  const totals = { tackles: 0, interceptions: 0, saves: 0 };
+  const totals = { tackles: 0, interceptions: 0 };
   if (!Array.isArray(matchesEntry) || matchesEntry.length <= 1) return totals;
 
   const playerKey = normalize(playerName);
@@ -203,13 +202,11 @@ function sumExtraStats(matchesEntry, playerName, teamData = null) {
     if (isHomePlayer || appearsInText) {
       totals.tackles += toNumber(row[10]);
       totals.interceptions += toNumber(row[12]);
-      totals.saves += toNumber(row[14]);
     }
 
     if (isAwayPlayer || appearsInText) {
       totals.tackles += toNumber(row[11]);
       totals.interceptions += toNumber(row[13]);
-      totals.saves += toNumber(row[15]);
     }
   });
 
@@ -276,8 +273,7 @@ function buildMystatsSummary(inputName, teamData, leagueRecord, goals, assists, 
     impactScore,
     badgeCount,
     tackles: extraStats.tackles,
-    interceptions: extraStats.interceptions,
-    saves: extraStats.saves
+    interceptions: extraStats.interceptions
   };
 }
 
@@ -432,8 +428,7 @@ module.exports = {
           name: `${safeEmoji(E.defense, '🛡️')} Defensive Stats`,
           value:
             `${safeEmoji(E.tackle, '🛡️')} **Tackles:** ${extraStats.tackles}\n` +
-            `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions}\n` +
-            `${safeEmoji(E.save, '🧤')} **Saves:** ${extraStats.saves}`,
+            `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions}`,
           inline: true
         },
         {
