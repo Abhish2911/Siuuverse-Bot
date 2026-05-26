@@ -1,0 +1,98 @@
+module.exports = {
+  // Awards / stats
+  goal: '<:goal:1500789713307439104>',
+  goldenBoot: '<:GoldenBoot:1500762228058488862>',
+  playmaker: '<:Playmaker:1500763087370850455>',
+  assist: '<:assist:1500749802906976307>',
+  mvp: '<:mvp:1500762394148864060>',
+  tackle: '<:tackle:1500762634952245298>',
+  save: '<:save:1500763133646733342>',
+  interception: '🧠',
+  fire: '<:fire:1500838844696625315>',
+  trophy_animated: '<a:trophy_animated:1504028182032945202>',
+  trophy_animated_2: '<a:trophy_animated:1501132320751489084>',
+  Carabao: '<:Carabao:1501131865312985090>', 
+  FA: '<:FA:1504028921002328084>', 
+  PL: '<:PL:1501131976994717757>', 
+  Trophy_icon: '<:Trophy_icon:1501131460860710985>',
+  UCL: '<:UCL:1504028660858884138>',
+  Badge: '<:Badge:1501132037145493649>',
+  team: '<:team:1501533460748304486>',
+  league: '<:league:1501526453118963742>',
+  rank: '<:rank:1501526236445409300>',
+  Stats: '<:stats:1501534348246257687>',
+  profile: '<:profile:1501539863822991371>',
+  defense: '<:defense:1501540615110918175>',
+  leftArrow: '<:left_arrow:1501617485932265482>',
+  rightArrow: '<:right_arrow:1501617353715089529>',
+  captain: '<:captain:1501829392567894069>',
+  runnerUp: '<a:runnerup_medal:1504026340322443415>',
+  winner: '<a:winner_medal:1504026302255075440>',
+  // Aliases for awards and UI
+  archive: '<:stats:1501534348246257687>',
+  trophy: '<:Trophy_icon:1501131460860710985>',
+  medal: '<:rank:1501526236445409300>',
+  badge: '<:Badge:1501132037145493649>',
+  relegated: '<:down_fall:1500764223742148698>',
+  coop: '<:team:1501533460748304486>',
+  duel: '<:vs:1500854672183918633>',
+  globe: '<:league:1501526453118963742>',
+  warning: '<:wrong:1500764039049908286>',
+  goalkeeper: '<:save:1500763133646733342>',
+  bestDefender: '<:defense:1501540615110918175>',
+  leagueWinner: '<a:winner_medal:1504026302255075440>',
+  leagueRunnerUp: '<a:runnerup_medal:1504026340322443415>',
+
+  // Cards / discipline
+  yellowCard: '<:YellowCard:1500762853701849180>',
+  redCard: '<:RedCard:1500762638949548115>',
+  yellowRedCard: '<:Yellow_Card_Red_Card:1500762964435931206>',
+  ban: '<:ban:1500761836516278324>',
+  suspend: '<:suspend:1500762621681471600>',
+  fairplay: '<:fairplay:1500762085834096712>',
+
+  // Result status
+  win: '<:win:1500762856025751553>',
+  draw: '<:draw:1500761925280075796>',
+  lose: '<:lose:1500762409261072435>',
+  played: '<:played:1500762396199882835>',
+  correct: '<:correct:1500764652014141561>',
+  wrong: '<:wrong:1500764039049908286>',
+  missing: '<:missing:1500764082129862828>',
+  equal: '<:equal:1500764562205708349>',
+  calendar: '<:Calender:1500803864675483732>',
+  lock: '<:lock:1500805293754290217>',
+  vs: '<:vs:1500854672183918633>',
+
+  // NEW (add these)
+
+  confirm: '<:correct:1500764652014141561>',
+  cancel: '<:wrong:1500764039049908286>',
+
+  // Movement / arrows
+  up: '<:up_rise:1500764175985545286>',
+  down: '<:down_fall:1500764223742148698>',
+  underArrow: '<:under_arrow:1500787048121110769>',
+  longArrow: '<:DirectLong_Arrow:1500786933109100644>',
+  shortArrow: '<:DirectShort_arrow:1500786979892363335>',
+  doubleArrow: '<:Double_WhiteArrow:1500786889622556724>',
+
+  // Colored icons
+  redIcon: '<:red_icon:1500750038572466218>',
+  yellowIcon: '<:yellow_icon:1500764297561899118>',
+  blueIcon: '<:blue_icon:1500764500918272000>',
+  greenIcon: '<:green_icon:1500764609819181066>',
+
+  // Aliases for easier command usage
+  scorer: '<:GoldenBoot:1500762228058488862>',
+  golden: '<:GoldenBoot:1500762228058488862>',
+  goldenBootStat: '<:GoldenBoot:1500762228058488862>',
+  yellow: '<:YellowCard:1500762853701849180>',
+  red: '<:RedCard:1500762638949548115>',
+  fairPlay: '<:fairplay:1500762085834096712>',
+  success: '<:correct:1500764652014141561>',
+  error: '<:wrong:1500764039049908286>',
+  unavailable: '<:missing:1500764082129862828>',
+  hot: '<:fire:1500838844696625315>',
+  locked: '<:lock:1500805293754290217>'
+};

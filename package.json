@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy.js",
+    "dev": "npx nodemon index.js"
+  },
+  "dependencies": {
+    "mongoose": "^9.6.2"
+  }
+}
