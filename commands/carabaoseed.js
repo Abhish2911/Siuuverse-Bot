@@ -102,8 +102,8 @@ function buildSeedSummary(rows, activeTeams) {
 
 function buildSeedDescription(isGenerated = false) {
   const base = isGenerated
-    ? `${safeEmoji(E.correct, '✅')} Carabao Cup seeds were generated from Power Rank and saved into the Teams sheet.\n`
-    : `${safeEmoji(E.info || E.Badge, '📌')} Current Carabao Cup seeds loaded from the Teams sheet.\n`;
+    ? `${safeEmoji(E.correct, '✅')} Carabao Cup seeds were generated from Power Rank and saved into the Teams.\n`
+    : `${safeEmoji(E.info || E.Badge, '📌')} Current Carabao Cup seeds loaded from the Teams.\n`;
 
   return (
     base +
@@ -117,7 +117,7 @@ function buildSeedDescription(isGenerated = false) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('carabaoseed')
-    .setDescription('Generate or view Carabao Cup seeds from the Teams sheet')
+    .setDescription('Generate or view Carabao Cup seeds from the Teams')
     .addSubcommand(subcommand =>
       subcommand
         .setName('generate')
@@ -126,7 +126,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription('View current Carabao Cup seeds from the Teams sheet')
+        .setDescription('View current Carabao Cup seeds from the Teams')
     ),
 
   async execute(interaction) {
@@ -134,7 +134,7 @@ module.exports = {
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is empty.` };
     }
 
     const header = teamsSheet[0];
@@ -149,7 +149,7 @@ module.exports = {
       headerMap.carabaoStatus === -1
     ) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is missing one of these columns: Team Name, Short Name, Power Rank, Carabao Seed, Carabao Status.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is missing one of these columns: Team Name, Short Name, Power Rank, Carabao Seed, Carabao Status.`
       };
     }
 
@@ -219,7 +219,7 @@ module.exports = {
 
     sendAuditLog(interaction, {
       title: '🏆 Carabao Cup Seeds Generated',
-      description: 'Carabao Cup seeds were generated from Power Rank and saved into Teams sheet.',
+      description: 'Carabao Cup seeds were generated from Power Rank and saved into Teams.',
       color: 0x5865F2,
       fields: [
         { name: 'Active Teams', value: String(activeCarabaoTeams.length), inline: true },
