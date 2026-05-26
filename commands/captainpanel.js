@@ -287,7 +287,7 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
   ]);
 
   if (!Array.isArray(teams) || teams.length <= 1) {
-    return { content: `${E.wrong} Teams sheet is empty.` };
+    return { content: `${E.wrong} Teams is empty.` };
   }
 
   const teamRows = teams.slice(1).filter(row => row[0]);
@@ -298,7 +298,7 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
       embeds: [
         new EmbedBuilder()
           .setTitle(`${E.lock} Captain Panel`)
-          .setDescription('You are not registered as a team captain in the Teams sheet.')
+          .setDescription('You are not registered as a team captain in the Teams.')
           .setColor(0xE74C3C)
       ],
       components: []
