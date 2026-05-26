@@ -104,7 +104,7 @@ function buildRecordsSummary(players, teams, rawPlayers, rawTeams) {
 
 function buildRecordsDescription(summary) {
   return (
-    `${safeEmoji(E.Stats, '📊')} **Historic all-competition records from archive sheets**\n` +
+    `${safeEmoji(E.Stats, '📊')} **Historic all-competition records from archive**\n` +
     `All-time player and club record leaders across scoring, awards, trophies, fair play and league achievements.\n\n` +
     `${safeEmoji(E.profile, '👤')} **Player Rows:** ${summary.playerRows}\n` +
     `${safeEmoji(E.team, '👥')} **Team Rows:** ${summary.teamRows}\n` +
