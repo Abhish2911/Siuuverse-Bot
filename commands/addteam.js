@@ -71,7 +71,7 @@ function buildAddTeamSummary(name, short, players, captain, users, teamId) {
 function buildAddTeamDescription(summary) {
   return (
     `✅ **Team Added Successfully**\n` +
-    `The new team was added to the Teams sheet.\n\n` +
+    `The new team was added to the Teams.\n\n` +
     `🏷️ **Team:** ${summary.name}\n` +
     `🔤 **Short Name:** ${summary.short}\n` +
     `🆔 **Team ID:** ${summary.teamId}\n` +
@@ -208,7 +208,7 @@ module.exports = {
 
     sendAuditLog(interaction, {
       title: '✅ Team Added',
-      description: `**${name}** was added to the Teams sheet.`,
+      description: `**${name}** was added to the Teams.`,
       color: 0x2ECC71,
       fields: [
         { name: '🔤 Short Name', value: short || 'N/A', inline: true },
