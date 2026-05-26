@@ -131,7 +131,7 @@ const buildMatchdaySummary = (activeMD, rows, completed, remaining, percent, nex
 const buildMatchdayDescription = summary => {
   return (
     `${safeEmoji(E.calendar, '📅')} **Current Active Matchday**\n` +
-    `Automatic league matchday tracker based on played and remaining fixtures from the Fixtures sheet.\n\n` +
+    `Automatic league matchday tracker based on played and remaining fixtures from the Fixtures.\n\n` +
     `${safeEmoji(E.calendar, '📅')} **Matchday:** ${summary.activeMD}\n` +
     `${safeEmoji(E.played, '🎮')} **Total Fixtures:** ${summary.total}\n` +
     `${safeEmoji(E.correct, '✅')} **Completed:** ${summary.completed}\n` +
@@ -153,7 +153,7 @@ module.exports = {
     const teams = await cachedGetData('Teams!A:H');
 
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
-      return { content: `${safeEmoji(E.wrong, '❌')} Fixtures sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong, '❌')} Fixtures is empty.` };
     }
 
     const allowedMD = getAllowedMatchday(fixtures);
