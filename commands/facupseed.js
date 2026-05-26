@@ -103,8 +103,8 @@ function buildSeedSummary(rows, activeTeams) {
 
 function buildSeedDescription(isGenerated = false) {
   const base = isGenerated
-    ? `${safeEmoji(E.correct, '✅')} FA Cup seeds were generated from Power Rank and saved into the Teams sheet.\n`
-    : `${safeEmoji(E.info || E.Badge, '📌')} Current FA Cup seeds loaded from the Teams sheet.\n`;
+    ? `${safeEmoji(E.correct, '✅')} FA Cup seeds were generated from Power Rank and saved into the Teams.\n`
+    : `${safeEmoji(E.info || E.Badge, '📌')} Current FA Cup seeds loaded from the Teams.\n`;
 
   return (
     base +
@@ -118,7 +118,7 @@ function buildSeedDescription(isGenerated = false) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('facupseed')
-    .setDescription('Generate or view FA Cup seeds from the Teams sheet')
+    .setDescription('Generate or view FA Cup seeds from the Teams')
     .addSubcommand(subcommand =>
       subcommand
         .setName('generate')
@@ -127,7 +127,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription('View current FA Cup seeds from the Teams sheet')
+        .setDescription('View current FA Cup seeds from the Teams')
     ),
 
   async execute(interaction) {
@@ -135,7 +135,7 @@ module.exports = {
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is empty.` };
     }
 
     const header = teamsSheet[0];
@@ -150,7 +150,7 @@ module.exports = {
       headerMap.faStatus === -1
     ) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is missing one of these columns: Team Name, Short Name, Power Rank, FA Cup Seed, FA Status.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is missing one of these columns: Team Name, Short Name, Power Rank, FA Cup Seed, FA Status.`
       };
     }
 
@@ -220,7 +220,7 @@ module.exports = {
 
     sendAuditLog(interaction, {
       title: '🏆 FA Cup Seeds Generated',
-      description: 'FA Cup seeds were generated from Power Rank and saved into Teams sheet.',
+      description: 'FA Cup seeds were generated from Power Rank and saved into Teams.',
       color: 0x5865F2,
       fields: [
         { name: 'Active Teams', value: String(activeFaTeams.length), inline: true },
