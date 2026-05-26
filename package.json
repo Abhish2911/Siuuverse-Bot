@@ -5,10 +5,14 @@
     "dev": "npx nodemon index.js"
   },
   "dependencies": {
+    "discord.js": "^14.26.4",
     "dotenv": "^17.4.2",
+    "gaxios": "^7.1.4",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^172.0.0",
     "mongoose": "^9.6.2"
   },
   "engines": {
     "node": "20.x"
-}
+  }
 }
