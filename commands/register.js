@@ -6,6 +6,7 @@ const E = require('../utils/emojis');
 const COOP_TEAM_LIMIT = Number.parseInt(process.env.COOP_TEAM_LIMIT || '8', 10);
 const COOP_PLAYER_ROLE_ID = String(process.env.COOP_PLAYER_ROLE_ID || '').trim();
 const COOP_CAPTAIN_ROLE_ID = String(process.env.COOP_CAPTAIN_ROLE_ID || '').trim();
+const COOP_REGISTRATION_OPEN = String(process.env.COOP_REGISTRATION_OPEN || 'true').trim().toLowerCase() !== 'false';
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
@@ -154,6 +155,12 @@ module.exports = {
 
   async execute(interaction) {
     const teamName = String(interaction.options.getString('team') || '').trim();
+    if (!COOP_REGISTRATION_OPEN) {
+      return sendReply(interaction, {
+        content: `${E.lock} Coop team registrations are currently closed.`,
+        ephemeral: true
+      });
+    }
     const shortName = String(interaction.options.getString('short') || '').trim().toUpperCase();
     const playerName = String(interaction.options.getString('player') || '').trim();
     const stadium = String(interaction.options.getString('stadium') || 'Not set').trim();
