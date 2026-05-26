@@ -455,7 +455,7 @@ function buildAdvanceDescription(config, currentRoundLabel, nextRoundLabel, isPr
   if (isPreview) {
     return (
       `${safeEmoji(E.calendar, '📅')} Previewing ${config.label} progression from **${currentRoundLabel}** to **${nextRoundLabel}**.\n` +
-      `${safeEmoji(E.info || E.Badge, '📌')} No sheet data will be changed until you run the real advance command.`
+      `${safeEmoji(E.info || E.Badge, '📌')} No data will be changed until you run the real advance command.`
     );
   }
 
@@ -563,7 +563,7 @@ module.exports = {
               .setDescription(
                 `${safeEmoji(E.UCL || E.trophy_animated, '🏆')} UCL group-stage qualification preview.\n` +
                 `${safeEmoji(E.correct, '✅')} Top 2 from each group + best 2 third-place teams qualify.\n` +
-                `${safeEmoji(E.info || E.Badge, '📌')} No sheet data will be changed until you run without preview.`
+                `${safeEmoji(E.info || E.Badge, '📌')} No data will be changed until you run without preview.`
               )
               .addFields(
                 { name: 'Qualified Teams', value: qualifiedResult.teams.map(team => `\`${team.shortName}\` ${team.teamName}`).join('\n'), inline: false },
@@ -629,7 +629,7 @@ module.exports = {
     const fixturesSheet = await cachedGetData(config.sheet).catch(() => []);
 
     if (!Array.isArray(fixturesSheet) || fixturesSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} ${config.label} fixtures sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong || E.error, '❌')} ${config.label} fixtures is empty.` };
     }
 
     const rows = fixturesSheet
