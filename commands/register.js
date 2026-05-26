@@ -213,6 +213,7 @@ module.exports = {
     const existingTeam = rows.find(r => normalize(r[0]) === normalize(teamName));
     const existingShort = rows.find(r => normalize(r[2]) === normalize(shortName));
 
+    const teamIdMapRows = cleanRows(teamIdRows);
     const isClaimingPreviousTeam = Boolean(previousTeamInput || previousShortInput);
     const mapIndex = findTeamIdMapIndex(teamIdMapRows, teamName, shortName, previousTeam, previousShort);
     const existingMapRow = mapIndex !== -1 ? teamIdMapRows[mapIndex] : null;
