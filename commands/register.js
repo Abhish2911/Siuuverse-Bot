@@ -43,6 +43,27 @@ function generateNextTeamId(teamIdRows) {
   return `T${String(maxNumber + 1).padStart(3, '0')}`;
 }
 
+function findTeamIdMapIndex(teamIdMapRows, teamName, shortName, previousTeam, previousShort) {
+  const teamKey = normalize(teamName);
+  const shortKey = normalize(shortName);
+  const previousTeamKey = normalize(previousTeam);
+  const previousShortKey = normalize(previousShort);
+
+  return teamIdMapRows.findIndex(row => {
+    const currentShort = normalize(row[0]);
+    const currentTeam = normalize(row[2]);
+    const oldTeam = normalize(row[3]);
+    const oldShort = normalize(row[4]);
+
+    return (
+      (previousTeamKey && (currentTeam === previousTeamKey || oldTeam === previousTeamKey)) ||
+      (previousShortKey && (currentShort === previousShortKey || oldShort === previousShortKey)) ||
+      (teamKey && currentTeam === teamKey) ||
+      (shortKey && currentShort === shortKey)
+    );
+  });
+}
+
 async function addRole(member, roleId) {
   if (!member || !roleId) return false;
   if (member.roles.cache.has(roleId)) return true;
@@ -192,9 +213,9 @@ module.exports = {
     const existingTeam = rows.find(r => normalize(r[0]) === normalize(teamName));
     const existingShort = rows.find(r => normalize(r[2]) === normalize(shortName));
 
-    const teamIdMapRows = cleanRows(teamIdRows);
-    const existingMapTeam = teamIdMapRows.find(r => normalize(r[2]) === normalize(teamName));
-    const existingMapShort = teamIdMapRows.find(r => normalize(r[0]) === normalize(shortName));
+    const isClaimingPreviousTeam = Boolean(previousTeamInput || previousShortInput);
+    const mapIndex = findTeamIdMapIndex(teamIdMapRows, teamName, shortName, previousTeam, previousShort);
+    const existingMapRow = mapIndex !== -1 ? teamIdMapRows[mapIndex] : null;
 
     const existingCaptain = rows.find(r => {
       const captain = cleanId(r[4]);
@@ -227,16 +248,13 @@ module.exports = {
       });
     }
 
-    if (existingMapTeam) {
+    if (isClaimingPreviousTeam && !existingMapRow) {
       return sendReply(interaction, {
-        content: `${E.wrong} Team already exists in Team_ID_Map.`,
-        ephemeral: true
-      });
-    }
-
-    if (existingMapShort) {
-      return sendReply(interaction, {
-        content: `${E.wrong} Short name already exists in Team_ID_Map.`,
+        content:
+          `${E.wrong} Previous team/short was not found in **Team_ID_Map**.\n` +
+          `You entered previous team: **${previousTeam || 'N/A'}** and previous short: **${previousShort || 'N/A'}**.\n\n` +
+          `If this is an old club rename, first add/fix that club in **Team_ID_Map** so the same Team ID can be reused.\n` +
+          `If this is a completely new club, leave previous_team and previous_short empty.`,
         ephemeral: true
       });
     }
@@ -248,7 +266,7 @@ module.exports = {
       });
     }
 
-    const teamId = generateNextTeamId(teamIdRows);
+    const teamId = String(existingMapRow?.[1] || '').trim() || generateNextTeamId(teamIdRows);
 
     // captain is automatically the user running the command
     rows.push([
@@ -261,8 +279,17 @@ module.exports = {
       stadium
     ]);
 
+    const nextTeamIdMapRows = teamIdMapRows.map(row => [...row]);
+    const nextMapRow = [shortName, teamId, teamName, previousTeam, previousShort];
+
+    if (mapIndex !== -1) {
+      nextTeamIdMapRows[mapIndex] = nextMapRow;
+    } else {
+      nextTeamIdMapRows.push(nextMapRow);
+    }
+
     await updateData('Teams!A2:G', rows);
-    await appendData('Team_ID_Map!A:E', [[shortName, teamId, teamName, previousTeam, previousShort]]);
+    await updateData('Team_ID_Map!A2:E', nextTeamIdMapRows);
 
     invalidateSheetCache([
       'Teams!',
@@ -324,7 +351,7 @@ module.exports = {
         { name: '🎭 Roles', value: `Player: ${summary.playerRoleText}\nCaptain: ${summary.captainRoleText}`, inline: true }
       )
       .setColor(0x2ECC71)
-      .setFooter({ text: 'Register • Teams + Team_ID_Map updated' });
+      .setFooter({ text: existingMapRow ? 'Register • Existing Team ID reused + Team_ID_Map updated' : 'Register • New Team ID created + Team_ID_Map updated' });
 
     if (logo) embed.setThumbnail(logo);
 
