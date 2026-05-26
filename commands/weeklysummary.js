@@ -325,7 +325,7 @@ function buildWeeklyOverview(md, completedMatchdays, mdMatches, suspended, top3,
 function buildWeeklyDescription(overview) {
   return (
     `${safeEmoji(E.calendar, '📅')} **Completed Matchday Summary**\n` +
-    `Latest fully completed league matchday recap based on the current sheet data.\n\n` +
+    `Latest fully completed league matchday recap based on the current data.\n\n` +
     `${safeEmoji(E.calendar, '📅')} **Matchday:** ${overview.matchday}\n` +
     `${safeEmoji(E.correct, '✅')} **Completed Matchdays:** ${overview.completedCount}\n` +
     `${safeEmoji(E.ball || E.goal, '⚽')} **Matches Played:** ${overview.matches}\n` +
@@ -407,7 +407,7 @@ async function buildWeeklySummaryPayload(forcedMd = null) {
   ]);
 
   if (!Array.isArray(fixtures) || fixtures.length <= 1) {
-    return { error: `${E.wrong} Fixtures sheet is empty.` };
+    return { error: `${E.wrong} Fixtures is empty.` };
   }
 
   const completedMatchdays = getCompletedMatchdays(fixtures);
