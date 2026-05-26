@@ -52,14 +52,14 @@ function buildFixtureSummary(fixtures, teamCount, doubleRoundRobin) {
 function buildFixtureDescription(isGenerated = false) {
   if (isGenerated) {
     return (
-      `${safeEmoji(E.correct, '✅')} League fixtures were generated and saved into the fixtures sheet.\n` +
+      `${safeEmoji(E.correct, '✅')} League fixtures were generated and saved into the fixtures.\n` +
       `${safeEmoji(E.info || E.Badge, '📌')} Review the opening pairings below before matches begin.`
     );
   }
 
   return (
     `${safeEmoji(E.calendar, '📅')} Previewing the current generated league fixture set.\n` +
-    `${safeEmoji(E.info || E.Badge, '📌')} No sheet data will be changed until you run the generate command.`
+    `${safeEmoji(E.info || E.Badge, '📌')} No data will be changed until you run the generate command.`
   );
 }
 
@@ -97,7 +97,7 @@ module.exports = {
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is empty.` };
     }
 
     const header = teamsSheet[0];
@@ -106,7 +106,7 @@ module.exports = {
 
     if (headerMap.teamName === -1 || headerMap.shortName === -1 || headerMap.powerRank === -1) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is missing one of these columns: Team Name, Short Name, Power Rank.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is missing one of these columns: Team Name, Short Name, Power Rank.`
       };
     }
 
@@ -156,7 +156,7 @@ module.exports = {
               { name: 'Mode', value: summary.mode, inline: true },
               { name: 'Opening Matchday', value: summary.firstMatchday, inline: true },
               { name: 'Top Pairing', value: summary.topPairing, inline: true },
-              { name: 'Preview', value: 'No sheet changes', inline: true },
+              { name: 'Preview', value: 'No data changes', inline: true },
               { name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`, value: formatFixtureLines(generatedFixtures), inline: false }
             )
             .setColor(0x5865F2)
