@@ -179,8 +179,8 @@ function buildDrawSummary(teamRows, fixtures, roundLabel, grouped = null) {
 
 function buildDrawDescription(roundLabel, isGenerated = false) {
   const base = isGenerated
-    ? `${safeEmoji(E.correct, '✅')} FA Cup QFQ-format draw was generated and saved into the fixtures sheet.\n`
-    : `${safeEmoji(E.info || E.Badge, '📌')} Current FA Cup fixtures loaded from the sheet.\n`;
+    ? `${safeEmoji(E.correct, '✅')} FA Cup QFQ-format draw was generated and saved into the fixtures.\n`
+    : `${safeEmoji(E.info || E.Badge, '📌')} Current FA Cup fixtures loaded from the data.\n`;
 
   return (
     base +
@@ -203,7 +203,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription('View the current FA Cup fixtures sheet draw')
+        .setDescription('View the current FA Cup fixtures draw')
     ),
 
   async execute(interaction) {
@@ -249,7 +249,7 @@ module.exports = {
               { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatDrawLines(fixtures), inline: false }
             )
             .setColor(0x5865F2)
-            .setFooter({ text: 'FA Cup Draw • Loaded from fixtures sheet' })
+            .setFooter({ text: 'FA Cup Draw • Loaded from fixtures data' })
         ]
       };
     }
@@ -261,7 +261,7 @@ module.exports = {
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is empty.` };
     }
 
     const header = teamsSheet[0];
@@ -275,7 +275,7 @@ module.exports = {
       headerMap.faSeed === -1
     ) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is missing one of these columns: Team Name, Short Name, FA Status, FA Cup Seed.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is missing one of these columns: Team Name, Short Name, FA Status, FA Cup Seed.`
       };
     }
 
@@ -336,7 +336,7 @@ module.exports = {
 
     sendAuditLog(interaction, {
       title: '🏆 FA Cup Draw Generated',
-      description: `FA Cup ${roundLabel} draw was generated from FA Cup seeds and saved into the fixtures sheet.`,
+      description: `FA Cup ${roundLabel} draw was generated from FA Cup seeds and saved into the fixtures.`,
       color: 0x5865F2,
       fields: [
         { name: 'Active Teams', value: String(activeFaTeams.length), inline: true },
