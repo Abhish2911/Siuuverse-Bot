@@ -24,6 +24,10 @@ function isValidShortName(value) {
   return /^[A-Z]{3}$/.test(String(value || '').trim().toUpperCase());
 }
 
+function isValidHexColor(value) {
+  return /^#[0-9A-Fa-f]{6}$/.test(String(value || '').trim());
+}
+
 function cleanRows(rows) {
   return Array.isArray(rows)
     ? rows.slice(1).filter(row => row.some(cell => String(cell || '').trim()))
@@ -76,13 +80,14 @@ async function sendReply(interaction, payload) {
   return payload;
 }
 
-function buildRegisterSummary(teamName, shortName, teamId, playerName, stadium, previousTeam, previousShort, playerRoleText, captainRoleText, filledTeams) {
+function buildRegisterSummary(teamName, shortName, teamId, playerName, stadium, color, previousTeam, previousShort, playerRoleText, captainRoleText, filledTeams) {
   return {
     teamName,
     shortName,
     teamId,
     playerName,
     stadium,
+    color,
     previousTeam,
     previousShort,
     playerRoleText,
@@ -98,6 +103,7 @@ function buildRegisterDescription(summary, captainId) {
     `${E.played} **Captain Player:** ${summary.playerName}\n` +
     `${E.mvp} **Captain:** <@${captainId}>\n` +
     `🏟️ **Stadium:** ${summary.stadium}\n\n` +
+    `🎨 **Color:** ${summary.color || 'Default'}\n\n` +
     `🔁 **Previous Team:** ${summary.previousTeam}\n\n` +
     `🔤 **Previous Short:** ${summary.previousShort}\n\n` +
     `${E.up} **Player Role:** ${summary.playerRoleText}\n` +
@@ -142,6 +148,12 @@ module.exports = {
     )
     .addStringOption(opt =>
       opt
+        .setName('color')
+        .setDescription('Optional team embed color hex like #5865F2')
+        .setRequired(false)
+    )
+    .addStringOption(opt =>
+      opt
         .setName('previous_team')
         .setDescription('Previous season team name, or same/current team if staying')
         .setRequired(false)
@@ -165,6 +177,7 @@ module.exports = {
     const playerName = String(interaction.options.getString('player') || '').trim();
     const stadium = String(interaction.options.getString('stadium') || 'Not set').trim();
     const logo = String(interaction.options.getString('logo') || '').trim();
+    const color = String(interaction.options.getString('color') || '').trim();
     const previousTeamInput = String(interaction.options.getString('previous_team') || '').trim();
     const previousTeam = previousTeamInput || teamName;
     const previousShortInput = String(interaction.options.getString('previous_short') || '').trim().toUpperCase();
@@ -207,8 +220,15 @@ module.exports = {
       });
     }
 
+    if (color && !isValidHexColor(color)) {
+      return sendReply(interaction, {
+        content: `${E.wrong} Invalid color. Use hex format like **#5865F2**.`,
+        ephemeral: true
+      });
+    }
+
     const [sheet, teamIdRows] = await Promise.all([
-      getData('Teams!A:G'),
+      getData('Teams!A:H'),
       getData('Team_ID_Map!A:E').catch(() => [])
     ]);
     const rows = Array.isArray(sheet)
@@ -284,7 +304,8 @@ module.exports = {
       logo,
       captainId,
       '',
-      stadium
+      stadium,
+      color
     ]);
 
     const nextTeamIdMapRows = teamIdMapRows.map(row => [...row]);
@@ -296,12 +317,13 @@ module.exports = {
       nextTeamIdMapRows.push(nextMapRow);
     }
 
-    await updateData('Teams!A2:G', rows);
+    await updateData('Teams!A2:H', rows);
     await updateData('Team_ID_Map!A2:E', nextTeamIdMapRows);
 
     invalidateSheetCache([
       'Teams!',
       'Teams!A:G',
+      'Teams!A:H',
       'Team_ID_Map!',
       'Team_ID_Map!A:E'
     ]);
@@ -337,6 +359,7 @@ module.exports = {
       teamId,
       playerName,
       stadium,
+      color,
       previousTeam,
       previousShort,
       playerRoleText,
@@ -354,11 +377,12 @@ module.exports = {
         { name: '📅 Spot', value: `**${summary.spot}**`, inline: true },
         { name: '👤 Captain Player', value: summary.playerName, inline: true },
         { name: '🏟️ Stadium', value: summary.stadium, inline: true },
+        { name: '🎨 Color', value: summary.color || 'Default', inline: true },
         { name: '🔁 Previous Team', value: summary.previousTeam, inline: true },
         { name: '🔤 Previous Short', value: summary.previousShort, inline: true },
         { name: '🎭 Roles', value: `Player: ${summary.playerRoleText}\nCaptain: ${summary.captainRoleText}`, inline: true }
       )
-      .setColor(0x2ECC71)
+      .setColor(color ? parseInt(color.replace('#', ''), 16) : 0x2ECC71)
       .setFooter({ text: existingMapRow ? 'Register • Existing Team ID reused + Team_ID_Map updated' : 'Register • New Team ID created + Team_ID_Map updated' });
 
     if (logo) embed.setThumbnail(logo);
