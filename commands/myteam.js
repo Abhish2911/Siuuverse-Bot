@@ -208,7 +208,7 @@ module.exports = {
     const teamInput = interaction.options.getString('team');
 
     const [teams, teamIdRows, standings, fairPlay, suspension, fixtures, ranking] = await Promise.all([
-      cachedGetData('Teams!A:G'),
+      cachedGetData('Teams!A:H'),
       cachedGetData('Team_ID_Map!A:E'),
       cachedGetData('Standings!A:J'),
       cachedGetData('Fair_Play!H:K'),
