@@ -404,21 +404,13 @@ module.exports = {
       .setDescription(buildTeamHubDescription(summary))
       .addFields(
         {
-          name: `${safeEmoji(E.Badge, '🏷️')} Club Identity`,
-          value:
-            `**Team ID:** ${teamId}\n` +
-            `**Current Short:** ${shortName}\n` +
-            `**Previous Short:** ${previousShort}\n` +
-            `**Previous Team:** ${previousName}`,
-          inline: false
-        },
-        {
           name: `${E.Stats} Season Stats`,
           value:
             `**Played:** ${p}\n` +
             `**Wins:** ${w}\n` +
             `**Draws:** ${d}\n` +
-            `**Losses:** ${l}`,
+            `**Losses:** ${l}\n` +
+            `**Record:** ${w}W / ${d}D / ${l}L`,
           inline: true
         },
         {
