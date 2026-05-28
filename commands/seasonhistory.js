@@ -47,13 +47,6 @@ function textAt(row, index, fallback = 'N/A') {
   return value || fallback;
 }
 
-function detectTeamId(row) {
-  return row
-    .map(cell => String(cell || '').trim())
-    .find(cell => /^T\d+$/i.test(cell))
-    ?.toUpperCase() || '';
-}
-
 function getSeasonLabel(value) {
   const text = String(value || '').trim();
   const match = text.match(/(\d+)/);
@@ -82,8 +75,7 @@ function buildSeasonArchiveSummary(rows, columns) {
     champion: textAt(row, columns.champion, 'N/A'),
     runnerUp: textAt(row, columns.runnerUp, 'N/A'),
     fairPlay: textAt(row, columns.fairPlay, 'N/A'),
-    type: textAt(row, columns.type, 'Coop / League'),
-    teamId: textAt(row, columns.teamId, '') || detectTeamId(row)
+    type: textAt(row, columns.type, 'Coop / League')
   }));
 
   const championLeaders = getLeaders(
@@ -176,23 +168,19 @@ function buildSeasonField(row, columns) {
   const bestGk = textAt(row, columns.bestGk, 'N/A');
   const fairPlay = textAt(row, columns.fairPlay, 'N/A');
   const type = textAt(row, columns.type, 'Coop / League');
-  const championTeamId = textAt(row, columns.teamId, '') || detectTeamId(row);
-  const championLine = championTeamId ? `${champion} • 🆔 ${championTeamId}` : champion;
-  const relegated = textAt(row, columns.relegated, 'N/A');
 
   return {
     name: `${safeEmoji(E.archive || E.calendar, '🗃️')} Season ${getSeasonLabel(season)}`,
     value:
       `${safeEmoji(E.coop || E.team, '🐉')} **${type}**\n\n` +
-      `${safeEmoji(E.trophy || E.winner || E.leagueWinner, '🏆')} **Champion:** ${championLine}\n` +
+      `${safeEmoji(E.trophy || E.winner || E.leagueWinner, '🏆')} **Champion:** ${champion}\n` +
       `${safeEmoji(E.medal || E.runnerUp, '🥈')} **Runner Up:** ${runnerUp}\n\n` +
       `${safeEmoji(E.goldenBoot || E.goal, '👟')} **Golden Boot:** ${goldenBoot}\n` +
       `${safeEmoji(E.playmaker || E.assist, '🪄')} **Playmaker:** ${playmaker}\n` +
       `${safeEmoji(E.mvp, '👑')} **MVP:** ${mvp}\n` +
       `${safeEmoji(E.bestDefender || E.defense, '🛡️')} **Best Defender:** ${bestDefender}\n` +
       `${safeEmoji(E.goalkeeper || E.save, '🧤')} **Best GK Team:** ${bestGk}\n\n` +
-      `${safeEmoji(E.fairplay || E.fairPlay, '🕊️')} **Fair Play:** ${fairPlay}\n` +
-      `${safeEmoji(E.relegated || E.down || E.lose, '🔻')} **Relegated:** ${relegated}`,
+      `${safeEmoji(E.fairplay || E.fairPlay, '🕊️')} **Fair Play:** ${fairPlay}`,
     inline: false
   };
 }
@@ -213,9 +201,7 @@ async function buildPage(page = 0) {
     bestDefender: findColumn(headerMap, ['Best Defender', 'Defender'], 6),
     bestGk: findColumn(headerMap, ['Best GK', 'Best Goalkeeper', 'Goalkeeper', 'Best GK Team'], 7),
     fairPlay: findColumn(headerMap, ['Fair Play', 'Fairplay'], 8),
-    relegated: findColumn(headerMap, ['Relegated', 'Relegated Teams'], 9),
-    type: findColumn(headerMap, ['Type', 'Competition', 'Competition Type'], 10),
-    teamId: findColumn(headerMap, ['Team ID', 'Champion Team ID', 'Winner Team ID'], -1)
+    type: findColumn(headerMap, ['Type', 'Competition', 'Competition Type'], 10)
   };
 
   const summary = buildSeasonArchiveSummary(rows, columns);
