@@ -2,8 +2,7 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
+  ButtonBuilder
 } = require('discord.js');
 
 const { cachedGetData } = require('../utils/helpers');
@@ -47,12 +46,6 @@ function getAwardEmoji(awardName) {
   return safeEmoji(E.badge || E.Badge, '🏅');
 }
 
-function getTypeEmoji(type) {
-  const t = normalize(type);
-  if (t.includes('duel')) return safeEmoji(E.duel || E.vs, '⚔️');
-  return safeEmoji(E.coop || E.team, '🤝');
-}
-
 function joinLeaders(items = [], formatter, empty = 'N/A') {
   if (!items.length) return empty;
   return items.map(formatter).join(' / ');
@@ -82,60 +75,35 @@ function buildAwardsSummary(rows = []) {
     item => mapped.filter(row => row.player === item.player).length
   );
 
-  const awardLeaders = getLeaders(
-    mapped.filter(item => item.award !== 'Award' && item.award !== 'N/A'),
-    item => mapped.filter(row => row.award === item.award).length
-  );
-
   return {
     total: rows.length,
     latestSeason: rows[0] ? `S${getSeasonNumberLabel(rows[0][0])}` : 'N/A',
     topWinner: playerLeaders.length
       ? `${joinLeaders(playerLeaders.map(item => item.player).filter((value, index, arr) => arr.indexOf(value) === index), value => value)} (${mapped.filter(row => row.player === playerLeaders[0].player).length})`
-      : 'N/A',
-    topAwardType: awardLeaders.length
-      ? `${joinLeaders(awardLeaders.map(item => item.award).filter((value, index, arr) => arr.indexOf(value) === index), value => value)} (${mapped.filter(row => row.award === awardLeaders[0].award).length})`
       : 'N/A'
   };
 }
 
-function buildAwardsDescription(summary, filter, coopCount, duelCount, currentPage, totalPages) {
+function buildAwardsDescription(summary, currentPage, totalPages) {
   return (
     `${safeEmoji(E.badge || E.Badge, '🏅')} **Archived award history**\n` +
-    `SiuuVerse seasonal award records across coop and duel competitions.\n\n` +
-    `${safeEmoji(E.badge || E.Badge, '🏅')} **All Awards:** ${summary.total}\n` +
-    `${safeEmoji(E.coop || E.team, '🤝')} **Coop Awards:** ${coopCount}\n` +
-    `${safeEmoji(E.duel || E.vs, '⚔️')} **Duel Awards:** ${duelCount}\n` +
+    `SiuuVerse seasonal award records across coop competitions.\n\n` +
+    `${safeEmoji(E.badge || E.Badge, '🏅')} **Awards Count:** ${summary.total}\n` +
     `${safeEmoji(E.calendar, '📅')} **Latest Season:** ${summary.latestSeason}\n` +
     `${safeEmoji(E.profile, '👤')} **Most Award Wins:** ${summary.topWinner}\n` +
-    `${safeEmoji(E.rank, '🏅')} **Most Repeated Award:** ${summary.topAwardType}\n` +
-    `${safeEmoji(E.page || E.calendar, '📄')} **Filter:** ${filter.toUpperCase()} • **Page:** ${currentPage + 1}/${totalPages}`
+    `${safeEmoji(E.page || E.calendar, '📄')} **Page:** ${currentPage + 1}/${totalPages}`
   );
 }
 
-function createButtons(page, totalPages, filter = 'all') {
+function createButtons(page, totalPages) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`awards_prev_${page}_${filter}`)
+      .setCustomId(`awards_prev_${page}`)
       .setEmoji('⬅️')
-      .setStyle(ButtonStyle.Secondary)
       .setDisabled(page <= 0),
     new ButtonBuilder()
-      .setCustomId(`awards_filter_all_${page}`)
-      .setLabel('All')
-      .setStyle(filter === 'all' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(`awards_filter_coop_${page}`)
-      .setLabel('Coop')
-      .setStyle(filter === 'coop' ? ButtonStyle.Success : ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(`awards_filter_duel_${page}`)
-      .setLabel('Duel')
-      .setStyle(filter === 'duel' ? ButtonStyle.Danger : ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(`awards_next_${page}_${filter}`)
+      .setCustomId(`awards_next_${page}`)
       .setEmoji('➡️')
-      .setStyle(ButtonStyle.Secondary)
       .setDisabled(page >= totalPages - 1)
   );
 }
@@ -145,8 +113,6 @@ function formatAwardField(row) {
   const player = String(row[1] || 'N/A').trim();
   const award = String(row[2] || 'Award').trim();
   const value = String(row[3] || '').trim();
-  const type = String(row[4] || 'N/A').trim();
-  const date = String(row[5] || '').trim();
 
   const seasonShort = `S${getSeasonNumberLabel(season)}`;
 
@@ -154,25 +120,17 @@ function formatAwardField(row) {
     name: `${getAwardEmoji(award)} ${award} • ${seasonShort}`,
     value:
       `${safeEmoji(E.profile, '👤')} **Winner:** ${player}\n` +
-      `${getTypeEmoji(type)} **Type:** ${type || 'N/A'}\n` +
       `${value ? `${safeEmoji(E.rank, '🏅')} **Value:** ${value}\n` : ''}` +
       `${safeEmoji(E.calendar, '📅')} **Season:** ${season}`,
     inline: false
   };
 }
 
-async function buildPage(page = 0, filter = 'all') {
+async function buildPage(page = 0) {
   const data = await cachedGetData('Awards!A:F');
   const rows = cleanRows(data);
 
-  const filtered = rows.filter(row => {
-    const type = normalize(row[4]);
-    if (filter === 'coop') return type.includes('coop');
-    if (filter === 'duel') return type.includes('duel');
-    return true;
-  });
-
-  const sorted = filtered.sort((a, b) => {
+  const sorted = rows.sort((a, b) => {
     const aSeason = Number((String(a[0] || '').match(/(\d+)/) || [0, 0])[1]);
     const bSeason = Number((String(b[0] || '').match(/(\d+)/) || [0, 0])[1]);
     return bSeason - aSeason;
@@ -183,13 +141,11 @@ async function buildPage(page = 0, filter = 'all') {
   const start = currentPage * PAGE_SIZE;
   const currentRows = sorted.slice(start, start + PAGE_SIZE);
 
-  const coopCount = rows.filter(row => normalize(row[4]).includes('coop')).length;
-  const duelCount = rows.filter(row => normalize(row[4]).includes('duel')).length;
   const summary = buildAwardsSummary(sorted);
 
   const embed = new EmbedBuilder()
     .setTitle(`${safeEmoji(E.badge || E.Badge, '🏅')} SIUUVERSE AWARDS GALLERY`)
-    .setDescription(buildAwardsDescription(summary, filter, coopCount, duelCount, currentPage, totalPages))
+    .setDescription(buildAwardsDescription(summary, currentPage, totalPages))
     .setColor(0xF39C12)
     .setFooter({ text: `Awards Gallery • Archived season awards • Page ${currentPage + 1}/${totalPages}` })
     .setTimestamp();
@@ -206,46 +162,29 @@ async function buildPage(page = 0, filter = 'all') {
   } else {
     embed.addFields({
       name: `${safeEmoji(E.wrong, '❌')} No awards found`,
-      value: 'There are no archived season awards for this filter yet.',
+      value: 'There are no archived season awards yet.',
       inline: false
     });
   }
 
   return {
     embeds: [embed],
-    components: [createButtons(currentPage, totalPages, filter)]
+    components: [createButtons(currentPage, totalPages)]
   };
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('awards')
-    .setDescription('Show archived season awards')
-    .addStringOption(option =>
-      option
-        .setName('type')
-        .setDescription('Filter by competition type')
-        .setRequired(false)
-        .addChoices(
-          { name: 'All', value: 'all' },
-          { name: 'Coop / League', value: 'coop' },
-          { name: 'Duel / 1v1', value: 'duel' }
-        )
-    ),
+    .setDescription('Show archived season awards'),
 
   async execute(interaction) {
-    const filter = interaction.options.getString('type') || 'all';
-    return buildPage(0, filter);
+    return buildPage(0);
   },
 
-  async buttonHandler(interaction, action, page = '0', filter = 'all') {
-    if (action === 'filter') {
-      return buildPage(0, page || 'all');
-    }
-
+  async buttonHandler(interaction, action, page = '0') {
     const currentPage = Number(page) || 0;
-    const currentFilter = filter || 'all';
     const nextPage = action === 'next' ? currentPage + 1 : currentPage - 1;
-    return buildPage(nextPage, currentFilter);
+    return buildPage(nextPage);
   }
 };
