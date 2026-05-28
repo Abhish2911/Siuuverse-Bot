@@ -754,7 +754,7 @@ async function buildCareerResponse(interaction, view = 'profile', targetType = '
     return {
       content:
         `${safeEmoji(E.wrong, '❌')} No career data found for **${query}**.\n` +
-        `Run \`/endseason\` first or check Discord ID/player name in All_Time_Player_Stats.`,
+        `Contact Bot Owner.`,
       components: []
     };
   }
