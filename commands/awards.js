@@ -2,7 +2,8 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
-  ButtonBuilder
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const { cachedGetData } = require('../utils/helpers');
@@ -100,10 +101,13 @@ function createButtons(page, totalPages) {
     new ButtonBuilder()
       .setCustomId(`awards_prev_${page}`)
       .setEmoji('⬅️')
+      .setStyle(ButtonStyle.Secondary)
       .setDisabled(page <= 0),
+
     new ButtonBuilder()
       .setCustomId(`awards_next_${page}`)
       .setEmoji('➡️')
+      .setStyle(ButtonStyle.Secondary)
       .setDisabled(page >= totalPages - 1)
   );
 }
