@@ -185,10 +185,7 @@ function buildTeamHubDescription(summary) {
     `🆔 **Team ID:** ${summary.teamId || 'N/A'}\n` +
     `🔁 **Previous:** ${summary.previousShort || 'N/A'} — ${summary.previousName || 'N/A'}\n` +
     `${safeEmoji(E.rank, '🏅')} **Rank:** #${summary.position}\n` +
-    `🏟️ **Stadium:** ${summary.stadium}\n\n` +
-    `${safeEmoji(E.played, '🎮')} **Record:** ${summary.wins}W / ${summary.draws}D / ${summary.losses}L\n` +
-    `${safeEmoji(E.goal, '⚽')} **GD:** ${summary.gd} • **Pts:** ${summary.pts}\n` +
-    `${safeEmoji(E.fairplay, '🕊️')} **Fair Play Rank:** #${summary.fairRank} • **Points:** ${summary.fairPoints}`
+    `🏟️ **Stadium:** ${summary.stadium}\n\n`
   );
 }
 
