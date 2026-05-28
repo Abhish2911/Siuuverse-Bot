@@ -281,7 +281,6 @@ module.exports = {
         content:
           `${E.wrong} Previous team/short was not found in **Team_ID_Map**.\n` +
           `You entered previous team: **${previousTeam || 'N/A'}** and previous short: **${previousShort || 'N/A'}**.\n\n` +
-          `If this is an old club rename, first add/fix that club in **Team_ID_Map** so the same Team ID can be reused.\n` +
           `If this is a completely new club, leave previous_team and previous_short empty.`,
         ephemeral: true
       });
