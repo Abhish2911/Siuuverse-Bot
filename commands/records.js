@@ -20,13 +20,6 @@ function cleanRows(rows) {
     : [];
 }
 
-function detectTeamId(row) {
-  return row
-    .map(cell => clean(cell))
-    .find(cell => /^T\d+$/i.test(cell))
-    ?.toUpperCase() || '';
-}
-
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
@@ -149,7 +142,6 @@ function aggregatePlayers(rows) {
       map.set(name, {
         name,
         teams: new Set(),
-        teamIds: new Set(),
         goals: 0,
         assists: 0,
         ga: 0,
@@ -170,8 +162,6 @@ function aggregatePlayers(rows) {
 
     const player = map.get(name);
     if (row[2]) player.teams.add(clean(row[2]));
-    const teamId = detectTeamId(row);
-    if (teamId) player.teamIds.add(teamId);
     player.goals += toNumber(row[8]);
     player.assists += toNumber(row[9]);
     player.ga += toNumber(row[10]);
@@ -193,8 +183,7 @@ function aggregatePlayers(rows) {
 
   return [...map.values()].map(player => ({
     ...player,
-    teamLine: [...player.teams].filter(Boolean).join(' / ') || 'N/A',
-    teamIdLine: [...player.teamIds].filter(Boolean).join(' / ') || 'N/A'
+    teamLine: [...player.teams].filter(Boolean).join(' / ') || 'N/A'
   }));
 }
 
@@ -208,7 +197,6 @@ function aggregateTeams(rows) {
     if (!map.has(teamName)) {
       map.set(teamName, {
         team: teamName,
-        teamId: '',
         seasons: new Set(),
         points: 0,
         wins: 0,
@@ -223,8 +211,6 @@ function aggregateTeams(rows) {
     }
 
     const team = map.get(teamName);
-    const teamId = detectTeamId(row);
-    if (teamId && !team.teamId) team.teamId = teamId;
     const meta = getTeamRowMeta(row);
 
     if (row[1]) team.seasons.add(`S${clean(row[1])}`);
@@ -243,8 +229,7 @@ function aggregateTeams(rows) {
     ...team,
     totalTitles: team.leagueTitles + team.faCups + team.carabaoCups + team.ucl,
     runnerUps: team.runnerUps,
-    seasonLine: [...team.seasons].filter(Boolean).join(' / ') || 'N/A',
-    teamIdLine: team.teamId || 'N/A'
+    seasonLine: [...team.seasons].filter(Boolean).join(' / ') || 'N/A'
   }));
 }
 
@@ -265,22 +250,22 @@ async function buildPage() {
     .setTitle(`${safeEmoji(E.rank, '🏅')} SIUUVERSE ALL-TIME RECORDS`)
     .setDescription(buildRecordsDescription(summary))
     .addFields(
-      makeRecordField(players, 'Most Goals', safeEmoji(E.goal, '⚽'), row => row.goals, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Assists', safeEmoji(E.assist, '🎯'), row => row.assists, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most G/A', safeEmoji(E.fire, '🔥'), row => row.ga, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most MVP', safeEmoji(E.mvp, '⭐'), row => row.mvp, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Tackles', safeEmoji(E.tackle, '🛡️'), row => row.tackles, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Interceptions', safeEmoji(E.interception, '✂️'), row => row.interceptions, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Saves', safeEmoji(E.save, '🧤'), row => row.saves, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Trophies', safeEmoji(E.trophy_animated, '🏆'), row => row.trophies, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Awards', safeEmoji(E.winner || E.leagueWinner, '👑'), row => row.awards, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(players, 'Most Runner-Ups', safeEmoji(E.runnerUp || E.leagueRunnerUp, '🥈'), row => row.runnerUps, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)} • 🆔 ${joinNames(winners, row => row.teamIdLine)}`),
-      makeRecordField(teams, 'Most Points (League)', safeEmoji(E.league, '🏆'), row => row.points, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
-      makeRecordField(teams, 'Most Wins (League)', safeEmoji(E.win, '✅'), row => row.wins, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
-      makeRecordField(teams, 'Best Goal Difference (League)', safeEmoji(E.up, '📈'), row => row.gd, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
-      makeRecordField(teams, 'Most Titles', safeEmoji(E.trophy_animated, '🏆'), row => row.totalTitles, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
-      makeRecordField(teams, 'Most Runner-Ups', safeEmoji(E.runnerUp || E.leagueRunnerUp, '🥈'), row => row.runnerUps, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
-      makeRecordField(teams, 'Most Fair Play', safeEmoji(E.fairplay || E.fairPlay, '🕊️'), row => row.fairPlay, row => row.team, winners => `🆔 ${joinNames(winners, row => row.teamIdLine)} • ${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`)
+      makeRecordField(players, 'Most Goals', safeEmoji(E.goal, '⚽'), row => row.goals, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Assists', safeEmoji(E.assist, '🎯'), row => row.assists, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most G/A', safeEmoji(E.fire, '🔥'), row => row.ga, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most MVP', safeEmoji(E.mvp, '⭐'), row => row.mvp, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Tackles', safeEmoji(E.tackle, '🛡️'), row => row.tackles, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Interceptions', safeEmoji(E.interception, '✂️'), row => row.interceptions, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Saves', safeEmoji(E.save, '🧤'), row => row.saves, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Trophies', safeEmoji(E.trophy_animated, '🏆'), row => row.trophies, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Awards', safeEmoji(E.winner || E.leagueWinner, '👑'), row => row.awards, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(players, 'Most Runner-Ups', safeEmoji(E.runnerUp || E.leagueRunnerUp, '🥈'), row => row.runnerUps, row => row.name, winners => `${safeEmoji(E.team, '👥')} ${joinNames(winners, row => row.teamLine)}`),
+      makeRecordField(teams, 'Most Points (League)', safeEmoji(E.league, '🏆'), row => row.points, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
+      makeRecordField(teams, 'Most Wins (League)', safeEmoji(E.win, '✅'), row => row.wins, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
+      makeRecordField(teams, 'Best Goal Difference (League)', safeEmoji(E.up, '📈'), row => row.gd, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
+      makeRecordField(teams, 'Most Titles', safeEmoji(E.trophy_animated, '🏆'), row => row.totalTitles, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
+      makeRecordField(teams, 'Most Runner-Ups', safeEmoji(E.runnerUp || E.leagueRunnerUp, '🥈'), row => row.runnerUps, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`),
+      makeRecordField(teams, 'Most Fair Play', safeEmoji(E.fairplay || E.fairPlay, '🕊️'), row => row.fairPlay, row => row.team, winners => `${safeEmoji(E.calendar, '📅')} ${joinNames(winners, row => row.seasonLine)}`)
     )
     .setColor(0x9B59B6)
     .setFooter({ text: 'Records Archive • All-time player and club records' })
