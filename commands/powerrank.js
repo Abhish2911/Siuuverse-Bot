@@ -9,7 +9,7 @@ function safeEmoji(value, fallback = '') {
 }
 
 function normalize(value) {
-  return clean(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean(value).toLowerCase();
 }
 
 function isOwner(interaction) {
@@ -27,8 +27,6 @@ function buildStandingsRows(rows) {
     .filter(row => clean(row[0]) || clean(row[1]))
     .map(row => ({
       team: clean(row[0]),
-      teamNormalized: normalize(row[0]),
-
       seasons: toNumber(row[1]),
       matches: toNumber(row[2]),
       wins: toNumber(row[3]),
@@ -38,19 +36,14 @@ function buildStandingsRows(rows) {
       goalsAgainst: toNumber(row[7]),
       gd: toNumber(row[8]),
       points: toNumber(row[9]),
-
       leagueTitles: toNumber(row[10]),
       runnerUps: toNumber(row[11]),
-
       faCups: toNumber(row[12]),
       faRunnerUps: toNumber(row[13]),
-
       carabaoCups: toNumber(row[14]),
       carabaoRunnerUps: toNumber(row[15]),
-
       ucl: toNumber(row[16]),
       uclRunnerUps: toNumber(row[17]),
-
       fairPlayRaw: clean(row[18]),
       type: clean(row[19])
     }));
@@ -62,9 +55,8 @@ function getFairPlayScore(raw) {
 }
 
 function buildPowerRanking(standingsRows) {
-  const filtered = standingsRows.filter(row => row.team);
-
-  return filtered
+  return standingsRows
+    .filter(row => row.team)
     .map(row => {
       const fairPlayScore = getFairPlayScore(row.fairPlayRaw);
 
@@ -94,18 +86,13 @@ function buildPowerRanking(standingsRows) {
       if (b.points !== a.points) return b.points - a.points;
       if (b.gd !== a.gd) return b.gd - a.gd;
       if (b.goals !== a.goals) return b.goals - a.goals;
-
       return a.team.localeCompare(b.team);
-    })
-    .map((row, index) => ({
-      rank: index + 1,
-      ...row
-    }));
+    });
 }
 
 async function buildTeamIdMap() {
   try {
-    const rows = await getData('Team_ID_Map!A:Z');
+    const rows = await getData('Team_ID_Map!A:E');
 
     if (!Array.isArray(rows) || rows.length <= 1) {
       return new Map();
@@ -122,18 +109,12 @@ async function buildTeamIdMap() {
 
       if (!teamId) return;
 
-      const aliases = [
-        currentName,
-        previousName,
-        currentShort,
-        previousShort
-      ]
-        .filter(Boolean)
-        .map(normalize);
-
       map.set(teamId, {
+        teamId,
         currentName,
-        aliases
+        currentShort,
+        previousName,
+        previousShort
       });
     });
 
@@ -143,84 +124,63 @@ async function buildTeamIdMap() {
   }
 }
 
-function findBestRankingMatch({
-  teamName,
-  shortName,
-  teamId,
-  ranking,
-  teamIdMap
-}) {
-  const normalizedTeam = normalize(teamName);
-  const normalizedShort = normalize(shortName);
+function buildHistoricalLookup(baseRanking, teamIdMap) {
+  const lookup = new Map();
 
-  let matched =
-    ranking.find(r => r.teamNormalized === normalizedTeam) ||
-    ranking.find(r => r.teamNormalized.includes(normalizedTeam)) ||
-    ranking.find(r => normalizedTeam.includes(r.teamNormalized));
+  function add(key, value) {
+    const normalized = normalize(key);
 
-  if (matched) return matched;
+    if (!normalized) return;
 
-  if (normalizedShort) {
-    matched =
-      ranking.find(r => normalize(r.team).includes(normalizedShort));
-
-    if (matched) return matched;
+    lookup.set(normalized, value);
   }
 
-  if (teamId && teamIdMap.has(teamId)) {
-    const mapped = teamIdMap.get(teamId);
+  baseRanking.forEach(row => {
+    add(row.team, row);
+  });
 
-    matched = ranking.find(rankRow => {
-      const normalizedRankTeam = normalize(rankRow.team);
+  for (const [, mapping] of teamIdMap.entries()) {
+    const matchedRow =
+      lookup.get(normalize(mapping.previousName)) ||
+      lookup.get(normalize(mapping.currentName));
 
-      return mapped.aliases.some(alias => {
-        return (
-          alias === normalizedRankTeam ||
-          normalizedRankTeam.includes(alias) ||
-          alias.includes(normalizedRankTeam)
-        );
-      });
-    });
+    if (!matchedRow) continue;
 
-    if (matched) return matched;
+    add(mapping.currentName, matchedRow);
+    add(mapping.previousName, matchedRow);
+    add(mapping.currentShort, matchedRow);
+    add(mapping.previousShort, matchedRow);
   }
 
-  return null;
+  return lookup;
 }
 
-function buildRankingWithTeamMap(ranking, teamRows, headerMap, teamIdMap) {
-  return teamRows
-    .map(row => {
-      const teamName = clean(row[headerMap.teamName]);
-      const shortName = clean(row[headerMap.shortName]);
-      const teamId = clean(row[headerMap.teamId] || '').toUpperCase();
+function buildRankingWithTeamMap(baseRanking, teamRows, headerMap, historicalLookup) {
+  const finalRows = teamRows.map(row => {
+    const currentName = clean(row[headerMap.teamName]);
+    const shortName = clean(row[headerMap.shortName]);
 
-      const matchedRanking = findBestRankingMatch({
-        teamName,
-        shortName,
-        teamId,
-        ranking,
-        teamIdMap
-      });
+    const matched =
+      historicalLookup.get(normalize(currentName)) ||
+      historicalLookup.get(normalize(shortName));
 
-      return {
-        team: teamName,
-        shortName,
+    return {
+      team: currentName,
+      shortName,
+      powerScore: matched?.powerScore || 0,
+      points: matched?.points || 0,
+      gd: matched?.gd || 0,
+      goals: matched?.goals || 0,
+      sourceTeam: matched?.team || currentName
+    };
+  });
 
-        powerScore: matchedRanking?.powerScore || 0,
-        points: matchedRanking?.points || 0,
-        gd: matchedRanking?.gd || 0,
-        goals: matchedRanking?.goals || 0,
-
-        sourceTeam: matchedRanking?.team || teamName
-      };
-    })
+  return finalRows
     .sort((a, b) => {
       if (b.powerScore !== a.powerScore) return b.powerScore - a.powerScore;
       if (b.points !== a.points) return b.points - a.points;
       if (b.gd !== a.gd) return b.gd - a.gd;
       if (b.goals !== a.goals) return b.goals - a.goals;
-
       return a.team.localeCompare(b.team);
     })
     .map((row, index) => ({
@@ -230,22 +190,27 @@ function buildRankingWithTeamMap(ranking, teamRows, headerMap, teamIdMap) {
 }
 
 function applyRanksToTeams(teamRows, headerMap, ranking, targetColumn) {
+  const rankingMap = new Map();
+
+  ranking.forEach(row => {
+    rankingMap.set(normalize(row.team), row);
+    rankingMap.set(normalize(row.shortName), row);
+  });
+
   return teamRows.map(row => {
     const next = [...row];
 
-    const teamName = clean(row[headerMap.teamName]);
+    const currentName = clean(row[headerMap.teamName]);
     const shortName = clean(row[headerMap.shortName]);
 
     const rankingRow =
-      ranking.find(r => normalize(r.team) === normalize(teamName)) ||
-      ranking.find(r => normalize(r.shortName) === normalize(shortName));
+      rankingMap.get(normalize(currentName)) ||
+      rankingMap.get(normalize(shortName));
 
     next[targetColumn] = rankingRow?.rank || '';
 
     if (headerMap.powerScore !== -1) {
-      next[headerMap.powerScore] = rankingRow
-        ? toNumber(rankingRow.powerScore)
-        : 0;
+      next[headerMap.powerScore] = rankingRow?.powerScore || 0;
     }
 
     return next;
@@ -270,12 +235,11 @@ function buildRankingSummary(rows, type) {
     topTeam,
     secondTeam,
     lastTeam,
-    type:
-      type === 'power'
-        ? 'Power Rank'
-        : type === 'fa'
-          ? 'FA Cup Seed'
-          : 'Carabao Seed'
+    type: type === 'power'
+      ? 'Power Rank'
+      : type === 'fa'
+        ? 'FA Cup Seed'
+        : 'Carabao Seed'
   };
 }
 
@@ -283,19 +247,15 @@ function buildRankingFields(rows, type) {
   const topHalf = rows.slice(0, Math.ceil(rows.length / 2));
   const bottomHalf = rows.slice(Math.ceil(rows.length / 2));
 
-  const formatHalf = items =>
-    items.length
-      ? items
-          .map(row => {
-            const label =
-              type === 'power'
-                ? `${toNumber(row.powerScore)} pts`
-                : `Seed ${row.rank}`;
+  const formatHalf = items => items.length
+    ? items.map(row => {
+        const label = type === 'power'
+          ? `${toNumber(row.powerScore)} pts`
+          : `Seed ${row.rank}`;
 
-            return `**${row.rank}.** \`${clean(row.shortName || row.team)}\` ${clean(row.team)} • ${label}`;
-          })
-          .join('\n')
-      : 'No teams found.';
+        return `**${row.rank}.** \`${clean(row.shortName || row.team)}\` ${clean(row.team)} • ${label}`;
+      }).join('\n')
+    : 'No teams found.';
 
   return [
     {
@@ -312,17 +272,16 @@ function buildRankingFields(rows, type) {
 }
 
 function buildRankingDescription(type, isGenerated = false) {
-  const label =
-    type === 'power'
-      ? 'power ranking'
-      : type === 'fa'
-        ? 'FA Cup seed order'
-        : 'Carabao Cup seed order';
+  const label = type === 'power'
+    ? 'power ranking'
+    : type === 'fa'
+      ? 'FA Cup seed order'
+      : 'Carabao Cup seed order';
 
   if (isGenerated) {
     return (
-      `${safeEmoji(E.correct, '✅')} ${label.charAt(0).toUpperCase() + label.slice(1)} was generated from All_Time_Team_Stats and saved into Teams.\n` +
-      `${safeEmoji(E.info || E.Badge, '📌')} Review the current order below before using it in draws or fixtures.`
+      `${safeEmoji(E.correct, '✅')} ${label.charAt(0).toUpperCase() + label.slice(1)} was generated from All_Time_Team_Stats and synced with Team_ID_Map.\n` +
+      `${safeEmoji(E.info || E.Badge, '📌')} Renamed clubs now inherit their historical ranking automatically.`
     );
   }
 
@@ -399,20 +358,24 @@ module.exports = {
 
     const baseRanking = buildPowerRanking(standingsRows);
 
+    const historicalLookup = buildHistoricalLookup(
+      baseRanking,
+      teamIdMap
+    );
+
     const ranking = buildRankingWithTeamMap(
       baseRanking,
       teamRows,
       headerMap,
-      teamIdMap
+      historicalLookup
     );
 
     if (subcommand === 'view') {
-      const columnIndex =
-        type === 'power'
-          ? headerMap.powerRank
-          : type === 'fa'
-            ? headerMap.faSeed
-            : headerMap.carabaoSeed;
+      const columnIndex = type === 'power'
+        ? headerMap.powerRank
+        : type === 'fa'
+          ? headerMap.faSeed
+          : headerMap.carabaoSeed;
 
       const viewRows = teamRows
         .map(row => ({
@@ -425,18 +388,19 @@ module.exports = {
         .sort((a, b) => a.rank - b.rank);
 
       const summary = buildRankingSummary(viewRows, type);
+      const rankingFields = buildRankingFields(viewRows, type);
 
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle(`${safeEmoji(E.stats || E.trophy_animated, '📊')} ${summary.type} Overview`)
+            .setTitle(`${safeEmoji(E.stats || E.trophy_animated, '📊')} Power Rank Overview`)
             .setDescription(buildRankingDescription(type, false))
             .addFields(
               { name: 'Teams', value: String(summary.teams), inline: true },
               { name: 'Top Team', value: summary.topTeam, inline: true },
               { name: 'Second Team', value: summary.secondTeam, inline: true },
               { name: 'Last Team', value: summary.lastTeam, inline: true },
-              ...buildRankingFields(viewRows, type)
+              ...rankingFields
             )
             .setColor(0x5865F2)
         ]
@@ -449,12 +413,11 @@ module.exports = {
       };
     }
 
-    const targetColumn =
-      type === 'power'
-        ? headerMap.powerRank
-        : type === 'fa'
-          ? headerMap.faSeed
-          : headerMap.carabaoSeed;
+    const targetColumn = type === 'power'
+      ? headerMap.powerRank
+      : type === 'fa'
+        ? headerMap.faSeed
+        : headerMap.carabaoSeed;
 
     const updatedRows = applyRanksToTeams(
       teamRows,
@@ -467,20 +430,20 @@ module.exports = {
 
     invalidateSheetCache(['Teams!']);
 
-    const title =
-      type === 'power'
-        ? 'Power Rank Generated'
-        : type === 'fa'
-          ? 'FA Cup Seeds Generated'
-          : 'Carabao Seeds Generated';
+    const title = type === 'power'
+      ? 'Power Rank Generated'
+      : type === 'fa'
+        ? 'FA Cup Seeds Generated'
+        : 'Carabao Seeds Generated';
 
     sendAuditLog(interaction, {
       title: `📊 ${title}`,
-      description: `${title} from All_Time_Team_Stats and saved into Teams.`,
+      description: `${title} generated using historical Team_ID_Map sync.`,
       color: 0x5865F2
     });
 
     const summary = buildRankingSummary(ranking, type);
+    const rankingFields = buildRankingFields(ranking, type);
 
     return {
       embeds: [
@@ -508,11 +471,11 @@ module.exports = {
               value: clean(header[targetColumn]) || 'Teams',
               inline: true
             },
-            ...buildRankingFields(ranking, type)
+            ...rankingFields
           )
           .setColor(0x2ECC71)
           .setFooter({
-            text: 'Power Ranking • Generated from All_Time_Team_Stats'
+            text: 'Power Ranking • Historical club mapping enabled'
           })
       ]
     };
