@@ -33,7 +33,7 @@ function buildGroupFixtures(groupTeams, groupName) {
       const away = groupTeams[j];
 
       fixtures.push({
-        md: `UCL GS-${groupName}-${matchNumber}`,
+        md: `UCL-GS-${groupName}-${matchNumber}`,
         date: '',
         homeTeam: home.teamName,
         awayTeam: away.teamName,
@@ -291,7 +291,7 @@ module.exports = {
         groupNames
       ).filter(field => field.value !== 'No teams drawn.');
 
-      const fixturesSheet = await cachedGetData('UCL_Coop_Fixtures!A:J')
+      const fixturesSheet = await cachedGetData('UCL_Coop_Group_Fixtures!A:J')
         .catch(() => []);
 
       const fixtureRows = Array.isArray(fixturesSheet)
@@ -396,14 +396,15 @@ module.exports = {
       fixture.result,
       fixture.homeShort,
       fixture.awayShort,
-      fixture.status
+      fixture.status,
+      ''
     ]);
 
-    await updateData('UCL_Coop_Fixtures!A2:J', fixtureRows);
+    await updateData('UCL_Coop_Group_Fixtures!A2:J', fixtureRows);
 
     invalidateSheetCache([
       'Teams!',
-      'UCL_Coop_Fixtures!'
+      'UCL_Coop_Group_Fixtures!'
     ]);
 
     const groupedFields = buildGroupedOutput(
