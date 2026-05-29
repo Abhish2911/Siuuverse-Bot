@@ -30,7 +30,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'fa',
       label: 'FA Cup',
-      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:L',
       reserveLabel: 'FA Cup',
       matchNoIndex: 0,
       dateIndex: 1,
@@ -39,9 +39,9 @@ function getCompetitionConfig(key) {
       hgIndex: 4,
       agIndex: 5,
       resultIndex: 6,
-      homeShortIndex: 7,
-      awayShortIndex: 8,
-      statusIndex: 9,
+      homeShortIndex: 8,
+      awayShortIndex: 9,
+      statusIndex: 10,
       footerText: 'SiuuVerse FA Cup'
     };
   }
@@ -50,7 +50,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
-      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:L',
       reserveLabel: 'Carabao Cup',
       matchNoIndex: 0,
       dateIndex: 1,
@@ -59,9 +59,9 @@ function getCompetitionConfig(key) {
       hgIndex: 4,
       agIndex: 5,
       resultIndex: 6,
-      homeShortIndex: 7,
-      awayShortIndex: 8,
-      statusIndex: 9,
+      homeShortIndex: 8,
+      awayShortIndex: 9,
+      statusIndex: 10,
       footerText: 'SiuuVerse Carabao Cup'
     };
   }
@@ -325,8 +325,8 @@ function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
 
     const played = hasScore(row, config);
 
-    const left = homeShort || shorten(home, 10);
-    const right = awayShort || shorten(away, 10);
+    const left = clean(homeShort) || shorten(home, 10);
+    const right = clean(awayShort) || shorten(away, 10);
 
     const res =
       result ||
@@ -380,10 +380,12 @@ function buildFixtureSummary(
 
   const firstPairing = firstFixture
     ? `\`${clean(
-        firstFixture?.[config.homeShortIndex] ||
+        firstFixture?.[config.homeShortIndex]
+      ) || clean(
         firstFixture?.[config.homeIndex]
       )}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(
-        firstFixture?.[config.awayShortIndex] ||
+        firstFixture?.[config.awayShortIndex]
+      ) || clean(
         firstFixture?.[config.awayIndex]
       )}\``
     : 'N/A';
