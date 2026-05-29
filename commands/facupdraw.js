@@ -56,6 +56,7 @@ function buildCupFixture(round, md, home, away, leg = '') {
     hg: '',
     ag: '',
     result: '',
+    decision: '',
     homeShort: home.shortName,
     awayShort: away.shortName,
     status: 'Upcoming'
