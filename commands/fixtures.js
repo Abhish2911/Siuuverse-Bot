@@ -110,7 +110,8 @@ function getCompetitionConfig(key) {
 /* ---------------- MATCHDAY PARSER ---------------- */
 
 function getHeaderLabel(row, config) {
-  const matchNo = clean(row?.[config.matchNoIndex]);
+  const rawMatchNo = clean(row?.[config.matchNoIndex]);
+  const matchNo = String(rawMatchNo || '').trim().toUpperCase();
 
   if (!matchNo) return '';
 
@@ -119,7 +120,8 @@ function getHeaderLabel(row, config) {
      2-3 -> 2
   */
   if (config.key === 'league') {
-    return matchNo.split('-')[0];
+    const parts = matchNo.split('-');
+    return parts[0] || matchNo;
   }
 
   /* ---------------- UCL ----------------
@@ -132,6 +134,10 @@ function getHeaderLabel(row, config) {
       return `${parts[1]}-${parts[2]}`;
     }
 
+    if (parts.length >= 3) {
+      return `${parts[0]}-${parts[1]}`;
+    }
+
     return matchNo;
   }
 
@@ -142,23 +148,23 @@ function getHeaderLabel(row, config) {
      FA-Final -> Final
   */
   if (config.key === 'fa') {
-    if (matchNo.startsWith('FA-R1')) {
+    if (matchNo.includes('R1')) {
       return 'Round 1';
     }
 
-    if (matchNo.startsWith('FA-QFQ')) {
+    if (matchNo.includes('QFQ')) {
       return 'Quarter Final Qualifier';
     }
 
-    if (matchNo.startsWith('FA-QF')) {
+    if (matchNo.includes('QF')) {
       return 'Quarter Final';
     }
 
-    if (matchNo.startsWith('FA-SF')) {
+    if (matchNo.includes('SF')) {
       return 'Semi Final';
     }
 
-    if (matchNo.startsWith('FA-Final')) {
+    if (matchNo.includes('FINAL')) {
       return 'Final';
     }
 
@@ -173,23 +179,23 @@ function getHeaderLabel(row, config) {
      CB-Final -> Final
   */
   if (config.key === 'carabao') {
-    if (matchNo.startsWith('CB-R1')) {
+    if (matchNo.includes('R1')) {
       return 'Round 1';
     }
 
-    if (matchNo.startsWith('CB-QFQ')) {
+    if (matchNo.includes('QFQ')) {
       return 'Quarter Final Qualifier';
     }
 
-    if (matchNo.startsWith('CB-QF')) {
+    if (matchNo.includes('QF')) {
       return 'Quarter Final';
     }
 
-    if (matchNo.startsWith('CB-SF')) {
+    if (matchNo.includes('SF')) {
       return 'Semi Final';
     }
 
-    if (matchNo.startsWith('CB-Final')) {
+    if (matchNo.includes('FINAL')) {
       return 'Final';
     }
 
