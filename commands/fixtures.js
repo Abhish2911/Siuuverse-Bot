@@ -6,6 +6,7 @@ const {
   ButtonStyle,
   StringSelectMenuBuilder
 } = require('discord.js');
+
 const { cachedGetData, getTeamColor } = require('../utils/helpers');
 const { clean: sharedClean } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
@@ -83,7 +84,6 @@ function getCompetitionConfig(key) {
       homeShortIndex: 7,
       awayShortIndex: 8,
       statusIndex: 9,
-      headerKeyIndex: null,
       footerText: 'SiuuVerse UCL'
     };
   }
@@ -103,19 +103,46 @@ function getCompetitionConfig(key) {
     homeShortIndex: 7,
     awayShortIndex: 8,
     statusIndex: 9,
-    headerKeyIndex: null,
     footerText: 'SiuuVerse Coop League'
   };
 }
 
+/* ---------------- MATCHDAY PARSER ---------------- */
+
 function getHeaderLabel(row, config) {
-  if (config.headerKeyIndex !== null && config.headerKeyIndex !== undefined) {
-    return clean(row?.[config.headerKeyIndex]);
+  const matchNo = clean(row?.[config.matchNoIndex]);
+
+  if (!matchNo) return '';
+
+  /* LEAGUE FORMAT
+     1-1 → MD 1
+     2-3 → MD 2
+  */
+  if (config.key === 'league') {
+    return matchNo.split('-')[0];
   }
 
-  const matchNo = String(row?.[config.matchNoIndex] || '').trim();
-  if (!matchNo) return '';
-  return matchNo.includes('.') ? matchNo.split('.')[0].trim() : matchNo;
+  /* UCL FORMAT
+     UCL GS-A-1 → GS-A
+     UCL GS-B-3 → GS-B
+  */
+  if (config.key === 'ucl') {
+    const parts = matchNo.split('-');
+
+    if (parts.length >= 4) {
+      return `${parts[1]}-${parts[2]}`;
+    }
+
+    return matchNo;
+  }
+
+  /* CUP FORMAT
+     QF-1
+     SF-2
+  */
+  return matchNo.includes('-')
+    ? matchNo.split('-')[0]
+    : matchNo;
 }
 
 function getReserveMap(rows, competitionLabel) {
@@ -126,8 +153,15 @@ function getReserveMap(rows, competitionLabel) {
   rows.slice(1).forEach(row => {
     const competition = clean(row?.[0]);
     const matchNo = normalizeMatchNo(row?.[1]);
+
     if (!matchNo) return;
-    if (clean(competition).toLowerCase() !== clean(competitionLabel).toLowerCase()) return;
+
+    if (
+      clean(competition).toLowerCase() !==
+      clean(competitionLabel).toLowerCase()
+    ) {
+      return;
+    }
 
     map.set(matchNo, {
       competition,
@@ -148,6 +182,7 @@ const getMatchdays = (data, config) => {
 
   for (const row of data.slice(1)) {
     const label = getHeaderLabel(row, config);
+
     if (label) days.add(label);
   }
 
@@ -155,33 +190,57 @@ const getMatchdays = (data, config) => {
 };
 
 function hasScore(row, config) {
-  return row[config.hgIndex] !== '' && row[config.hgIndex] !== undefined &&
-    row[config.agIndex] !== '' && row[config.agIndex] !== undefined;
+  return (
+    row[config.hgIndex] !== '' &&
+    row[config.hgIndex] !== undefined &&
+    row[config.agIndex] !== '' &&
+    row[config.agIndex] !== undefined
+  );
 }
 
 function getResultEmoji(homeGoals, awayGoals) {
   const hg = Number(homeGoals);
   const ag = Number(awayGoals);
 
-  if (Number.isNaN(hg) || Number.isNaN(ag)) return safeEmoji(E.played, '🎮');
+  if (Number.isNaN(hg) || Number.isNaN(ag)) {
+    return safeEmoji(E.played, '🎮');
+  }
+
   if (hg > ag) return safeEmoji(E.win, '✅');
   if (hg < ag) return safeEmoji(E.lose, '❌');
+
   return safeEmoji(E.draw, '🤝');
 }
 
 function getStatusText(row, config, reserveMap = new Map()) {
-  if (hasScore(row, config)) return `${safeEmoji(E.correct, '✅')} DONE`;
+  if (hasScore(row, config)) {
+    return `${safeEmoji(E.correct, '✅')} DONE`;
+  }
 
-  const reserve = reserveMap.get(normalizeMatchNo(row?.[config.matchNoIndex]));
+  const reserve = reserveMap.get(
+    normalizeMatchNo(row?.[config.matchNoIndex])
+  );
+
   if (reserve) {
-    return `${safeEmoji(E.lock, '🔒')} RESERVED${reserve.by ? ` by ${reserve.by}` : ''}`;
+    return `${safeEmoji(E.lock, '🔒')} RESERVED${
+      reserve.by ? ` by ${reserve.by}` : ''
+    }`;
   }
 
   const rawStatus = clean(row?.[config.statusIndex]).toUpperCase();
+
   if (rawStatus) {
-    if (rawStatus === 'DONE') return `${safeEmoji(E.correct, '✅')} DONE`;
-    if (rawStatus === 'RESERVED') return `${safeEmoji(E.lock, '🔒')} RESERVED`;
-    if (rawStatus === 'LIVE') return `${safeEmoji(E.fire, '🔥')} LIVE`;
+    if (rawStatus === 'DONE') {
+      return `${safeEmoji(E.correct, '✅')} DONE`;
+    }
+
+    if (rawStatus === 'RESERVED') {
+      return `${safeEmoji(E.lock, '🔒')} RESERVED`;
+    }
+
+    if (rawStatus === 'LIVE') {
+      return `${safeEmoji(E.fire, '🔥')} LIVE`;
+    }
   }
 
   return `${safeEmoji(E.calendar, '📅')} UPCOMING`;
@@ -189,7 +248,10 @@ function getStatusText(row, config, reserveMap = new Map()) {
 
 function shorten(value, len = 14) {
   const str = String(value || '').trim();
-  return str.length > len ? `${str.slice(0, len - 1)}…` : str;
+
+  return str.length > len
+    ? `${str.slice(0, len - 1)}…`
+    : str;
 }
 
 function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
@@ -204,36 +266,90 @@ function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
     const awayShort = row?.[config.awayShortIndex];
 
     const played = hasScore(row, config);
+
     const left = homeShort || shorten(home, 10);
     const right = awayShort || shorten(away, 10);
-    const res = result || (played ? (Number(hg) > Number(ag) ? 'H' : Number(hg) < Number(ag) ? 'A' : 'D') : '-');
-    const reserve = reserveMap.get(normalizeMatchNo(matchNo));
+
+    const res =
+      result ||
+      (played
+        ? Number(hg) > Number(ag)
+          ? 'H'
+          : Number(hg) < Number(ag)
+            ? 'A'
+            : 'D'
+        : '-');
+
+    const reserve = reserveMap.get(
+      normalizeMatchNo(matchNo)
+    );
+
     const scoreText = played
       ? `${getResultEmoji(hg, ag)} **${hg}-${ag}** (${res})`
       : reserve
-        ? `${safeEmoji(E.lock, '🔒')} Reserved${reserve.by ? ` by **${reserve.by}**` : ''}${reserve.playerName ? ` • **${reserve.playerName}**` : ''}`
+        ? `${safeEmoji(E.lock, '🔒')} Reserved${
+            reserve.by ? ` by **${reserve.by}**` : ''
+          }${
+            reserve.playerName
+              ? ` • **${reserve.playerName}**`
+              : ''
+          }`
         : `${safeEmoji(E.calendar, '📅')} Pending`;
 
     return (
-      `**${matchNo || '-'}** • ${getStatusText(row, config, reserveMap)}\n` +
-      `> \`${left || 'HOME'}\` ${safeEmoji(E.vs, '⚔️')} \`${right || 'AWAY'}\`\n` +
+      `**${matchNo || '-'}** • ${getStatusText(
+        row,
+        config,
+        reserveMap
+      )}\n` +
+      `> \`${left || 'HOME'}\` ${safeEmoji(
+        E.vs,
+        '⚔️'
+      )} \`${right || 'AWAY'}\`\n` +
       `> ${scoreText}`
     );
   });
 }
 
-function buildFixtureSummary(mdMatches, md, filter, config, reserveMap) {
+function buildFixtureSummary(
+  mdMatches,
+  md,
+  filter,
+  config,
+  reserveMap
+) {
   const firstFixture = mdMatches[0];
+
   const firstPairing = firstFixture
-    ? `\`${clean(firstFixture?.[config.homeShortIndex] || firstFixture?.[config.homeIndex])}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(firstFixture?.[config.awayShortIndex] || firstFixture?.[config.awayIndex])}\``
+    ? `\`${clean(
+        firstFixture?.[config.homeShortIndex] ||
+        firstFixture?.[config.homeIndex]
+      )}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(
+        firstFixture?.[config.awayShortIndex] ||
+        firstFixture?.[config.awayIndex]
+      )}\``
     : 'N/A';
 
   const date = firstFixture?.[config.dateIndex] || 'TBD';
-  const playedCount = mdMatches.filter(row => hasScore(row, config)).length;
+
+  const playedCount = mdMatches.filter(row =>
+    hasScore(row, config)
+  ).length;
+
   const totalCount = mdMatches.length;
+
   const pendingCount = totalCount - playedCount;
-  const reservedCount = mdMatches.filter(row => reserveMap.has(normalizeMatchNo(row?.[config.matchNoIndex])) && !hasScore(row, config)).length;
-  const progress = totalCount ? Math.round((playedCount / totalCount) * 100) : 0;
+
+  const reservedCount = mdMatches.filter(
+    row =>
+      reserveMap.has(
+        normalizeMatchNo(row?.[config.matchNoIndex])
+      ) && !hasScore(row, config)
+  ).length;
+
+  const progress = totalCount
+    ? Math.round((playedCount / totalCount) * 100)
+    : 0;
 
   return {
     matchday: md,
@@ -252,9 +368,13 @@ function buildFixtureDescription(summary, config) {
   return (
     `# ${config.label} • ${summary.matchday}\n` +
     `${safeEmoji(E.calendar, '📅')} Date: **${summary.date}**\n` +
-    `${safeEmoji(E.correct, '✅')} Done: **${summary.playedCount}** • ${safeEmoji(E.missing, '➖')} Pending: **${summary.pendingCount}** • ${safeEmoji(E.lock, '🔒')} Reserved: **${summary.reservedCount}**\n` +
-    `${safeEmoji(E.played, '🎮')} Progress: **${summary.playedCount}/${summary.totalCount} • ${summary.progress}%**\n` +
-    `${safeEmoji(E.Badge || E.info, '📌')} Filter: **${summary.filter}** • Opening Pairing: ${summary.firstPairing}`
+    `${safeEmoji(E.correct, '✅')} Done: **${summary.playedCount}** • ` +
+    `${safeEmoji(E.missing, '➖')} Pending: **${summary.pendingCount}** • ` +
+    `${safeEmoji(E.lock, '🔒')} Reserved: **${summary.reservedCount}**\n` +
+    `${safeEmoji(E.played, '🎮')} Progress: ` +
+    `**${summary.playedCount}/${summary.totalCount} • ${summary.progress}%**\n` +
+    `${safeEmoji(E.Badge || E.info, '📌')} Filter: ` +
+    `**${summary.filter}** • Opening Pairing: ${summary.firstPairing}`
   );
 }
 
@@ -285,62 +405,137 @@ function createButtons(md, matchdays, config, filter = 'all') {
 function createDropdown(md, matchdays, config, filter = 'all') {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`md_select_fixtures__${config.key}__${filter}`)
+      .setCustomId(
+        `md_select_fixtures__${config.key}__${filter}`
+      )
       .setPlaceholder(`${config.label} • ${md}`)
       .addOptions(
         matchdays.slice(0, 25).map(m => ({
           label: `${config.label} • ${m}`.slice(0, 100),
           value: m,
-          description: `Open ${m} (${String(filter || 'all').toUpperCase()})`.slice(0, 100),
+          description: `Open ${m} (${String(
+            filter || 'all'
+          ).toUpperCase()})`.slice(0, 100),
           default: m === md
         }))
       )
   );
 }
 
-function buildFixtures(data, md, matchdays, teams = [], reserveRows = [], filter = 'all', config = getCompetitionConfig('league')) {
-  const reserveMap = getReserveMap(reserveRows, config.reserveLabel);
+function buildFixtures(
+  data,
+  md,
+  matchdays,
+  teams = [],
+  reserveRows = [],
+  filter = 'all',
+  config = getCompetitionConfig('league')
+) {
+  const reserveMap = getReserveMap(
+    reserveRows,
+    config.reserveLabel
+  );
+
   let mdMatches = data
     .slice(1)
     .filter(r => getHeaderLabel(r, config) === md)
     .sort((a, b) => {
       const aMatch = clean(a?.[config.matchNoIndex]);
       const bMatch = clean(b?.[config.matchNoIndex]);
-      return aMatch.localeCompare(bMatch, undefined, { numeric: true, sensitivity: 'base' });
+
+      return aMatch.localeCompare(
+        bMatch,
+        undefined,
+        {
+          numeric: true,
+          sensitivity: 'base'
+        }
+      );
     });
 
   if (filter === 'played') {
-    mdMatches = mdMatches.filter(row => hasScore(row, config));
+    mdMatches = mdMatches.filter(row =>
+      hasScore(row, config)
+    );
   } else if (filter === 'pending') {
-    mdMatches = mdMatches.filter(row => !hasScore(row, config));
+    mdMatches = mdMatches.filter(
+      row => !hasScore(row, config)
+    );
   }
 
   if (!mdMatches.length) {
-    return { content: `${safeEmoji(E.wrong, '❌')} No ${filter === 'all' ? '' : `${filter} `}fixtures found for Matchday ${md}.` };
+    return {
+      content:
+        `${safeEmoji(E.wrong, '❌')} No ` +
+        `${filter === 'all' ? '' : `${filter} `}` +
+        `fixtures found for ${md}.`
+    };
   }
 
-  const featureTeam = mdMatches[0]?.[config.homeIndex] || mdMatches[0]?.[config.awayIndex] || '';
-  const embedColor = getTeamColor(teams, featureTeam);
+  const featureTeam =
+    mdMatches[0]?.[config.homeIndex] ||
+    mdMatches[0]?.[config.awayIndex] ||
+    '';
 
-  const summary = buildFixtureSummary(mdMatches, md, filter, config, reserveMap);
+  const embedColor = getTeamColor(
+    teams,
+    featureTeam
+  );
+
+  const summary = buildFixtureSummary(
+    mdMatches,
+    md,
+    filter,
+    config,
+    reserveMap
+  );
 
   const embed = new EmbedBuilder()
-    .setTitle(`${safeEmoji(E.league, safeEmoji(E.calendar, '📅'))} ${config.label} Fixtures Hub`)
-    .setDescription(buildFixtureDescription(summary, config))
+    .setTitle(
+      `${safeEmoji(
+        E.league,
+        safeEmoji(E.calendar, '📅')
+      )} ${config.label} Fixtures Hub`
+    )
+    .setDescription(
+      buildFixtureDescription(summary, config)
+    )
     .addFields(
-      buildFixtureLines(mdMatches, config, reserveMap).map((text, index) => ({
-        name: `${safeEmoji(E.doubleArrow, '➡️')} Fixture ${index + 1}`,
+      buildFixtureLines(
+        mdMatches,
+        config,
+        reserveMap
+      ).map((text, index) => ({
+        name: `${safeEmoji(
+          E.doubleArrow,
+          '➡️'
+        )} Fixture ${index + 1}`,
         value: text,
         inline: true
       }))
     )
     .setColor(embedColor)
-    .setFooter({ text: `${md} • ${config.footerText}` })
+    .setFooter({
+      text: `${md} • ${config.footerText}`
+    })
     .setTimestamp();
 
   return {
     embeds: [embed],
-    components: [createButtons(md, matchdays, config, filter), createDropdown(md, matchdays, config, filter)]
+    components: [
+      createButtons(
+        md,
+        matchdays,
+        config,
+        filter
+      ),
+      createDropdown(
+        md,
+        matchdays,
+        config,
+        filter
+      )
+    ]
   };
 }
 
@@ -351,98 +546,224 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('matchday')
-        .setDescription('Matchday number to view')
+        .setDescription('Matchday / Stage')
         .setRequired(false)
     )
     .addStringOption(option =>
       option
         .setName('competition')
-        .setDescription('Competition to view fixtures for')
+        .setDescription(
+          'Competition to view fixtures for'
+        )
         .setRequired(false)
         .addChoices(
-          { name: 'League', value: 'league' },
-          { name: 'FA Cup', value: 'fa' },
-          { name: 'Carabao Cup', value: 'carabao' },
-          { name: 'UCL', value: 'ucl' }
+          {
+            name: 'League',
+            value: 'league'
+          },
+          {
+            name: 'FA Cup',
+            value: 'fa'
+          },
+          {
+            name: 'Carabao Cup',
+            value: 'carabao'
+          },
+          {
+            name: 'UCL',
+            value: 'ucl'
+          }
         )
     )
     .addStringOption(option =>
       option
         .setName('filter')
-        .setDescription('Show all, played, or pending fixtures')
+        .setDescription(
+          'Show all, played, or pending fixtures'
+        )
         .setRequired(false)
         .addChoices(
-          { name: 'All', value: 'all' },
-          { name: 'Played', value: 'played' },
-          { name: 'Pending', value: 'pending' }
+          {
+            name: 'All',
+            value: 'all'
+          },
+          {
+            name: 'Played',
+            value: 'played'
+          },
+          {
+            name: 'Pending',
+            value: 'pending'
+          }
         )
     ),
 
   async execute(interaction) {
-    const competitionKey = interaction.options.getString('competition') || 'league';
-    const config = getCompetitionConfig(competitionKey);
+    const competitionKey =
+      interaction.options.getString(
+        'competition'
+      ) || 'league';
 
-    const [data, teams, reserveRows] = await Promise.all([
-      cachedGetData(config.fixturesRange),
-      cachedGetData('Teams!A:Z'),
-      cachedGetData('Reserve!A:F').catch(() => [])
-    ]);
-    const matchdays = getMatchdays(data, config);
+    const config =
+      getCompetitionConfig(competitionKey);
+
+    const [data, teams, reserveRows] =
+      await Promise.all([
+        cachedGetData(config.fixturesRange),
+        cachedGetData('Teams!A:Z'),
+        cachedGetData('Reserve!A:F').catch(
+          () => []
+        )
+      ]);
+
+    const matchdays = getMatchdays(
+      data,
+      config
+    );
 
     if (!matchdays.length) {
-      return { content: `${safeEmoji(E.wrong, '❌')} No ${config.label} fixtures found.` };
+      return {
+        content:
+          `${safeEmoji(E.wrong, '❌')} No ` +
+          `${config.label} fixtures found.`
+      };
     }
 
-    const requestedMd = interaction.options.getString('matchday');
-    const filter = interaction.options.getString('filter') || 'all';
-    const selectedMd = requestedMd && matchdays.includes(requestedMd) ? requestedMd : matchdays[0];
+    const requestedMd =
+      interaction.options.getString(
+        'matchday'
+      );
 
-    return buildFixtures(data, selectedMd, matchdays, teams, reserveRows, filter, config);
+    const filter =
+      interaction.options.getString(
+        'filter'
+      ) || 'all';
+
+    const selectedMd =
+      requestedMd &&
+      matchdays.includes(requestedMd)
+        ? requestedMd
+        : matchdays[0];
+
+    return buildFixtures(
+      data,
+      selectedMd,
+      matchdays,
+      teams,
+      reserveRows,
+      filter,
+      config
+    );
   },
 
-  async buttonHandler(interaction, action, page) {
-    const [competitionKey = 'league', filter = 'all', currentMd = ''] = String(page || 'league__all__').split('__');
-    const config = getCompetitionConfig(competitionKey);
-    const [data, teams, reserveRows] = await Promise.all([
-      cachedGetData(config.fixturesRange),
-      cachedGetData('Teams!A:Z'),
-      cachedGetData('Reserve!A:F').catch(() => [])
-    ]);
-    const matchdays = getMatchdays(data, config);
+  async buttonHandler(
+    interaction,
+    action,
+    page
+  ) {
+    const [
+      competitionKey = 'league',
+      filter = 'all',
+      currentMd = ''
+    ] = String(
+      page || 'league__all__'
+    ).split('__');
+
+    const config =
+      getCompetitionConfig(competitionKey);
+
+    const [data, teams, reserveRows] =
+      await Promise.all([
+        cachedGetData(config.fixturesRange),
+        cachedGetData('Teams!A:Z'),
+        cachedGetData('Reserve!A:F').catch(
+          () => []
+        )
+      ]);
+
+    const matchdays = getMatchdays(
+      data,
+      config
+    );
 
     if (!matchdays.length) {
-      return { content: `${safeEmoji(E.wrong, '❌')} No ${config.label} fixtures found.` };
+      return {
+        content:
+          `${safeEmoji(E.wrong, '❌')} No ` +
+          `${config.label} fixtures found.`
+      };
     }
 
     let index = matchdays.indexOf(currentMd);
+
     if (index === -1) index = 0;
 
     if (action === 'prev') index--;
     if (action === 'next') index++;
-    if (action === 'refresh') index = matchdays.indexOf(currentMd);
+    if (action === 'refresh') {
+      index = matchdays.indexOf(currentMd);
+    }
 
-    index = Math.max(0, Math.min(index, matchdays.length - 1));
+    index = Math.max(
+      0,
+      Math.min(index, matchdays.length - 1)
+    );
 
-    return buildFixtures(data, matchdays[index], matchdays, teams, reserveRows, filter, config);
+    return buildFixtures(
+      data,
+      matchdays[index],
+      matchdays,
+      teams,
+      reserveRows,
+      filter,
+      config
+    );
   },
 
   async selectHandler(interaction) {
-    const parts = String(interaction.customId || '').split('__');
-    const competitionKey = parts[1] || 'league';
-    const filter = parts[2] || 'all';
-    const config = getCompetitionConfig(competitionKey);
+    const parts = String(
+      interaction.customId || ''
+    ).split('__');
 
-    const [data, teams, reserveRows] = await Promise.all([
-      cachedGetData(config.fixturesRange),
-      cachedGetData('Teams!A:Z'),
-      cachedGetData('Reserve!A:F').catch(() => [])
-    ]);
-    const matchdays = getMatchdays(data, config);
+    const competitionKey =
+      parts[1] || 'league';
+
+    const filter =
+      parts[2] || 'all';
+
+    const config =
+      getCompetitionConfig(competitionKey);
+
+    const [data, teams, reserveRows] =
+      await Promise.all([
+        cachedGetData(config.fixturesRange),
+        cachedGetData('Teams!A:Z'),
+        cachedGetData('Reserve!A:F').catch(
+          () => []
+        )
+      ]);
+
+    const matchdays = getMatchdays(
+      data,
+      config
+    );
 
     if (!matchdays.length) {
-      return { content: `${safeEmoji(E.wrong, '❌')} No ${config.label} fixtures found.` };
+      return {
+        content:
+          `${safeEmoji(E.wrong, '❌')} No ` +
+          `${config.label} fixtures found.`
+      };
     }
 
-    return buildFixtures(data, interaction.values[0], matchdays, teams, reserveRows, filter, config);
+    return buildFixtures(
+      data,
+      interaction.values[0],
+      matchdays,
+      teams,
+      reserveRows,
+      filter,
+      config
+    );
   }
 };
