@@ -91,10 +91,27 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
     const upperAlias = alias.toUpperCase();
 
     if (upperAlias === 'F') {
-      return /FINAL$/i.test(md);
+      return / FINAL$/i.test(md) || / FINAL-/i.test(md);
     }
 
-    return md.includes(` ${upperAlias}-`) || md.includes(` ${upperAlias}`);
+    // Prevent QF from matching QFQ fixtures.
+    // Match exact stage tokens only.
+    const patterns = {
+      R1: /\sR1-/i,
+      QFQ: /\sQFQ-/i,
+      R16: /\sR16-/i,
+      QF: /\sQF-(?!Q)/i,
+      SF: /\sSF-/i,
+      GS: /\sGS-/i
+    };
+
+    const pattern = patterns[upperAlias];
+
+    if (pattern) {
+      return pattern.test(md);
+    }
+
+    return false;
   });
 }
 
