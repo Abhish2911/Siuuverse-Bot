@@ -695,19 +695,21 @@ module.exports = {
         };
       }
 
-      const nextRows = nextFixtures.map(fixture => [
-        fixture.round,
-        fixture.md,
-        fixture.date,
-        fixture.homeTeam,
-        fixture.awayTeam,
-        fixture.hg,
-        fixture.ag,
-        fixture.result,
-        fixture.homeShort,
-        fixture.awayShort,
-        fixture.status
-      ]);
+      const nextRows = nextFixtures.map(fixture => {
+        return [
+          fixture.round,
+          fixture.md,
+          fixture.date,
+          fixture.homeTeam,
+          fixture.awayTeam,
+          fixture.hg,
+          fixture.ag,
+          fixture.result,
+          fixture.homeShort,
+          fixture.awayShort,
+          fixture.status
+        ];
+      });
 
       await updateData(config.saveRange, nextRows);
       invalidateSheetCache([config.sheet.split('!')[0] + '!']);
@@ -818,19 +820,41 @@ module.exports = {
       const normalized = normalizeFixtureRow(row);
       return !doesFixtureMatchRound(normalized.round, nextRoundLabel, normalized.md);
     });
-    const nextRows = nextFixtures.map(fixture => [
-      fixture.round || nextRoundLabel,
-      fixture.md,
-      fixture.date,
-      fixture.homeTeam,
-      fixture.awayTeam,
-      fixture.hg,
-      fixture.ag,
-      fixture.result,
-      fixture.homeShort,
-      fixture.awayShort,
-      fixture.status
-    ]);
+    const nextRows = nextFixtures.map(fixture => {
+      // UCL sheet layout:
+      // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
+      if (config.key === 'ucl') {
+        return [
+          fixture.round || nextRoundLabel,
+          fixture.md,
+          fixture.date,
+          fixture.homeTeam,
+          fixture.awayTeam,
+          fixture.hg,
+          fixture.ag,
+          fixture.result,
+          fixture.homeShort,
+          fixture.awayShort,
+          fixture.status
+        ];
+      }
+
+      // FA / Carabao sheet layout:
+      // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
+      return [
+        fixture.md,
+        fixture.date,
+        fixture.homeTeam,
+        fixture.awayTeam,
+        fixture.hg,
+        fixture.ag,
+        fixture.result,
+        fixture.homeShort,
+        fixture.awayShort,
+        fixture.status,
+        fixture.round || nextRoundLabel
+      ];
+    });
 
     const rowsToSave = [...keptRows, ...nextRows];
 
