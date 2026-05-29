@@ -28,58 +28,83 @@ function buildGroupFixtures(groupTeams, groupName) {
   let matchNumber = 1;
 
   const homeCount = new Map();
+  const awayCount = new Map();
 
   groupTeams.forEach(team => {
     homeCount.set(team.shortName, 0);
+    awayCount.set(team.shortName, 0);
   });
+
+  const pairings = [];
 
   for (let i = 0; i < groupTeams.length; i++) {
     for (let j = i + 1; j < groupTeams.length; j++) {
-      let home = groupTeams[i];
-      let away = groupTeams[j];
-
-      const homeGamesA = homeCount.get(home.shortName) || 0;
-      const homeGamesB = homeCount.get(away.shortName) || 0;
-
-      /*
-        Balance logic:
-        - Prefer giving home to lower home-count team
-        - If equal -> random
-      */
-
-      if (homeGamesA > homeGamesB) {
-        home = groupTeams[j];
-        away = groupTeams[i];
-      } else if (homeGamesA === homeGamesB) {
-        if (Math.random() >= 0.5) {
-          home = groupTeams[j];
-          away = groupTeams[i];
-        }
-      }
-
-      homeCount.set(
-        home.shortName,
-        (homeCount.get(home.shortName) || 0) + 1
-      );
-
-      fixtures.push({
-        md: `UCL-GS-${groupName}-${matchNumber}`,
-        date: '',
-        homeTeam: home.teamName,
-        awayTeam: away.teamName,
-        hg: '',
-        ag: '',
-        result: '',
-        homeShort: home.shortName,
-        awayShort: away.shortName,
-        status: 'Upcoming'
-      });
-
-      matchNumber++;
+      pairings.push([groupTeams[i], groupTeams[j]]);
     }
   }
 
-  return fixtures;
+  pairings.forEach(([teamA, teamB], index) => {
+    let home = teamA;
+    let away = teamB;
+
+    const aHome = homeCount.get(teamA.shortName) || 0;
+    const aAway = awayCount.get(teamA.shortName) || 0;
+
+    const bHome = homeCount.get(teamB.shortName) || 0;
+    const bAway = awayCount.get(teamB.shortName) || 0;
+
+    /*
+      Goal:
+      - Every team gets balanced home/away games
+      - Target ≈ 2-3 home and 2-3 away
+      - Avoid one team having all home or all away
+    */
+
+    const aBalance = aHome - aAway;
+    const bBalance = bHome - bAway;
+
+    if (aBalance > bBalance) {
+      home = teamB;
+      away = teamA;
+    } else if (aBalance === bBalance) {
+      if (aHome > bHome) {
+        home = teamB;
+        away = teamA;
+      } else if (aHome === bHome) {
+        if (Math.random() >= 0.5) {
+          home = teamB;
+          away = teamA;
+        }
+      }
+    }
+
+    homeCount.set(
+      home.shortName,
+      (homeCount.get(home.shortName) || 0) + 1
+    );
+
+    awayCount.set(
+      away.shortName,
+      (awayCount.get(away.shortName) || 0) + 1
+    );
+
+    fixtures.push({
+      md: `UCL-GS-${groupName}-${matchNumber}`,
+      date: '',
+      homeTeam: home.teamName,
+      awayTeam: away.teamName,
+      hg: '',
+      ag: '',
+      result: '',
+      homeShort: home.shortName,
+      awayShort: away.shortName,
+      status: 'Upcoming'
+    });
+
+    matchNumber++;
+  });
+
+  return shuffleArray(fixtures);
 }
 
 function buildAllGroupFixtures(rows, headerMap, groupNames) {
@@ -193,8 +218,11 @@ function buildFixturePreview(fixtures) {
   };
 
   fixtures.forEach(fixture => {
-    const parts = String(fixture.md).split('-');
-    const group = parts[2];
+    const match = String(fixture.md).match(/UCL-GS-([A-Z])/i);
+
+    if (!match) return;
+
+    const group = match[1];
 
     if (grouped[group]) {
       grouped[group].push(fixture);
@@ -203,14 +231,17 @@ function buildFixturePreview(fixtures) {
 
   const lines = [];
 
-  Object.keys(grouped).forEach(group => {
-    lines.push(
-      `**Group ${group}**`
-    );
+  Object.entries(grouped).forEach(([group, matches]) => {
+    lines.push(`**Group ${group}**`);
 
-    grouped[group]
+    matches
+      .sort((a, b) => {
+        const aNum = Number(String(a.md).split('-').pop()) || 0;
+        const bNum = Number(String(b.md).split('-').pop()) || 0;
+        return aNum - bNum;
+      })
       .slice(0, 5)
-      .forEach((fixture, index) => {
+      .forEach(fixture => {
         lines.push(
           `\`${fixture.md}\` • ` +
           `\`${fixture.homeShort}\` ` +
