@@ -98,6 +98,62 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
   });
 }
 
+// Normalizes a fixture row into an object with keys, handling both round-in-column and inferred round.
+function normalizeFixtureRow(row) {
+  const firstColumn = clean(row[0]).toUpperCase();
+  const hasRoundColumn = [
+    'ROUND 1',
+    'QUARTER FINAL',
+    'QUARTER FINAL LEG 1',
+    'QUARTER FINAL LEG 2',
+    'SEMI FINAL',
+    'SEMI FINAL LEG 1',
+    'SEMI FINAL LEG 2',
+    'FINAL',
+    'GROUP STAGE',
+    'QUARTER FINAL QUALIFIER'
+  ].includes(firstColumn);
+
+  if (hasRoundColumn) {
+    return {
+      round: clean(row[0]),
+      md: clean(row[1]),
+      date: clean(row[2]),
+      homeTeam: clean(row[3]),
+      awayTeam: clean(row[4]),
+      hg: clean(row[5]),
+      ag: clean(row[6]),
+      result: clean(row[7]),
+      homeShort: clean(row[8]),
+      awayShort: clean(row[9]),
+      status: clean(row[10])
+    };
+  }
+
+  const md = clean(row[0]);
+  let inferredRound = '';
+
+  if (/ R1-/i.test(md)) inferredRound = 'Round 1';
+  else if (/ QFQ-/i.test(md)) inferredRound = 'Quarter Final Qualifier';
+  else if (/ QF-/i.test(md)) inferredRound = 'Quarter Final';
+  else if (/ SF-/i.test(md)) inferredRound = 'Semi Final';
+  else if (/FINAL/i.test(md)) inferredRound = 'Final';
+
+  return {
+    round: inferredRound,
+    md: clean(row[0]),
+    date: clean(row[1]),
+    homeTeam: clean(row[2]),
+    awayTeam: clean(row[3]),
+    hg: clean(row[4]),
+    ag: clean(row[5]),
+    result: clean(row[6]),
+    homeShort: clean(row[7]),
+    awayShort: clean(row[8]),
+    status: clean(row[9])
+  };
+}
+
 function inferNextRound(currentRound, config) {
   const code = clean(currentRound).toUpperCase();
 
@@ -673,21 +729,10 @@ module.exports = {
       .filter(row => clean(row[0]) || clean(row[1]) || clean(row[3]) || clean(row[4]));
 
     const currentRoundLabel = getRoundLabel(currentRound);
-    const currentRoundFixtures = rows
-      .filter(row => doesFixtureMatchRound(row[0], currentRoundLabel, row[1]))
-      .map(row => ({
-        round: clean(row[0]),
-        md: clean(row[1]),
-        date: clean(row[2]),
-        homeTeam: clean(row[3]),
-        awayTeam: clean(row[4]),
-        hg: clean(row[5]),
-        ag: clean(row[6]),
-        result: clean(row[7]),
-        homeShort: clean(row[8]),
-        awayShort: clean(row[9]),
-        status: clean(row[10])
-      }));
+    const normalizedRows = rows.map(normalizeFixtureRow);
+
+    const currentRoundFixtures = normalizedRows
+      .filter(row => doesFixtureMatchRound(row.round, currentRoundLabel, row.md));
 
     if (!currentRoundFixtures.length) {
       return {
@@ -743,7 +788,10 @@ module.exports = {
       };
     }
 
-    const keptRows = rows.filter(row => !doesFixtureMatchRound(row[0], nextRoundLabel, row[1]));
+    const keptRows = rows.filter(row => {
+      const normalized = normalizeFixtureRow(row);
+      return !doesFixtureMatchRound(normalized.round, nextRoundLabel, normalized.md);
+    });
     const nextRows = nextFixtures.map(fixture => [
       fixture.round || nextRoundLabel,
       fixture.md,
