@@ -156,10 +156,22 @@ function buildFaCupAdvantageDraw(seedRows) {
   };
 }
 
+function chunkArray(items, size) {
+  const chunks = [];
+
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+
+  return chunks;
+}
+
 function formatDrawLines(fixtures) {
-  return fixtures.map((fixture, index) => {
+  const lines = fixtures.map((fixture, index) => {
     return `**${index + 1}.** **${clean(fixture.round || 'Round')}** • \`${clean(fixture.md)}\` • \`${clean(fixture.homeShort)}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(fixture.awayShort)}\``;
-  }).join('\n') || 'No draw generated.';
+  });
+
+  return chunkArray(lines, 8).map(chunk => chunk.join('\n'));
 }
 
 function buildDrawSummary(teamRows, fixtures, roundLabel, grouped = null) {
@@ -246,7 +258,11 @@ module.exports = {
               { name: 'Round', value: summary.round, inline: true },
               { name: 'Loaded From', value: 'FA_Cup_Coop_Fixtures', inline: true },
               { name: 'Format', value: 'Top 4 QF • QFQ • QF/SF 2 Legs', inline: true },
-              { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatDrawLines(fixtures), inline: false }
+              ...formatDrawLines(fixtures).map((value, index) => ({
+                name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+                value,
+                inline: false
+              }))
             )
             .setColor(0x5865F2)
             .setFooter({ text: 'FA Cup Draw • Loaded from fixtures data' })
@@ -364,7 +380,11 @@ module.exports = {
             { name: 'QFQ Path', value: String(summary.qfqPathTeams), inline: true },
             { name: 'Format', value: 'QFQ • QF/SF 2 Legs • Final 1 Match', inline: true },
             { name: 'QFQ Bye', value: draw.qfqBye ? `\`${draw.qfqBye.shortName}\` ${draw.qfqBye.teamName}` : 'N/A', inline: true },
-            { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatDrawLines(generatedFixtures), inline: false }
+            ...formatDrawLines(generatedFixtures).map((value, index) => ({
+              name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+              value,
+              inline: false
+            }))
           )
           .setColor(0x2ECC71)
           .setFooter({ text: 'FA Cup Draw • Top 4 direct QF + QFQ format' })
