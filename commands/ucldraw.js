@@ -27,10 +27,40 @@ function buildGroupFixtures(groupTeams, groupName) {
   const fixtures = [];
   let matchNumber = 1;
 
+  const homeCount = new Map();
+
+  groupTeams.forEach(team => {
+    homeCount.set(team.shortName, 0);
+  });
+
   for (let i = 0; i < groupTeams.length; i++) {
     for (let j = i + 1; j < groupTeams.length; j++) {
-      const home = groupTeams[i];
-      const away = groupTeams[j];
+      let home = groupTeams[i];
+      let away = groupTeams[j];
+
+      const homeGamesA = homeCount.get(home.shortName) || 0;
+      const homeGamesB = homeCount.get(away.shortName) || 0;
+
+      /*
+        Balance logic:
+        - Prefer giving home to lower home-count team
+        - If equal -> random
+      */
+
+      if (homeGamesA > homeGamesB) {
+        home = groupTeams[j];
+        away = groupTeams[i];
+      } else if (homeGamesA === homeGamesB) {
+        if (Math.random() >= 0.5) {
+          home = groupTeams[j];
+          away = groupTeams[i];
+        }
+      }
+
+      homeCount.set(
+        home.shortName,
+        (homeCount.get(home.shortName) || 0) + 1
+      );
 
       fixtures.push({
         md: `UCL-GS-${groupName}-${matchNumber}`,
@@ -156,12 +186,43 @@ function buildGroupedOutput(rows, headerMap, groupNames) {
 }
 
 function buildFixturePreview(fixtures) {
-  return fixtures
-    .slice(0, 15)
-    .map((fixture, index) => {
-      return `**${index + 1}.** \`${fixture.md}\` • \`${fixture.homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${fixture.awayShort}\``;
-    })
-    .join('\n') || 'No fixtures generated.';
+  const grouped = {
+    A: [],
+    B: [],
+    C: []
+  };
+
+  fixtures.forEach(fixture => {
+    const parts = String(fixture.md).split('-');
+    const group = parts[2];
+
+    if (grouped[group]) {
+      grouped[group].push(fixture);
+    }
+  });
+
+  const lines = [];
+
+  Object.keys(grouped).forEach(group => {
+    lines.push(
+      `**Group ${group}**`
+    );
+
+    grouped[group]
+      .slice(0, 5)
+      .forEach((fixture, index) => {
+        lines.push(
+          `\`${fixture.md}\` • ` +
+          `\`${fixture.homeShort}\` ` +
+          `${safeEmoji(E.vs, '⚔️')} ` +
+          `\`${fixture.awayShort}\``
+        );
+      });
+
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
 }
 
 function buildDrawSummary(rows, headerMap, groupNames, fixtures = []) {
