@@ -311,18 +311,14 @@ function shuffleTeams(teams) {
 
 function buildQfqFixtures(winners, competitionCode) {
   const shuffled = shuffleTeams(winners);
+  const byeTeam = shuffled[shuffled.length - 1];
+  const playingTeams = shuffled.slice(0, -1);
   const fixtures = [];
-
-  // One team receives direct QF bye
-  const byeTeam = shuffled[0];
-  const playingTeams = shuffled.slice(1);
-
   let tie = 1;
 
   for (let i = 0; i < playingTeams.length; i += 2) {
     const home = playingTeams[i];
     const away = playingTeams[i + 1];
-
     if (!home || !away) continue;
 
     fixtures.push({
@@ -342,19 +338,21 @@ function buildQfqFixtures(winners, competitionCode) {
     tie += 1;
   }
 
-  fixtures.push({
-    round: 'Quarter Final Qualifier',
-    md: `${competitionCode} QFQ-BYE`,
-    date: '',
-    homeTeam: byeTeam.teamName,
-    awayTeam: 'BYE',
-    hg: '',
-    ag: '',
-    result: 'BYE',
-    homeShort: byeTeam.shortName,
-    awayShort: 'BYE',
-    status: 'Done'
-  });
+  if (byeTeam) {
+    fixtures.push({
+      round: 'Quarter Final Qualifier',
+      md: `${competitionCode} QFQ-BYE`,
+      date: '',
+      homeTeam: byeTeam.teamName,
+      awayTeam: 'BYE',
+      hg: '',
+      ag: '',
+      result: 'BYE',
+      homeShort: byeTeam.shortName,
+      awayShort: 'BYE',
+      status: 'Done'
+    });
+  }
 
   return fixtures;
 }
@@ -448,7 +446,18 @@ function buildNextFixturesFromCurrent(currentFixtures, config, nextRound) {
     return { ok: true, fixtures: buildQfqFixtures(winners, config.code) };
   }
 
-  if ((config.key === 'fa' || config.key === 'carabao' || config.key === 'ucl') && (next === 'QF' || next === 'SF')) {
+  // FA/Carabao Quarter Finals are generated from:
+  // - 3 QFQ winners
+  // - 1 QFQ bye winner
+  // - 4 seeded teams from Teams sheet
+  if ((config.key === 'fa' || config.key === 'carabao') && next === 'QF') {
+    return {
+      ok: false,
+      reason: 'FA/Carabao Quarter Finals must be generated using seeded teams from Teams sheet.'
+    };
+  }
+
+  if ((config.key === 'fa' || config.key === 'carabao' || config.key === 'ucl') && (next === 'SF')) {
     return { ok: true, fixtures: buildTwoLegFixtures(winners, next, config.code) };
   }
 
@@ -697,21 +706,19 @@ module.exports = {
         };
       }
 
-      const nextRows = nextFixtures.map(fixture => {
-        return [
-          fixture.round,
-          fixture.md,
-          fixture.date,
-          fixture.homeTeam,
-          fixture.awayTeam,
-          fixture.hg,
-          fixture.ag,
-          fixture.result,
-          fixture.homeShort,
-          fixture.awayShort,
-          fixture.status
-        ];
-      });
+      const nextRows = nextFixtures.map(fixture => [
+        fixture.round,
+        fixture.md,
+        fixture.date,
+        fixture.homeTeam,
+        fixture.awayTeam,
+        fixture.hg,
+        fixture.ag,
+        fixture.result,
+        fixture.homeShort,
+        fixture.awayShort,
+        fixture.status
+      ]);
 
       await updateData(config.saveRange, nextRows);
       invalidateSheetCache([config.sheet.split('!')[0] + '!']);
@@ -749,6 +756,7 @@ module.exports = {
     }
 
     const fixturesSheet = await cachedGetData(config.sheet).catch(() => []);
+    const teamsSheet = await cachedGetData('Teams!A:Q').catch(() => []);
 
     if (!Array.isArray(fixturesSheet) || fixturesSheet.length <= 1) {
       return { content: `${safeEmoji(E.wrong || E.error, '❌')} ${config.label} fixtures is empty.` };
@@ -777,7 +785,51 @@ module.exports = {
       };
     }
 
-    const advanceResult = buildNextFixturesFromCurrent(currentRoundFixtures, config, nextRound);
+    let advanceResult;
+
+    // FA/Carabao QF generation with seeded teams
+    if ((config.key === 'fa' || config.key === 'carabao') && nextRound === 'QF') {
+      const winnerResult = getWinnersFromFixtures(currentRoundFixtures);
+
+      if (!winnerResult.ok) {
+        return {
+          content: `${safeEmoji(E.wrong || E.error, '❌')} ${winnerResult.reason}`
+        };
+      }
+
+      const qfqWinners = winnerResult.winners;
+
+      const seedColumnIndex = config.key === 'fa' ? 15 : 16;
+
+      const seededTeams = teamsSheet
+        .slice(1)
+        .filter(row => clean(row[seedColumnIndex]).toLowerCase() === 'yes')
+        .map(row => ({
+          teamName: clean(row[0]),
+          shortName: clean(row[1]) || clean(row[0])
+        }));
+
+      if (seededTeams.length !== 4) {
+        return {
+          content: `${safeEmoji(E.wrong || E.error, '❌')} Expected exactly 4 seeded teams in Teams sheet for ${config.label}. Found ${seededTeams.length}.`
+        };
+      }
+
+      const allQuarterFinalists = [...seededTeams, ...qfqWinners];
+
+      if (allQuarterFinalists.length !== 8) {
+        return {
+          content: `${safeEmoji(E.wrong || E.error, '❌')} Quarter Final generation requires 8 teams. Found ${allQuarterFinalists.length}.`
+        };
+      }
+
+      advanceResult = {
+        ok: true,
+        fixtures: buildTwoLegFixtures(allQuarterFinalists, 'QF', config.code)
+      };
+    } else {
+      advanceResult = buildNextFixturesFromCurrent(currentRoundFixtures, config, nextRound);
+    }
     if (!advanceResult.ok) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} ${advanceResult.reason}`
@@ -821,48 +873,25 @@ module.exports = {
     const keptRows = rows.filter(row => {
       const normalized = normalizeFixtureRow(row);
 
-      // Remove only exact same-round fixtures before regenerating.
-      // Prevents QF generation from overwriting QFQ rows.
-      const normalizedRound = clean(normalized.round).toLowerCase();
-      const targetRound = clean(nextRoundLabel).toLowerCase();
-
-      return normalizedRound !== targetRound;
+      // Only remove already-generated fixtures for the exact next round.
+      // Keep older rounds like QFQ when generating QF.
+      return !(
+        doesFixtureMatchRound(normalized.round, nextRoundLabel, normalized.md)
+      );
     });
-    const nextRows = nextFixtures.map(fixture => {
-      // UCL sheet layout:
-      // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
-      if (config.key === 'ucl') {
-        return [
-          fixture.round || nextRoundLabel,
-          fixture.md,
-          fixture.date,
-          fixture.homeTeam,
-          fixture.awayTeam,
-          fixture.hg,
-          fixture.ag,
-          fixture.result,
-          fixture.homeShort,
-          fixture.awayShort,
-          fixture.status
-        ];
-      }
-
-      // FA / Carabao sheet layout:
-      // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
-      return [
-        fixture.md,
-        fixture.date,
-        fixture.homeTeam,
-        fixture.awayTeam,
-        fixture.hg,
-        fixture.ag,
-        fixture.result,
-        fixture.homeShort,
-        fixture.awayShort,
-        fixture.status,
-        fixture.round || nextRoundLabel
-      ];
-    });
+    const nextRows = nextFixtures.map(fixture => [
+      fixture.round || nextRoundLabel,
+      fixture.md,
+      fixture.date,
+      fixture.homeTeam,
+      fixture.awayTeam,
+      fixture.hg,
+      fixture.ag,
+      fixture.result,
+      fixture.homeShort,
+      fixture.awayShort,
+      fixture.status
+    ]);
 
     const rowsToSave = [...keptRows, ...nextRows];
 
