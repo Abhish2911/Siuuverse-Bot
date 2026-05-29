@@ -756,7 +756,7 @@ module.exports = {
     }
 
     const fixturesSheet = await cachedGetData(config.sheet).catch(() => []);
-    const teamsSheet = await cachedGetData('Teams!A:Q').catch(() => []);
+    const teamsSheet = await cachedGetData('Teams!A:R').catch(() => []);
 
     if (!Array.isArray(fixturesSheet) || fixturesSheet.length <= 1) {
       return { content: `${safeEmoji(E.wrong || E.error, '❌')} ${config.label} fixtures is empty.` };
@@ -803,11 +803,16 @@ module.exports = {
 
       const seededTeams = teamsSheet
         .slice(1)
-        .filter(row => clean(row[seedColumnIndex]).toLowerCase() === 'yes')
+        .filter(row => {
+           const seedValue = Number(clean(row[seedColumnIndex]));
+           return !Number.isNaN(seedValue) && seedValue >= 1 && seedValue <= 4;
+        })
         .map(row => ({
           teamName: clean(row[0]),
-          shortName: clean(row[1]) || clean(row[0])
-        }));
+          shortName: clean(row[1]) || clean(row[0]),
+          seed: Number(clean(row[seedColumnIndex]))
+        }))
+        .sort((a, b) => a.seed - b.seed)
 
       if (seededTeams.length !== 4) {
         return {
