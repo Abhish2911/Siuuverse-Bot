@@ -17,6 +17,13 @@ function isOwner(interaction) {
   return ownerIds.includes(interaction.user.id) || interaction.guild?.ownerId === interaction.user.id;
 }
 
+function detectTeamId(values = []) {
+  return values
+    .map(value => clean(value))
+    .find(value => /^T\d+$/i.test(value))
+    ?.toUpperCase() || '';
+}
+
 function buildStandingsRows(rows) {
   return rows
     .slice(1)
@@ -218,9 +225,10 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
     const type = interaction.options.getString('type');
 
-    const [teamsSheet, allTimeTeams] = await Promise.all([
+    const [teamsSheet, allTimeTeams, teamIdMapSheet] = await Promise.all([
       cachedGetData('Teams!A:Z'),
-      cachedGetData('All_Time_Team_Stats!A:Z')
+      cachedGetData('All_Time_Team_Stats!A:Z'),
+      cachedGetData('Team_ID_Map!A:Z')
     ]);
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
@@ -249,16 +257,44 @@ module.exports = {
     }
 
     const standingsRows = buildStandingsRows(allTimeTeams);
-    const ranking = buildPowerRanking(standingsRows).map(row => {
-      const matchingTeamRow = teamRows.find(
-        teamRow => clean(teamRow[headerMap.teamName]).toLowerCase() === row.team.toLowerCase()
-      );
 
-      return {
-        ...row,
-        shortName: matchingTeamRow ? clean(matchingTeamRow[headerMap.shortName]) : row.team
-      };
+    const teamIdRows = Array.isArray(teamIdMapSheet)
+      ? teamIdMapSheet.slice(1).filter(row => clean(row[0]))
+      : [];
+
+    const currentNameByTeamId = new Map();
+
+    teamIdRows.forEach(row => {
+      const teamId = clean(row[0]).toUpperCase();
+      const currentName = clean(row[1]);
+
+      if (teamId && currentName) {
+        currentNameByTeamId.set(teamId, currentName);
+      }
     });
+
+    const ranking = buildPowerRanking(standingsRows)
+      .map(row => {
+        const teamId = detectTeamId(Object.values(row));
+        const mappedCurrentName = currentNameByTeamId.get(teamId);
+
+        const matchingTeamRow = teamRows.find(teamRow => {
+          const currentTeamName = clean(teamRow[headerMap.teamName]).toLowerCase();
+
+          return (
+            currentTeamName === row.team.toLowerCase() ||
+            (mappedCurrentName && currentTeamName === mappedCurrentName.toLowerCase())
+          );
+        });
+
+        return {
+          ...row,
+          team: mappedCurrentName || row.team,
+          shortName: matchingTeamRow
+            ? clean(matchingTeamRow[headerMap.shortName])
+            : row.team
+        };
+      });
 
     if (subcommand === 'view') {
       const columnIndex = type === 'power'
@@ -277,12 +313,16 @@ module.exports = {
           return {
             team,
             shortName: clean(row[headerMap.shortName]),
-            rank: toNumber(row[columnIndex]),
+            rank: toNumber(row[columnIndex]) || 999,
             powerScore: rankingRow?.powerScore || 0
           };
         })
-        .filter(row => row.team && row.rank > 0)
+        .filter(row => row.team)
         .sort((a, b) => a.rank - b.rank || a.team.localeCompare(b.team));
+
+      viewRows.forEach((row, index) => {
+        row.rank = index + 1;
+      });
 
       const summary = buildRankingSummary(viewRows, type);
       const rankingFields = buildRankingFields(viewRows, type);
