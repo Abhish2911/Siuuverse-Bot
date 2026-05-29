@@ -98,10 +98,9 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
   });
 }
 
-// Normalizes a fixture row into an object with keys, handling both round-in-column and inferred round.
 function normalizeFixtureRow(row) {
   const firstColumn = clean(row[0]).toUpperCase();
-  const lastColumn = clean(row[row.length - 1]);
+  const lastColumn = clean(row[row.length - 1]).toUpperCase();
 
   const knownRounds = [
     'ROUND 1',
@@ -117,12 +116,13 @@ function normalizeFixtureRow(row) {
   ];
 
   const hasRoundColumnFirst = knownRounds.includes(firstColumn);
-  const hasRoundColumnLast = knownRounds.includes(clean(lastColumn).toUpperCase());
+  const hasRoundColumnLast = knownRounds.includes(lastColumn);
 
-  // New layout:
+  // Layout:
   // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
   if (hasRoundColumnFirst) {
     return {
+      storageType: 'ROUND_FIRST',
       round: clean(row[0]),
       md: clean(row[1]),
       date: clean(row[2]),
@@ -137,10 +137,11 @@ function normalizeFixtureRow(row) {
     };
   }
 
-  // Current FA/Carabao layout:
+  // Layout:
   // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
   if (hasRoundColumnLast) {
     return {
+      storageType: 'ROUND_LAST',
       round: clean(row[10]),
       md: clean(row[0]),
       date: clean(row[1]),
@@ -166,6 +167,7 @@ function normalizeFixtureRow(row) {
   else if (/FINAL/i.test(md)) inferredRound = 'Final';
 
   return {
+    storageType: 'ROUND_LAST',
     round: inferredRound,
     md: clean(row[0]),
     date: clean(row[1]),
@@ -756,7 +758,7 @@ module.exports = {
     }
 
     const fixturesSheet = await cachedGetData(config.sheet).catch(() => []);
-    const teamsSheet = await cachedGetData('Teams!A:Q').catch(() => []);
+    const teamsSheet = await cachedGetData('Teams!A:R').catch(() => []);
 
     if (!Array.isArray(fixturesSheet) || fixturesSheet.length <= 1) {
       return { content: `${safeEmoji(E.wrong || E.error, '❌')} ${config.label} fixtures is empty.` };
@@ -816,7 +818,7 @@ module.exports = {
           shortName: clean(row[2]) || clean(row[0]),
           seed: Number(clean(row[seedColumnIndex]))
         }))
-        .sort((a, b) => a.seed - b.seed)
+        .sort((a, b) => a.seed - b.seed);
 
       if (seededTeams.length !== 4) {
         return {
@@ -826,6 +828,23 @@ module.exports = {
 
       const allQuarterFinalists = [...seededTeams, ...qfqWinners];
 
+      // Seeded teams must always be paired against QFQ winners.
+      // 1v4 and 2v3 style split.
+      const pairings = [
+        [seededTeams[0], qfqWinners[3]],
+        [seededTeams[1], qfqWinners[2]],
+        [seededTeams[2], qfqWinners[1]],
+        [seededTeams[3], qfqWinners[0]]
+      ];
+
+      const orderedQuarterFinalists = [];
+
+      pairings.forEach(([seeded, qualifier]) => {
+        if (seeded && qualifier) {
+          orderedQuarterFinalists.push(seeded, qualifier);
+        }
+      });
+
       if (allQuarterFinalists.length !== 8) {
         return {
           content: `${safeEmoji(E.wrong || E.error, '❌')} Quarter Final generation requires 8 teams. Found ${allQuarterFinalists.length}.`
@@ -834,7 +853,7 @@ module.exports = {
 
       advanceResult = {
         ok: true,
-        fixtures: buildTwoLegFixtures(allQuarterFinalists, 'QF', config.code)
+        fixtures: buildTwoLegFixtures(orderedQuarterFinalists, 'QF', config.code)
       };
     } else {
       advanceResult = buildNextFixturesFromCurrent(currentRoundFixtures, config, nextRound);
@@ -888,19 +907,46 @@ module.exports = {
         doesFixtureMatchRound(normalized.round, nextRoundLabel, normalized.md)
       );
     });
-    const nextRows = nextFixtures.map(fixture => [
-      fixture.round || nextRoundLabel,
-      fixture.md,
-      fixture.date,
-      fixture.homeTeam,
-      fixture.awayTeam,
-      fixture.hg,
-      fixture.ag,
-      fixture.result,
-      fixture.homeShort,
-      fixture.awayShort,
-      fixture.status
-    ]);
+    const usesRoundLastLayout = rows.some(row => {
+      const normalized = normalizeFixtureRow(row);
+      return normalized.storageType === 'ROUND_LAST';
+    });
+
+    const nextRows = nextFixtures.map(fixture => {
+      // Existing FA/Carabao/UCL sheets:
+      // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
+      if (usesRoundLastLayout) {
+        return [
+          fixture.md,
+          fixture.date,
+          fixture.homeTeam,
+          fixture.awayTeam,
+          fixture.hg,
+          fixture.ag,
+          fixture.result,
+          fixture.homeShort,
+          fixture.awayShort,
+          fixture.status,
+          fixture.round || nextRoundLabel
+        ];
+      }
+
+      // Alternate layout:
+      // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
+      return [
+        fixture.round || nextRoundLabel,
+        fixture.md,
+        fixture.date,
+        fixture.homeTeam,
+        fixture.awayTeam,
+        fixture.hg,
+        fixture.ag,
+        fixture.result,
+        fixture.homeShort,
+        fixture.awayShort,
+        fixture.status
+      ];
+    });
 
     const rowsToSave = [...keptRows, ...nextRows];
 
