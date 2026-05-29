@@ -30,6 +30,48 @@ function getGroupNamesFromTeams(teamRows, headerMap) {
   )].sort((a, b) => a.localeCompare(b));
 }
 
+function buildGroupTeamMap(teamRows, headerMap) {
+  const map = new Map();
+
+  for (const row of teamRows) {
+    const group = clean(row[headerMap.uclGroup]);
+
+    if (!group) continue;
+
+    if (!map.has(group)) {
+      map.set(group, []);
+    }
+
+    map.get(group).push({
+      teamName: clean(row[headerMap.teamName]),
+      shortName: clean(row[headerMap.shortName])
+    });
+  }
+
+  return map;
+}
+
+function applyUclMatchIds(fixtures) {
+  const groupCounters = {};
+
+  return fixtures.map(fixture => {
+    const next = { ...fixture };
+
+    const rawGroup = clean(fixture.md).match(/GS-([A-Z])/i);
+    const groupName = rawGroup?.[1] || 'A';
+
+    if (!groupCounters[groupName]) {
+      groupCounters[groupName] = 1;
+    }
+
+    next.md = `UCL GS-${groupName}-${groupCounters[groupName]}`;
+
+    groupCounters[groupName] += 1;
+
+    return next;
+  });
+}
+
 function validateUclFixtureSetup(activeUclTeams, groupNames, teamsByGroup) {
   if (activeUclTeams.length !== 18) {
     return `UCL group-stage fixtures require exactly **18 active teams**. Current active teams: **${activeUclTeams.length}**.`;
@@ -37,12 +79,14 @@ function validateUclFixtureSetup(activeUclTeams, groupNames, teamsByGroup) {
 
   const expectedGroups = ['A', 'B', 'C'];
   const missingGroups = expectedGroups.filter(group => !groupNames.includes(group));
+
   if (missingGroups.length) {
     return `Missing UCL groups: **${missingGroups.join(', ')}**. Run \`/ucldraw generate\` first.`;
   }
 
   for (const group of expectedGroups) {
     const teams = teamsByGroup.get(group) || [];
+
     if (teams.length !== 6) {
       return `Group **${group}** must have exactly **6 teams**. Current: **${teams.length}**.`;
     }
@@ -59,16 +103,17 @@ function formatFixtureLines(fixtures) {
 
 function buildFixtureSummary(fixtures, activeTeams, groupNames) {
   const expectedFixtures = 45;
-  const teamsPerGroup = groupNames.length ? Math.round(activeTeams / groupNames.length) : 0;
+  const teamsPerGroup = groupNames.length
+    ? Math.round(activeTeams / groupNames.length)
+    : 0;
 
   const firstFixture = fixtures[0];
+
   const topPairing = firstFixture
     ? `\`${clean(firstFixture.homeShort)}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(firstFixture.awayShort)}\``
     : 'N/A';
 
-  const openingStage = firstFixture?.md
-    ? clean(firstFixture.md).split('.')[0]
-    : 'N/A';
+  const openingStage = firstFixture?.md || 'N/A';
 
   return {
     activeTeams,
@@ -91,6 +136,7 @@ function buildFixtureDescription(isGenerated = false) {
     base +
     `${safeEmoji(E.UCL || E.trophy_animated, '🏆')} **Format:** 18 teams → 3 groups of 6.\n` +
     `${safeEmoji(E.played, '🎮')} **Group Stage:** Single round-robin, each team plays 5 matches.\n` +
+    `${safeEmoji(E.calendar, '📅')} **Match IDs:** UCL GS-A-1, UCL GS-B-1 style.\n` +
     `${safeEmoji(E.calendar, '📅')} **Total Group Fixtures:** 45.\n` +
     `${safeEmoji(E.correct, '✅')} **Qualification:** Top 2 each group + best 2 third-place teams.`
   );
@@ -113,15 +159,22 @@ module.exports = {
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
+
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return {
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.`
+      };
     }
 
     const header = teamsSheet[0];
+
     const headerMap = getTeamsHeaderMap(header);
-    const teamRows = teamsSheet.slice(1).filter(row => clean(row[headerMap.teamName]));
+
+    const teamRows = teamsSheet
+      .slice(1)
+      .filter(row => clean(row[headerMap.teamName]));
 
     if (
       headerMap.teamName === -1 ||
@@ -135,7 +188,11 @@ module.exports = {
       };
     }
 
-    const activeUclTeams = getActiveTeamsByCompetition(teamRows, headerMap, 'ucl');
+    const activeUclTeams = getActiveTeamsByCompetition(
+      teamRows,
+      headerMap,
+      'ucl'
+    );
 
     if (!activeUclTeams.length) {
       return {
@@ -143,24 +200,39 @@ module.exports = {
       };
     }
 
-    const missingGroup = activeUclTeams.some(row => !clean(row[headerMap.uclGroup]));
+    const missingGroup = activeUclTeams.some(
+      row => !clean(row[headerMap.uclGroup])
+    );
+
     if (missingGroup) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} Some active UCL teams do not have a UCL Group yet. Run /ucldraw generate first.`
       };
     }
 
-    const groupNames = getGroupNamesFromTeams(activeUclTeams, headerMap);
-    const teamsByGroup = buildGroupTeamMap(activeUclTeams, headerMap);
+    const groupNames = getGroupNamesFromTeams(
+      activeUclTeams,
+      headerMap
+    );
 
-    const setupError = validateUclFixtureSetup(activeUclTeams, groupNames, teamsByGroup);
+    const teamsByGroup = buildGroupTeamMap(
+      activeUclTeams,
+      headerMap
+    );
+
+    const setupError = validateUclFixtureSetup(
+      activeUclTeams,
+      groupNames,
+      teamsByGroup
+    );
+
     if (setupError) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} ${setupError}`
       };
     }
 
-    const generatedFixtures = [];
+    let generatedFixtures = [];
 
     for (const groupName of groupNames) {
       const groupTeams = teamsByGroup.get(groupName) || [];
@@ -181,6 +253,8 @@ module.exports = {
       generatedFixtures.push(...groupFixtures);
     }
 
+    generatedFixtures = applyUclMatchIds(generatedFixtures);
+
     if (!generatedFixtures.length) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} Could not generate UCL group fixtures.`
@@ -194,7 +268,11 @@ module.exports = {
     }
 
     if (subcommand === 'preview') {
-      const summary = buildFixtureSummary(generatedFixtures, activeUclTeams.length, groupNames);
+      const summary = buildFixtureSummary(
+        generatedFixtures,
+        activeUclTeams.length,
+        groupNames
+      );
 
       return {
         embeds: [
@@ -210,16 +288,24 @@ module.exports = {
               { name: 'Group List', value: summary.groupList, inline: true },
               { name: 'Opening Stage', value: summary.openingStage, inline: true },
               { name: 'Top Pairing', value: summary.topPairing, inline: true },
-              { name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`, value: formatFixtureLines(generatedFixtures), inline: false }
+              {
+                name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`,
+                value: formatFixtureLines(generatedFixtures),
+                inline: false
+              }
             )
             .setColor(0x5865F2)
-            .setFooter({ text: 'UCL Fixtures • 3 groups of 6 preview' })
+            .setFooter({
+              text: 'UCL Fixtures • GS-A-1 style IDs'
+            })
         ]
       };
     }
 
     if (!isOwner(interaction)) {
-      return { content: `${safeEmoji(E.lock || E.error, '🚫')} Owner only command.` };
+      return {
+        content: `${safeEmoji(E.lock || E.error, '🚫')} Owner only command.`
+      };
     }
 
     const rowsToSave = generatedFixtures.map(fixture => [
@@ -235,22 +321,48 @@ module.exports = {
       fixture.status
     ]);
 
-    await updateData('UCL_Coop_Group_Fixtures!A2:J', rowsToSave);
-    invalidateSheetCache(['UCL_Coop_Group_Fixtures!']);
+    await updateData(
+      'UCL_Coop_Group_Fixtures!A2:J',
+      rowsToSave
+    );
+
+    invalidateSheetCache([
+      'UCL_Coop_Group_Fixtures!'
+    ]);
 
     sendAuditLog(interaction, {
       title: '🏆 UCL Fixtures Generated',
       description: 'UCL group-stage fixtures were generated and saved into UCL_Coop_Group_Fixtures.',
       color: 0x5865F2,
       fields: [
-        { name: 'Active Teams', value: String(activeUclTeams.length), inline: true },
-        { name: 'Groups', value: groupNames.join(', '), inline: true },
-        { name: 'Teams / Group', value: '6', inline: true },
-        { name: 'Fixtures', value: String(generatedFixtures.length), inline: true }
+        {
+          name: 'Active Teams',
+          value: String(activeUclTeams.length),
+          inline: true
+        },
+        {
+          name: 'Groups',
+          value: groupNames.join(', '),
+          inline: true
+        },
+        {
+          name: 'Teams / Group',
+          value: '6',
+          inline: true
+        },
+        {
+          name: 'Fixtures',
+          value: String(generatedFixtures.length),
+          inline: true
+        }
       ]
     });
 
-    const summary = buildFixtureSummary(generatedFixtures, activeUclTeams.length, groupNames);
+    const summary = buildFixtureSummary(
+      generatedFixtures,
+      activeUclTeams.length,
+      groupNames
+    );
 
     return {
       embeds: [
@@ -267,10 +379,16 @@ module.exports = {
             { name: 'Opening Stage', value: summary.openingStage, inline: true },
             { name: 'Top Pairing', value: summary.topPairing, inline: true },
             { name: 'Saved To', value: 'UCL_Coop_Group_Fixtures', inline: true },
-            { name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`, value: formatFixtureLines(generatedFixtures), inline: false }
+            {
+              name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`,
+              value: formatFixtureLines(generatedFixtures),
+              inline: false
+            }
           )
           .setColor(0x2ECC71)
-          .setFooter({ text: 'UCL Fixtures • 3 groups of 6 generated' })
+          .setFooter({
+            text: 'UCL Fixtures • GS-A-1 style generated'
+          })
       ]
     };
   }
