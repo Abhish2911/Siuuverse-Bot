@@ -311,14 +311,18 @@ function shuffleTeams(teams) {
 
 function buildQfqFixtures(winners, competitionCode) {
   const shuffled = shuffleTeams(winners);
-  const byeTeam = shuffled[shuffled.length - 1];
-  const playingTeams = shuffled.slice(0, -1);
   const fixtures = [];
+
+  // One team receives direct QF bye
+  const byeTeam = shuffled[0];
+  const playingTeams = shuffled.slice(1);
+
   let tie = 1;
 
   for (let i = 0; i < playingTeams.length; i += 2) {
     const home = playingTeams[i];
     const away = playingTeams[i + 1];
+
     if (!home || !away) continue;
 
     fixtures.push({
@@ -338,21 +342,19 @@ function buildQfqFixtures(winners, competitionCode) {
     tie += 1;
   }
 
-  if (byeTeam) {
-    fixtures.push({
-      round: 'Quarter Final Qualifier',
-      md: `${competitionCode} QFQ-BYE`,
-      date: '',
-      homeTeam: byeTeam.teamName,
-      awayTeam: 'BYE',
-      hg: '',
-      ag: '',
-      result: 'BYE',
-      homeShort: byeTeam.shortName,
-      awayShort: 'BYE',
-      status: 'Done'
-    });
-  }
+  fixtures.push({
+    round: 'Quarter Final Qualifier',
+    md: `${competitionCode} QFQ-BYE`,
+    date: '',
+    homeTeam: byeTeam.teamName,
+    awayTeam: 'BYE',
+    hg: '',
+    ag: '',
+    result: 'BYE',
+    homeShort: byeTeam.shortName,
+    awayShort: 'BYE',
+    status: 'Done'
+  });
 
   return fixtures;
 }
@@ -818,7 +820,13 @@ module.exports = {
 
     const keptRows = rows.filter(row => {
       const normalized = normalizeFixtureRow(row);
-      return !doesFixtureMatchRound(normalized.round, nextRoundLabel, normalized.md);
+
+      // Remove only exact same-round fixtures before regenerating.
+      // Prevents QF generation from overwriting QFQ rows.
+      const normalizedRound = clean(normalized.round).toLowerCase();
+      const targetRound = clean(nextRoundLabel).toLowerCase();
+
+      return normalizedRound !== targetRound;
     });
     const nextRows = nextFixtures.map(fixture => {
       // UCL sheet layout:
