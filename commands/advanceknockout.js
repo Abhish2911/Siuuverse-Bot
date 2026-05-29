@@ -82,7 +82,10 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
   const targetAliases = aliases[target] || [target];
 
   const roundMatched = fixture && targetAliases.some(alias => {
-    return fixture === alias || fixture.startsWith(alias);
+    // Exact matching only.
+    // Prevent "quarter final" from matching
+    // "quarter final qualifier".
+    return fixture === alias;
   });
 
   if (roundMatched) return true;
