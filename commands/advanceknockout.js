@@ -62,6 +62,17 @@ function getRoundLabel(roundCode) {
   return 'Final';
 }
 
+function doesFixtureMatchRound(fixtureRound, targetRoundLabel) {
+  const fixture = clean(fixtureRound).toLowerCase();
+  const target = clean(targetRoundLabel).toLowerCase();
+
+  if (!fixture || !target) return false;
+
+  if (fixture === target) return true;
+
+  return fixture.startsWith(target);
+}
+
 function inferNextRound(currentRound, config) {
   const code = clean(currentRound).toUpperCase();
 
@@ -638,7 +649,7 @@ module.exports = {
 
     const currentRoundLabel = getRoundLabel(currentRound);
     const currentRoundFixtures = rows
-      .filter(row => clean(row[0]).toLowerCase() === currentRoundLabel.toLowerCase())
+      .filter(row => doesFixtureMatchRound(row[0], currentRoundLabel))
       .map(row => ({
         round: clean(row[0]),
         md: clean(row[1]),
@@ -707,7 +718,7 @@ module.exports = {
       };
     }
 
-    const keptRows = rows.filter(row => clean(row[0]).toLowerCase() !== nextRoundLabel.toLowerCase());
+    const keptRows = rows.filter(row => !doesFixtureMatchRound(row[0], nextRoundLabel));
     const nextRows = nextFixtures.map(fixture => [
       fixture.round || nextRoundLabel,
       fixture.md,
