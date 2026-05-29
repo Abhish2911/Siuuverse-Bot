@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData, invalidateSheetCache, sendAuditLog } = require('../utils/helpers');
-const { updateData } = require('../utils/sheets');
+const { updateData, getData } = require('../utils/sheets');
 const { clean, toNumber, getTeamsHeaderMap } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
@@ -15,13 +15,6 @@ function isOwner(interaction) {
     .filter(Boolean);
 
   return ownerIds.includes(interaction.user.id) || interaction.guild?.ownerId === interaction.user.id;
-}
-
-function detectTeamId(values = []) {
-  return values
-    .map(value => clean(value))
-    .find(value => /^T\d+$/i.test(value))
-    ?.toUpperCase() || '';
 }
 
 function buildStandingsRows(rows) {
@@ -97,6 +90,86 @@ function buildPowerRanking(standingsRows) {
     }));
 }
 
+async function buildTeamIdMap() {
+  try {
+    const rows = await getData('Team_ID_Map!A:Z');
+
+    if (!Array.isArray(rows) || rows.length <= 1) {
+      return new Map();
+    }
+
+    const map = new Map();
+
+    rows.slice(1).forEach(row => {
+      const teamId = clean(row[0]).toUpperCase();
+      const currentName = clean(row[1]);
+      const oldNames = String(row[2] || '')
+        .split(',')
+        .map(name => clean(name).toLowerCase())
+        .filter(Boolean);
+
+      if (!teamId) return;
+
+      map.set(teamId, {
+        currentName,
+        aliases: [currentName.toLowerCase(), ...oldNames]
+      });
+    });
+
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function buildRankingWithTeamMap(ranking, teamRows, headerMap, teamIdMap) {
+  const rankingByName = new Map();
+
+  ranking.forEach(row => {
+    rankingByName.set(row.team.toLowerCase(), row);
+  });
+
+  const finalRows = teamRows
+    .map(row => {
+      const teamName = clean(row[headerMap.teamName]);
+      const shortName = clean(row[headerMap.shortName]);
+      const teamId = clean(row[headerMap.teamId] || '').toUpperCase();
+
+      let matchedRanking = rankingByName.get(teamName.toLowerCase());
+
+      if (!matchedRanking && teamId && teamIdMap.has(teamId)) {
+        const mapped = teamIdMap.get(teamId);
+
+        matchedRanking = ranking.find(rankRow =>
+          mapped.aliases.includes(rankRow.team.toLowerCase())
+        );
+      }
+
+      return {
+        team: teamName,
+        shortName,
+        powerScore: matchedRanking?.powerScore || 0,
+        points: matchedRanking?.points || 0,
+        gd: matchedRanking?.gd || 0,
+        goals: matchedRanking?.goals || 0,
+        sourceTeam: matchedRanking?.team || teamName
+      };
+    })
+    .sort((a, b) => {
+      if (b.powerScore !== a.powerScore) return b.powerScore - a.powerScore;
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.gd !== a.gd) return b.gd - a.gd;
+      if (b.goals !== a.goals) return b.goals - a.goals;
+      return a.team.localeCompare(b.team);
+    })
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1
+    }));
+
+  return finalRows;
+}
+
 function applyRanksToTeams(teamRows, headerMap, ranking, targetColumn) {
   const rankingByTeam = new Map(ranking.map(row => [row.team.toLowerCase(), row]));
 
@@ -108,7 +181,7 @@ function applyRanksToTeams(teamRows, headerMap, ranking, targetColumn) {
     next[targetColumn] = rankingRow?.rank || '';
 
     if (headerMap.powerScore !== -1) {
-      next[headerMap.powerScore] = rankingRow ? toNumber(rankingRow.powerScore) : '';
+      next[headerMap.powerScore] = rankingRow ? toNumber(rankingRow.powerScore) : 0;
     }
 
     return next;
@@ -225,10 +298,10 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
     const type = interaction.options.getString('type');
 
-    const [teamsSheet, allTimeTeams, teamIdMapSheet] = await Promise.all([
+    const [teamsSheet, allTimeTeams, teamIdMap] = await Promise.all([
       cachedGetData('Teams!A:Z'),
       cachedGetData('All_Time_Team_Stats!A:Z'),
-      cachedGetData('Team_ID_Map!A:Z')
+      buildTeamIdMap()
     ]);
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
@@ -249,7 +322,8 @@ module.exports = {
       headerMap.powerRank === -1 ||
       headerMap.powerScore === -1 ||
       headerMap.faSeed === -1 ||
-      headerMap.carabaoSeed === -1
+      headerMap.carabaoSeed === -1 ||
+      headerMap.teamId === -1
     ) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is missing one of these columns: Team Name, Short Name, Power Rank, Power Score, FA Cup Seed, Carabao Seed.`
@@ -258,43 +332,14 @@ module.exports = {
 
     const standingsRows = buildStandingsRows(allTimeTeams);
 
-    const teamIdRows = Array.isArray(teamIdMapSheet)
-      ? teamIdMapSheet.slice(1).filter(row => clean(row[0]))
-      : [];
+    const baseRanking = buildPowerRanking(standingsRows);
 
-    const currentNameByTeamId = new Map();
-
-    teamIdRows.forEach(row => {
-      const teamId = clean(row[0]).toUpperCase();
-      const currentName = clean(row[1]);
-
-      if (teamId && currentName) {
-        currentNameByTeamId.set(teamId, currentName);
-      }
-    });
-
-    const ranking = buildPowerRanking(standingsRows)
-      .map(row => {
-        const teamId = detectTeamId(Object.values(row));
-        const mappedCurrentName = currentNameByTeamId.get(teamId);
-
-        const matchingTeamRow = teamRows.find(teamRow => {
-          const currentTeamName = clean(teamRow[headerMap.teamName]).toLowerCase();
-
-          return (
-            currentTeamName === row.team.toLowerCase() ||
-            (mappedCurrentName && currentTeamName === mappedCurrentName.toLowerCase())
-          );
-        });
-
-        return {
-          ...row,
-          team: mappedCurrentName || row.team,
-          shortName: matchingTeamRow
-            ? clean(matchingTeamRow[headerMap.shortName])
-            : row.team
-        };
-      });
+    const ranking = buildRankingWithTeamMap(
+      baseRanking,
+      teamRows,
+      headerMap,
+      teamIdMap
+    );
 
     if (subcommand === 'view') {
       const columnIndex = type === 'power'
@@ -303,26 +348,20 @@ module.exports = {
           ? headerMap.faSeed
           : headerMap.carabaoSeed;
 
-      const rankingByTeam = new Map(ranking.map(row => [row.team.toLowerCase(), row]));
-
       const viewRows = teamRows
         .map(row => {
           const team = clean(row[headerMap.teamName]);
-          const rankingRow = rankingByTeam.get(team.toLowerCase());
+          const rankingRow = null;
 
           return {
             team,
             shortName: clean(row[headerMap.shortName]),
-            rank: toNumber(row[columnIndex]) || 999,
-            powerScore: rankingRow?.powerScore || 0
+            rank: toNumber(row[columnIndex]),
+            powerScore: toNumber(row[headerMap.powerScore]) || rankingRow?.powerScore || 0
           };
         })
-        .filter(row => row.team)
+        .filter(row => row.team && row.rank > 0)
         .sort((a, b) => a.rank - b.rank || a.team.localeCompare(b.team));
-
-      viewRows.forEach((row, index) => {
-        row.rank = index + 1;
-      });
 
       const summary = buildRankingSummary(viewRows, type);
       const rankingFields = buildRankingFields(viewRows, type);
