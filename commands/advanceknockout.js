@@ -27,7 +27,7 @@ function getCompetitionConfig(key) {
       label: 'FA Cup',
       code: 'FA',
       sheet: 'FA_Cup_Coop_Fixtures!A:K',
-      saveRange: 'FA_Cup_Coop_Fixtures!A2:K'
+      saveRange: 'FA_Cup_Coop_Fixtures!A2:L'
     };
   }
 
@@ -37,7 +37,7 @@ function getCompetitionConfig(key) {
       label: 'Carabao Cup',
       code: 'CB',
       sheet: 'Carabao_Coop_Fixtures!A:K',
-      saveRange: 'Carabao_Coop_Fixtures!A2:K'
+      saveRange: 'Carabao_Coop_Fixtures!A2:L'
     };
   }
 
@@ -46,7 +46,7 @@ function getCompetitionConfig(key) {
     label: 'UCL',
     code: 'UCL',
     sheet: 'UCL_Coop_Knockout_Fixtures!A:K',
-    saveRange: 'UCL_Coop_Knockout_Fixtures!A2:K',
+    saveRange: 'UCL_Coop_Knockout_Fixtures!A2:L',
     groupStandingsSheet: 'UCL_Coop_Group_Standings!A:K'
   };
 }
@@ -139,7 +139,7 @@ function normalizeFixtureRow(row) {
   const hasRoundColumnLast = knownRounds.includes(lastColumn);
 
   // Layout:
-  // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
+  // Round | MD | Date | Home | Away | HG | AG | Result | Decision | HS | AS | Status
   if (hasRoundColumnFirst) {
     return {
       storageType: 'ROUND_FIRST',
@@ -151,18 +151,19 @@ function normalizeFixtureRow(row) {
       hg: clean(row[5]),
       ag: clean(row[6]),
       result: clean(row[7]),
-      homeShort: clean(row[8]),
-      awayShort: clean(row[9]),
-      status: clean(row[10])
+      decision: clean(row[8]),
+      homeShort: clean(row[9]),
+      awayShort: clean(row[10]),
+      status: clean(row[11])
     };
   }
 
   // Layout:
-  // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
+  // MD | Date | Home | Away | HG | AG | Result | Decision | HS | AS | Status | Round
   if (hasRoundColumnLast) {
     return {
       storageType: 'ROUND_LAST',
-      round: clean(row[10]),
+      round: clean(row[11]),
       md: clean(row[0]),
       date: clean(row[1]),
       homeTeam: clean(row[2]),
@@ -170,9 +171,10 @@ function normalizeFixtureRow(row) {
       hg: clean(row[4]),
       ag: clean(row[5]),
       result: clean(row[6]),
-      homeShort: clean(row[7]),
-      awayShort: clean(row[8]),
-      status: clean(row[9])
+      decision: clean(row[7]),
+      homeShort: clean(row[8]),
+      awayShort: clean(row[9]),
+      status: clean(row[10])
     };
   }
 
@@ -196,9 +198,10 @@ function normalizeFixtureRow(row) {
     hg: clean(row[4]),
     ag: clean(row[5]),
     result: clean(row[6]),
-    homeShort: clean(row[7]),
-    awayShort: clean(row[8]),
-    status: clean(row[9])
+    decision: clean(row[7]),
+    homeShort: clean(row[8]),
+    awayShort: clean(row[9]),
+    status: clean(row[10])
   };
 }
 
@@ -243,11 +246,26 @@ function getWinnerFromSingleFixture(fixture) {
   const hg = toNumber(fixture.hg);
   const ag = toNumber(fixture.ag);
 
-  if (hg === ag) return null;
+  if (hg > ag) {
+    return { teamName: fixture.homeTeam, shortName: fixture.homeShort };
+  }
 
-  return hg > ag
-    ? { teamName: fixture.homeTeam, shortName: fixture.homeShort }
-    : { teamName: fixture.awayTeam, shortName: fixture.awayShort };
+  if (ag > hg) {
+    return { teamName: fixture.awayTeam, shortName: fixture.awayShort };
+  }
+
+  // DRAW → use decision column (NEW)
+  const d = (fixture.decision || '').toUpperCase();
+
+  if (d === 'ET H' || d === 'PENS H') {
+    return { teamName: fixture.homeTeam, shortName: fixture.homeShort };
+  }
+
+  if (d === 'ET A' || d === 'PENS A') {
+    return { teamName: fixture.awayTeam, shortName: fixture.awayShort };
+  }
+
+  return null;
 }
 
 function getWinnersFromFixtures(fixtures) {
@@ -352,6 +370,7 @@ function buildQfqFixtures(winners, competitionCode) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: home.shortName,
       awayShort: away.shortName,
       status: 'Upcoming'
@@ -370,6 +389,7 @@ function buildQfqFixtures(winners, competitionCode) {
       hg: '',
       ag: '',
       result: 'BYE',
+      decision: '',
       homeShort: byeTeam.shortName,
       awayShort: 'BYE',
       status: 'Done'
@@ -398,6 +418,7 @@ function buildTwoLegFixtures(winners, nextRoundCode, competitionCode) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: home.shortName,
       awayShort: away.shortName,
       status: 'Upcoming'
@@ -412,6 +433,7 @@ function buildTwoLegFixtures(winners, nextRoundCode, competitionCode) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: away.shortName,
       awayShort: home.shortName,
       status: 'Upcoming'
@@ -442,6 +464,7 @@ function buildSingleLegFixtures(winners, nextRoundCode, competitionCode) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: home.shortName,
       awayShort: away.shortName,
       status: 'Upcoming'
