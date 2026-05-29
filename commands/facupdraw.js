@@ -100,8 +100,15 @@ function shuffleTeams(teams) {
 
 function buildQfqFixtures(round1WinnerSlots) {
   const shuffled = shuffleTeams(round1WinnerSlots);
+
   const byeTeam = shuffled[shuffled.length - 1];
-  const fixtures = pairSequentialTeams(shuffled, 'Quarter Final Qualifier', 'FA QFQ');
+  const playingTeams = shuffled.slice(0, -1);
+
+  const fixtures = pairSequentialTeams(
+    playingTeams,
+    'Quarter Final Qualifier',
+    'FA QFQ'
+  );
 
   return {
     fixtures,
@@ -266,14 +273,15 @@ module.exports = {
         };
       }
 
-      const rows = fixturesSheet.slice(1).filter(row => clean(row[1]) || clean(row[2]) || clean(row[3]));
+      const rows = fixturesSheet.slice(1).filter(row => clean(row[0]) || clean(row[2]) || clean(row[3]));
       const fixtures = rows.map(row => ({
-        round: clean(row[0]),
-        md: clean(row[1]),
-        homeTeam: clean(row[3]),
-        awayTeam: clean(row[4]),
-        homeShort: clean(row[8]),
-        awayShort: clean(row[9])
+        md: clean(row[0]),
+        homeTeam: clean(row[2]),
+        awayTeam: clean(row[3]),
+        homeShort: clean(row[7]),
+        awayShort: clean(row[8]),
+        status: clean(row[9]),
+        round: clean(row[10])
       }));
 
       const roundLabel = fixtures[0]?.round || 'Draw';
@@ -374,14 +382,11 @@ module.exports = {
       clean(fixture.result),
       clean(fixture.homeShort),
       clean(fixture.awayShort),
-      clean(fixture.status)
+      clean(fixture.status),
+      clean(fixture.round)
     ]);
 
-    await updateData('FA_Cup_Coop_Fixtures!A2:J', rowsToSave);
-    await updateData(
-      `FA_Cup_Coop_Fixtures!K2:K${rowsToSave.length + 1}`,
-      rowsToSave.map(() => [''])
-    );
+    await updateData('FA_Cup_Coop_Fixtures!A2:K', rowsToSave);
     invalidateSheetCache(['FA_Cup_Coop_Fixtures!']);
 
     sendAuditLog(interaction, {
