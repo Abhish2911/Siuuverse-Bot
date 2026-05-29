@@ -128,8 +128,37 @@ function buildFaCupAdvantageDraw(seedRows) {
     seed: 200 + index
   }));
 
-  const qfTeams = [...grouped.top4, ...qfqWinnerSlots, qfqDraw.byeTeam].filter(Boolean);
-  const qfFixtures = pairSequentialTeams(qfTeams, 'Quarter Final', 'FA QF', 1, true);
+  const qfOpponents = [...qfqWinnerSlots, qfqDraw.byeTeam].filter(Boolean);
+  const shuffledSeeds = shuffleTeams(grouped.top4);
+  const shuffledOpponents = shuffleTeams(qfOpponents);
+
+  const qfFixtures = [];
+
+  for (let i = 0; i < Math.min(shuffledSeeds.length, shuffledOpponents.length); i++) {
+    const seededTeam = shuffledSeeds[i];
+    const opponentTeam = shuffledOpponents[i];
+    const matchNumber = i + 1;
+
+    qfFixtures.push(
+      buildCupFixture(
+        'Quarter Final',
+        `FA QF-${matchNumber}A`,
+        seededTeam,
+        opponentTeam,
+        'Leg 1'
+      )
+    );
+
+    qfFixtures.push(
+      buildCupFixture(
+        'Quarter Final',
+        `FA QF-${matchNumber}B`,
+        opponentTeam,
+        seededTeam,
+        'Leg 2'
+      )
+    );
+  }
 
   const sfSlots = [1, 2, 3, 4].map(number => ({
     teamName: `Winner FA QF-${number}`,
@@ -349,6 +378,10 @@ module.exports = {
     ]);
 
     await updateData('FA_Cup_Coop_Fixtures!A2:J', rowsToSave);
+    await updateData(
+      `FA_Cup_Coop_Fixtures!K2:K${rowsToSave.length + 1}`,
+      rowsToSave.map(() => [''])
+    );
     invalidateSheetCache(['FA_Cup_Coop_Fixtures!']);
 
     sendAuditLog(interaction, {
