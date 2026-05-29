@@ -69,13 +69,21 @@ function pairSequentialTeams(teams, round, prefix, startNumber = 1, twoLegged = 
   for (let i = 0; i < teams.length; i += 2) {
     const home = teams[i];
     const away = teams[i + 1];
+
     if (!home || !away) continue;
 
     if (twoLegged) {
-      fixtures.push(buildCupFixture(round, `${prefix}-${matchNumber}A`, home, away, 'Leg 1'));
-      fixtures.push(buildCupFixture(round, `${prefix}-${matchNumber}B`, away, home, 'Leg 2'));
+      fixtures.push(
+        buildCupFixture(round, `${prefix}-${matchNumber}A`, home, away, 'Leg 1')
+      );
+
+      fixtures.push(
+        buildCupFixture(round, `${prefix}-${matchNumber}B`, away, home, 'Leg 2')
+      );
     } else {
-      fixtures.push(buildCupFixture(round, `${prefix}-${matchNumber}`, home, away));
+      fixtures.push(
+        buildCupFixture(round, `${prefix}-${matchNumber}`, home, away)
+      );
     }
 
     matchNumber += 1;
@@ -110,7 +118,13 @@ function buildQfqFixtures(round1WinnerSlots) {
 function buildCarabaoAdvantageDraw(seedRows) {
   const grouped = splitSeedsForCupFormat(seedRows);
 
-  const round1Fixtures = pairSequentialTeams(grouped.round1, 'Round 1', 'CB R1');
+  const shuffledRound1 = shuffleTeams(grouped.round1);
+
+  const round1Fixtures = pairSequentialTeams(
+    shuffledRound1,
+    'Round 1',
+    'CB R1'
+  );
 
   const round1WinnerSlots = round1Fixtures.map((fixture, index) => ({
     teamName: `Winner ${fixture.md}`,
@@ -126,21 +140,56 @@ function buildCarabaoAdvantageDraw(seedRows) {
     seed: 200 + index
   }));
 
-  const qfTeams = [...grouped.top4, ...qfqWinnerSlots, qfqDraw.byeTeam].filter(Boolean);
-  const qfFixtures = pairSequentialTeams(qfTeams, 'Quarter Final', 'CB QF', 1, true);
+  const seededTeams = shuffleTeams(grouped.top4);
+  const qualifierTeams = shuffleTeams([
+    ...qfqWinnerSlots,
+    qfqDraw.byeTeam
+  ].filter(Boolean));
+
+  const qfPairings = [];
+
+  for (let i = 0; i < seededTeams.length; i++) {
+    const seeded = seededTeams[i];
+    const qualifier = qualifierTeams[i];
+
+    if (!seeded || !qualifier) continue;
+
+    qfPairings.push(seeded, qualifier);
+  }
+
+  const qfFixtures = pairSequentialTeams(
+    qfPairings,
+    'Quarter Final',
+    'CB QF',
+    1,
+    true
+  );
 
   const sfSlots = [1, 2, 3, 4].map(number => ({
     teamName: `Winner CB QF-${number}`,
     shortName: `SF${number}`,
     seed: 300 + number
   }));
-  const sfFixtures = pairSequentialTeams(sfSlots, 'Semi Final', 'CB SF', 1, true);
+
+  const sfFixtures = pairSequentialTeams(
+    sfSlots,
+    'Semi Final',
+    'CB SF',
+    1,
+    true
+  );
 
   const finalFixture = buildCupFixture(
     'Final',
     'CB Final',
-    { teamName: 'Winner CB SF-1', shortName: 'F1' },
-    { teamName: 'Winner CB SF-2', shortName: 'F2' }
+    {
+      teamName: 'Winner CB SF-1',
+      shortName: 'F1'
+    },
+    {
+      teamName: 'Winner CB SF-2',
+      shortName: 'F2'
+    }
   );
 
   return {
@@ -157,9 +206,21 @@ function buildCarabaoAdvantageDraw(seedRows) {
 }
 
 function formatDrawLines(fixtures) {
-  return fixtures.map((fixture, index) => {
+  if (!fixtures.length) {
+    return ['No draw generated.'];
+  }
+
+  const lines = fixtures.map((fixture, index) => {
     return `**${index + 1}.** **${clean(fixture.round || 'Round')}** • \`${clean(fixture.md)}\` • \`${clean(fixture.homeShort)}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(fixture.awayShort)}\``;
-  }).join('\n') || 'No draw generated.';
+  });
+
+  const chunks = [];
+
+  for (let i = 0; i < lines.length; i += 8) {
+    chunks.push(lines.slice(i, i + 8).join('\n'));
+  }
+
+  return chunks;
 }
 
 function buildDrawSummary(teamRows, fixtures, roundLabel, grouped = null) {
@@ -235,6 +296,7 @@ module.exports = {
 
       const roundLabel = fixtures[0]?.round || 'Draw';
       const summary = buildDrawSummary([], fixtures, roundLabel);
+      const pairingChunks = formatDrawLines(fixtures);
 
       return {
         embeds: [
@@ -246,7 +308,11 @@ module.exports = {
               { name: 'Round', value: summary.round, inline: true },
               { name: 'Loaded From', value: 'Carabao_Coop_Fixtures', inline: true },
               { name: 'Format', value: 'Top 4 QF • QFQ • QF/SF 2 Legs', inline: true },
-              { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatDrawLines(fixtures), inline: false }
+              ...pairingChunks.map((chunk, index) => ({
+                name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+                value: chunk,
+                inline: false
+              }))
             )
             .setColor(0x5865F2)
             .setFooter({ text: 'Carabao Draw • Loaded from fixtures' })
@@ -329,7 +395,7 @@ module.exports = {
       fixture.homeShort,
       fixture.awayShort,
       fixture.status
-    ]);
+    ].slice(0, 11));
 
     await updateData('Carabao_Coop_Fixtures!A2:K', rowsToSave);
     invalidateSheetCache(['Carabao_Coop_Fixtures!']);
@@ -350,6 +416,7 @@ module.exports = {
     });
 
     const summary = buildDrawSummary(summaryTeams, generatedFixtures, roundLabel, draw.grouped);
+    const pairingChunks = formatDrawLines(generatedFixtures);
 
     return {
       embeds: [
@@ -364,7 +431,11 @@ module.exports = {
             { name: 'QFQ Path', value: String(summary.qfqPathTeams), inline: true },
             { name: 'Format', value: 'QFQ • QF/SF 2 Legs • Final 1 Match', inline: true },
             { name: 'QFQ Bye', value: draw.qfqBye ? `\`${draw.qfqBye.shortName}\` ${draw.qfqBye.teamName}` : 'N/A', inline: true },
-            { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatDrawLines(generatedFixtures), inline: false }
+            ...pairingChunks.map((chunk, index) => ({
+              name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+              value: chunk,
+              inline: false
+            }))
           )
           .setColor(0x2ECC71)
           .setFooter({ text: 'Carabao Draw • Top 4 direct QF + QFQ format' })
