@@ -396,9 +396,10 @@ module.exports = {
       fixture.result,
       fixture.homeShort,
       fixture.awayShort,
-      fixture.status,
-      ''
+      fixture.status
     ]);
+
+await updateData('UCL_Coop_Group_Fixtures!A2:J', fixtureRows);
 
     await updateData('UCL_Coop_Group_Fixtures!A2:J', fixtureRows);
 
