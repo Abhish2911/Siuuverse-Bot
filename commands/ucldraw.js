@@ -5,7 +5,8 @@ const {
   clean,
   toNumber,
   getTeamsHeaderMap,
-  getActiveTeamsByCompetition
+  getActiveTeamsByCompetition,
+  shuffleArray
 } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
@@ -22,19 +23,56 @@ function isOwner(interaction) {
   return ownerIds.includes(interaction.user.id) || interaction.guild?.ownerId === interaction.user.id;
 }
 
-function getGroupNames(teamCount) {
-  return ['A', 'B', 'C'];
-}
+function buildGroupFixtures(groupTeams, groupName) {
+  const fixtures = [];
+  let matchNumber = 1;
 
-function shuffleRows(rows) {
-  const copy = [...rows];
+  for (let i = 0; i < groupTeams.length; i++) {
+    for (let j = i + 1; j < groupTeams.length; j++) {
+      const home = groupTeams[i];
+      const away = groupTeams[j];
 
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+      fixtures.push({
+        md: `UCL GS-${groupName}-${matchNumber}`,
+        date: '',
+        homeTeam: home.teamName,
+        awayTeam: away.teamName,
+        hg: '',
+        ag: '',
+        result: '',
+        homeShort: home.shortName,
+        awayShort: away.shortName,
+        status: 'Upcoming'
+      });
+
+      matchNumber++;
+    }
   }
 
-  return copy;
+  return fixtures;
+}
+
+function buildAllGroupFixtures(rows, headerMap, groupNames) {
+  const fixtures = [];
+
+  for (const groupName of groupNames) {
+    const groupTeams = rows
+      .filter(row => clean(row[headerMap.uclGroup]) === groupName)
+      .sort((a, b) => {
+        const potDiff = toNumber(a[headerMap.uclPot]) - toNumber(b[headerMap.uclPot]);
+        if (potDiff !== 0) return potDiff;
+
+        return clean(a[headerMap.teamName]).localeCompare(clean(b[headerMap.teamName]));
+      })
+      .map(row => ({
+        teamName: clean(row[headerMap.teamName]),
+        shortName: clean(row[headerMap.shortName])
+      }));
+
+    fixtures.push(...buildGroupFixtures(groupTeams, groupName));
+  }
+
+  return fixtures;
 }
 
 function drawThreeGroupsFromSixPots(rows, headerMap) {
@@ -43,7 +81,11 @@ function drawThreeGroupsFromSixPots(rows, headerMap) {
 
   rows.forEach(row => {
     const pot = clean(row[headerMap.uclPot]);
-    if (!groupedByPot.has(pot)) groupedByPot.set(pot, []);
+
+    if (!groupedByPot.has(pot)) {
+      groupedByPot.set(pot, []);
+    }
+
     groupedByPot.get(pot).push(row);
   });
 
@@ -56,7 +98,7 @@ function drawThreeGroupsFromSixPots(rows, headerMap) {
       throw new Error(`Pot ${pot} must have exactly 3 teams for 3 groups. Found ${potTeams.length}.`);
     }
 
-    const shuffled = shuffleRows(potTeams);
+    const shuffled = shuffleArray(potTeams);
 
     shuffled.forEach((row, index) => {
       const next = [...row];
@@ -74,6 +116,7 @@ function validateUclDrawSetup(activeUclTeams, headerMap) {
   }
 
   const potCounts = new Map();
+
   activeUclTeams.forEach(row => {
     const pot = clean(row[headerMap.uclPot]);
     potCounts.set(pot, (potCounts.get(pot) || 0) + 1);
@@ -81,6 +124,7 @@ function validateUclDrawSetup(activeUclTeams, headerMap) {
 
   for (let pot = 1; pot <= 6; pot++) {
     const count = potCounts.get(String(pot)) || 0;
+
     if (count !== 3) {
       return `Pot **${pot}** must have exactly **3 teams**. Current: **${count}**. Run \`/uclpots generate\` first.`;
     }
@@ -96,6 +140,7 @@ function buildGroupedOutput(rows, headerMap, groupNames) {
       .sort((a, b) => {
         const potDiff = toNumber(a[headerMap.uclPot]) - toNumber(b[headerMap.uclPot]);
         if (potDiff !== 0) return potDiff;
+
         return clean(a[headerMap.teamName]).localeCompare(clean(b[headerMap.teamName]));
       })
       .map(row => {
@@ -110,7 +155,16 @@ function buildGroupedOutput(rows, headerMap, groupNames) {
   });
 }
 
-function buildDrawSummary(rows, headerMap, groupNames) {
+function buildFixturePreview(fixtures) {
+  return fixtures
+    .slice(0, 15)
+    .map((fixture, index) => {
+      return `**${index + 1}.** \`${fixture.md}\` • \`${fixture.homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${fixture.awayShort}\``;
+    })
+    .join('\n') || 'No fixtures generated.';
+}
+
+function buildDrawSummary(rows, headerMap, groupNames, fixtures = []) {
   const assignedGroups = new Set(
     rows
       .map(row => clean(row[headerMap.uclGroup]))
@@ -128,6 +182,7 @@ function buildDrawSummary(rows, headerMap, groupNames) {
     .sort((a, b) => {
       const potDiff = toNumber(a[headerMap.uclPot]) - toNumber(b[headerMap.uclPot]);
       if (potDiff !== 0) return potDiff;
+
       return clean(a[headerMap.teamName]).localeCompare(clean(b[headerMap.teamName]));
     })[0];
 
@@ -135,7 +190,10 @@ function buildDrawSummary(rows, headerMap, groupNames) {
     activeTeams: rows.length,
     groupsUsed: assignedGroups.size || groupNames.length,
     potsUsed: potCount,
-    teamsPerGroup: rows.length && groupNames.length ? Math.round(rows.length / groupNames.length) : 0,
+    teamsPerGroup: rows.length && groupNames.length
+      ? Math.round(rows.length / groupNames.length)
+      : 0,
+    fixtures: fixtures.length,
     format: '18 teams → 3 groups of 6',
     groupList: groupNames.join(', ') || 'N/A',
     topSeed: topSeedRow
@@ -146,13 +204,13 @@ function buildDrawSummary(rows, headerMap, groupNames) {
 
 function buildDrawDescription(isGenerated = false) {
   const base = isGenerated
-    ? `${safeEmoji(E.correct, '✅')} UCL groups were drawn and saved into the Teams sheet.\n`
+    ? `${safeEmoji(E.correct, '✅')} UCL groups and fixtures were generated and saved.\n`
     : `${safeEmoji(E.info || E.Badge, '📌')} Current UCL groups loaded from the Teams sheet.\n`;
 
   return (
     base +
     `${safeEmoji(E.UCL || E.trophy_animated, '🏆')} **Format:** 18 teams → 3 groups of 6.\n` +
-    `${safeEmoji(E.rank, '🏅')} **Pots:** 6 pots of 3 teams. Each group receives one team from every pot.\n` +
+    `${safeEmoji(E.rank, '🏅')} **Match IDs:** UCL GS-A-1 • UCL GS-B-1 • UCL GS-C-1.\n` +
     `${safeEmoji(E.correct, '✅')} **Qualification:** Top 2 from each group + best 2 third-place teams.`
   );
 }
@@ -174,15 +232,21 @@ module.exports = {
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
+
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
     if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
-      return { content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.` };
+      return {
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams sheet is empty.`
+      };
     }
 
     const header = teamsSheet[0];
     const headerMap = getTeamsHeaderMap(header);
-    const teamRows = teamsSheet.slice(1).filter(row => clean(row[headerMap.teamName]));
+
+    const teamRows = teamsSheet
+      .slice(1)
+      .filter(row => clean(row[headerMap.teamName]));
 
     if (
       headerMap.teamName === -1 ||
@@ -196,40 +260,56 @@ module.exports = {
       };
     }
 
-    const activeUclTeams = getActiveTeamsByCompetition(teamRows, headerMap, 'ucl');
+    const activeUclTeams = getActiveTeamsByCompetition(
+      teamRows,
+      headerMap,
+      'ucl'
+    );
 
     if (!activeUclTeams.length) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} No active UCL teams found. Set UCL Status to Active first.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} No active UCL teams found.`
       };
     }
 
-    const missingPot = activeUclTeams.some(row => !clean(row[headerMap.uclPot]));
+    const missingPot = activeUclTeams.some(
+      row => !clean(row[headerMap.uclPot])
+    );
+
     if (missingPot) {
       return {
-        content: `${safeEmoji(E.wrong || E.error, '❌')} Some active UCL teams do not have a UCL Pot yet. Run /uclpots generate first.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Some active UCL teams do not have a UCL Pot yet.`
       };
     }
 
-    const groupNames = getGroupNames(activeUclTeams.length);
-    const setupError = validateUclDrawSetup(activeUclTeams, headerMap);
+    const groupNames = ['A', 'B', 'C'];
 
     if (subcommand === 'view') {
-      const groupedFields = buildGroupedOutput(activeUclTeams, headerMap, groupNames)
-        .filter(field => field.value !== 'No teams drawn.');
+      const groupedFields = buildGroupedOutput(
+        activeUclTeams,
+        headerMap,
+        groupNames
+      ).filter(field => field.value !== 'No teams drawn.');
 
-      if (!groupedFields.length) {
-        return {
-          embeds: [
-            new EmbedBuilder()
-              .setTitle(`${safeEmoji(E.UCL || E.calendar, '🏆')} UCL Group Draw`)
-              .setDescription('No UCL groups have been drawn yet.')
-              .setColor(0x5865F2)
-          ]
-        };
-      }
+      const fixturesSheet = await cachedGetData('UCL_Coop_Fixtures!A:J')
+        .catch(() => []);
 
-      const summary = buildDrawSummary(activeUclTeams, headerMap, groupNames);
+      const fixtureRows = Array.isArray(fixturesSheet)
+        ? fixturesSheet.slice(1)
+        : [];
+
+      const fixtures = fixtureRows.map(row => ({
+        md: clean(row[0]),
+        homeShort: clean(row[7]),
+        awayShort: clean(row[8])
+      }));
+
+      const summary = buildDrawSummary(
+        activeUclTeams,
+        headerMap,
+        groupNames,
+        fixtures
+      );
 
       return {
         embeds: [
@@ -239,23 +319,30 @@ module.exports = {
             .addFields(
               { name: 'Active Teams', value: String(summary.activeTeams), inline: true },
               { name: 'Groups', value: String(summary.groupsUsed), inline: true },
-              { name: 'Teams / Group', value: String(summary.teamsPerGroup), inline: true },
+              { name: 'Fixtures', value: String(summary.fixtures), inline: true },
               { name: 'Format', value: summary.format, inline: true },
               { name: 'Pots Used', value: String(summary.potsUsed), inline: true },
-              { name: 'Group List', value: summary.groupList, inline: true },
               { name: 'Top Seed', value: summary.topSeed, inline: true },
-              { name: 'Loaded From', value: 'Teams', inline: true },
-              ...groupedFields
+              ...groupedFields,
+              {
+                name: `${safeEmoji(E.calendar, '📅')} Fixture Preview`,
+                value: buildFixturePreview(fixtures),
+                inline: false
+              }
             )
             .setColor(0x5865F2)
-            .setFooter({ text: 'UCL Draw • 3 groups of 6 format' })
+            .setFooter({ text: 'UCL Draw • Group Stage IDs enabled' })
         ]
       };
     }
 
     if (!isOwner(interaction)) {
-      return { content: `${safeEmoji(E.lock || E.error, '🚫')} Owner only command.` };
+      return {
+        content: `${safeEmoji(E.lock || E.error, '🚫')} Owner only command.`
+      };
     }
+
+    const setupError = validateUclDrawSetup(activeUclTeams, headerMap);
 
     if (setupError) {
       return {
@@ -263,14 +350,21 @@ module.exports = {
       };
     }
 
-    const drawnRows = drawThreeGroupsFromSixPots(activeUclTeams, headerMap);
+    const drawnRows = drawThreeGroupsFromSixPots(
+      activeUclTeams,
+      headerMap
+    );
 
     const groupMap = new Map(
-      drawnRows.map(row => [clean(row[headerMap.teamName]).toLowerCase(), clean(row[headerMap.uclGroup])])
+      drawnRows.map(row => [
+        clean(row[headerMap.teamName]).toLowerCase(),
+        clean(row[headerMap.uclGroup])
+      ])
     );
 
     const updatedRows = teamRows.map(row => {
       const next = [...row];
+
       const teamName = clean(row[headerMap.teamName]).toLowerCase();
 
       if (groupMap.has(teamName)) {
@@ -281,45 +375,83 @@ module.exports = {
     });
 
     await updateData('Teams!A2:Z', updatedRows);
-    invalidateSheetCache(['Teams!']);
 
-    const activeAfterDraw = updatedRows.filter(row => clean(row[headerMap.uclStatus]).toLowerCase() === 'active');
-    const groupedFields = buildGroupedOutput(activeAfterDraw, headerMap, groupNames)
-      .filter(field => field.value !== 'No teams drawn.');
+    const activeAfterDraw = updatedRows.filter(
+      row => clean(row[headerMap.uclStatus]).toLowerCase() === 'active'
+    );
 
-    const summary = buildDrawSummary(activeAfterDraw, headerMap, groupNames);
+    const fixtures = buildAllGroupFixtures(
+      activeAfterDraw,
+      headerMap,
+      groupNames
+    );
+
+    const fixtureRows = fixtures.map(fixture => [
+      fixture.md,
+      fixture.date,
+      fixture.homeTeam,
+      fixture.awayTeam,
+      fixture.hg,
+      fixture.ag,
+      fixture.result,
+      fixture.homeShort,
+      fixture.awayShort,
+      fixture.status
+    ]);
+
+    await updateData('UCL_Coop_Fixtures!A2:J', fixtureRows);
+
+    invalidateSheetCache([
+      'Teams!',
+      'UCL_Coop_Fixtures!'
+    ]);
+
+    const groupedFields = buildGroupedOutput(
+      activeAfterDraw,
+      headerMap,
+      groupNames
+    ).filter(field => field.value !== 'No teams drawn.');
+
+    const summary = buildDrawSummary(
+      activeAfterDraw,
+      headerMap,
+      groupNames,
+      fixtures
+    );
 
     sendAuditLog(interaction, {
-      title: '🏆 UCL Group Draw Generated',
-      description: 'UCL groups were drawn from existing UCL pots and saved into Teams sheet.',
+      title: '🏆 UCL Draw Generated',
+      description: 'UCL groups and fixtures generated successfully.',
       color: 0x5865F2,
       fields: [
-        { name: 'Active Teams', value: String(activeUclTeams.length), inline: true },
-        { name: 'Groups', value: groupNames.join(', '), inline: true },
-        { name: 'Teams / Group', value: '6', inline: true },
-        { name: 'Pots', value: '6 pots of 3', inline: true },
-        { name: 'Qualification', value: 'Top 2 + best 2 third-place teams', inline: false }
+        { name: 'Teams', value: String(summary.activeTeams), inline: true },
+        { name: 'Groups', value: String(summary.groupsUsed), inline: true },
+        { name: 'Fixtures', value: String(summary.fixtures), inline: true },
+        { name: 'Format', value: summary.format, inline: false }
       ]
     });
 
     return {
       embeds: [
         new EmbedBuilder()
-          .setTitle(`${safeEmoji(E.correct || E.UCL, '✅')} UCL Group Draw Generated`)
+          .setTitle(`${safeEmoji(E.correct || E.UCL, '✅')} UCL Draw Generated`)
           .setDescription(buildDrawDescription(true))
           .addFields(
             { name: 'Active Teams', value: String(summary.activeTeams), inline: true },
             { name: 'Groups', value: String(summary.groupsUsed), inline: true },
-            { name: 'Teams / Group', value: String(summary.teamsPerGroup), inline: true },
+            { name: 'Fixtures', value: String(summary.fixtures), inline: true },
             { name: 'Format', value: summary.format, inline: true },
             { name: 'Pots Used', value: String(summary.potsUsed), inline: true },
-            { name: 'Group List', value: summary.groupList, inline: true },
             { name: 'Top Seed', value: summary.topSeed, inline: true },
-            { name: 'Saved To', value: 'Teams', inline: true },
-            ...groupedFields
+            ...groupedFields,
+            {
+              name: `${safeEmoji(E.calendar, '📅')} Fixture Preview`,
+              value: buildFixturePreview(fixtures),
+              inline: false
+            }
           )
           .setColor(0x2ECC71)
-          .setFooter({ text: 'UCL Draw • 3 groups of 6 format' })
+          .setFooter({ text: 'UCL Draw • Match IDs: UCL GS-A-1 format' })
       ]
     };
   }
