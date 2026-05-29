@@ -101,7 +101,9 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
 // Normalizes a fixture row into an object with keys, handling both round-in-column and inferred round.
 function normalizeFixtureRow(row) {
   const firstColumn = clean(row[0]).toUpperCase();
-  const hasRoundColumn = [
+  const lastColumn = clean(row[row.length - 1]);
+
+  const knownRounds = [
     'ROUND 1',
     'QUARTER FINAL',
     'QUARTER FINAL LEG 1',
@@ -112,9 +114,14 @@ function normalizeFixtureRow(row) {
     'FINAL',
     'GROUP STAGE',
     'QUARTER FINAL QUALIFIER'
-  ].includes(firstColumn);
+  ];
 
-  if (hasRoundColumn) {
+  const hasRoundColumnFirst = knownRounds.includes(firstColumn);
+  const hasRoundColumnLast = knownRounds.includes(clean(lastColumn).toUpperCase());
+
+  // New layout:
+  // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
+  if (hasRoundColumnFirst) {
     return {
       round: clean(row[0]),
       md: clean(row[1]),
@@ -130,6 +137,25 @@ function normalizeFixtureRow(row) {
     };
   }
 
+  // Current FA/Carabao layout:
+  // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
+  if (hasRoundColumnLast) {
+    return {
+      round: clean(row[10]),
+      md: clean(row[0]),
+      date: clean(row[1]),
+      homeTeam: clean(row[2]),
+      awayTeam: clean(row[3]),
+      hg: clean(row[4]),
+      ag: clean(row[5]),
+      result: clean(row[6]),
+      homeShort: clean(row[7]),
+      awayShort: clean(row[8]),
+      status: clean(row[9])
+    };
+  }
+
+  // Fallback legacy inference from MD
   const md = clean(row[0]);
   let inferredRound = '';
 
