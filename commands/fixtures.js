@@ -30,7 +30,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'fa',
       label: 'FA Cup',
-      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:L',
       reserveLabel: 'FA Cup',
       matchNoIndex: 1,
       dateIndex: 2,
@@ -51,7 +51,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
-      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:L',
       reserveLabel: 'Carabao Cup',
       matchNoIndex: 1,
       dateIndex: 2,
@@ -114,17 +114,16 @@ function getHeaderLabel(row, config) {
 
   if (!matchNo) return '';
 
-  /* LEAGUE FORMAT
-     1-1 → MD 1
-     2-3 → MD 2
+  /* ---------------- LEAGUE ----------------
+     1-1 -> 1
+     2-3 -> 2
   */
   if (config.key === 'league') {
     return matchNo.split('-')[0];
   }
 
-  /* UCL FORMAT
-     UCL GS-A-1 → GS-A
-     UCL GS-B-3 → GS-B
+  /* ---------------- UCL ----------------
+     UCL-GS-A-1 -> GS-A
   */
   if (config.key === 'ucl') {
     const parts = matchNo.split('-');
@@ -136,13 +135,68 @@ function getHeaderLabel(row, config) {
     return matchNo;
   }
 
-  /* CUP FORMAT
-     QF-1
-     SF-2
+  /* ---------------- FA CUP ----------------
+     FA-R1-1 -> Round 1
+     FA-QF-1 -> Quarter Final
+     FA-SF-1-1 -> Semi Final
+     FA-Final -> Final
   */
-  return matchNo.includes('-')
-    ? matchNo.split('-')[0]
-    : matchNo;
+  if (config.key === 'fa') {
+    if (matchNo.startsWith('FA-R1')) {
+      return 'Round 1';
+    }
+
+    if (matchNo.startsWith('FA-QFQ')) {
+      return 'Quarter Final Qualifier';
+    }
+
+    if (matchNo.startsWith('FA-QF')) {
+      return 'Quarter Final';
+    }
+
+    if (matchNo.startsWith('FA-SF')) {
+      return 'Semi Final';
+    }
+
+    if (matchNo.startsWith('FA-Final')) {
+      return 'Final';
+    }
+
+    return matchNo;
+  }
+
+  /* ---------------- CARABAO CUP ----------------
+     CB-R1-1 -> Round 1
+     CB-QFQ-1 -> Quarter Final Qualifier
+     CB-QF-1-1 -> Quarter Final
+     CB-SF-1-1 -> Semi Final
+     CB-Final -> Final
+  */
+  if (config.key === 'carabao') {
+    if (matchNo.startsWith('CB-R1')) {
+      return 'Round 1';
+    }
+
+    if (matchNo.startsWith('CB-QFQ')) {
+      return 'Quarter Final Qualifier';
+    }
+
+    if (matchNo.startsWith('CB-QF')) {
+      return 'Quarter Final';
+    }
+
+    if (matchNo.startsWith('CB-SF')) {
+      return 'Semi Final';
+    }
+
+    if (matchNo.startsWith('CB-Final')) {
+      return 'Final';
+    }
+
+    return matchNo;
+  }
+
+  return matchNo;
 }
 
 function getReserveMap(rows, competitionLabel) {
