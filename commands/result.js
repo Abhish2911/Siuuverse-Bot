@@ -698,6 +698,11 @@ module.exports = {
     )
     .addStringOption(opt =>
       opt.setName('awayplayed').setDescription('Away players who played, separated by commas').setRequired(false)
+    )
+    .addStringOption(opt =>
+      opt.setName('decision')
+        .setDescription('ET H / ET A / PENS H / PENS A (for knockout)')
+        .setRequired(false)
     ),
 
   async execute(interaction) {
@@ -707,6 +712,8 @@ module.exports = {
     const fixtureIndexes = getFixtureFieldIndexes(competition);
     const hg = interaction.options.getInteger('homegoals');
     const ag = interaction.options.getInteger('awaygoals');
+    const decisionRaw = interaction.options.getString('decision') || '';
+    const decision = decisionRaw ? decisionRaw.toUpperCase().trim() : '';
 
     const scorersRaw = interaction.options.getString('scorers') || '';
     const assistsRaw = interaction.options.getString('assists') || '';
@@ -926,6 +933,7 @@ module.exports = {
       awayPlayed,
       reservedBy,
       resultText,
+      decision,
       tackles1,
       tackles2,
       interceptions1,
@@ -1043,7 +1051,8 @@ module.exports = {
       pending.saves2,
       pending.homePlayed,
       pending.awayPlayed,
-      pending.submittedAt || new Date().toISOString()
+      pending.submittedAt || new Date().toISOString(),
+      pending.decision || ''
     ];
 
     if (existingEntryIndex === -1) {
@@ -1052,7 +1061,7 @@ module.exports = {
       entryRows[existingEntryIndex] = nextEntryRow;
     }
 
-    await updateData(`${pending.competition.resultsRange.split('!')[0]}!A2:S`, entryRows);
+    await updateData(`${pending.competition.resultsRange.split('!')[0]}!A2:T`, entryRows);
     const reserveRows = Array.isArray(reserveSheet) ? reserveSheet.slice(1).map(row => [...row]) : [];
     const reserveIndex = reserveRows.findIndex(row => normalizeMatchNo(row[1]) === pending.matchNo && clean(row[0]).toLowerCase() === pending.competition.reserveKey.toLowerCase());
 
