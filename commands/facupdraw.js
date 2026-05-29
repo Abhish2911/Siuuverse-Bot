@@ -121,76 +121,10 @@ function buildFaCupAdvantageDraw(seedRows) {
 
   const round1Fixtures = pairSequentialTeams(grouped.round1, 'Round 1', 'FA R1');
 
-  const round1WinnerSlots = round1Fixtures.map((fixture, index) => ({
-    teamName: `Winner ${fixture.md}`,
-    shortName: `W${index + 1}`,
-    seed: 100 + index
-  }));
-
-  const qfqDraw = buildQfqFixtures(round1WinnerSlots);
-
-  const qfqWinnerSlots = qfqDraw.fixtures.map((fixture, index) => ({
-    teamName: `Winner ${fixture.md}`,
-    shortName: `QFQ${index + 1}`,
-    seed: 200 + index
-  }));
-
-  const qfOpponents = [...qfqWinnerSlots, qfqDraw.byeTeam].filter(Boolean);
-  const shuffledSeeds = shuffleTeams(grouped.top4);
-  const shuffledOpponents = shuffleTeams(qfOpponents);
-
-  const qfFixtures = [];
-
-  for (let i = 0; i < Math.min(shuffledSeeds.length, shuffledOpponents.length); i++) {
-    const seededTeam = shuffledSeeds[i];
-    const opponentTeam = shuffledOpponents[i];
-    const matchNumber = i + 1;
-
-    qfFixtures.push(
-      buildCupFixture(
-        'Quarter Final',
-        `FA QF-${matchNumber}A`,
-        seededTeam,
-        opponentTeam,
-        'Leg 1'
-      )
-    );
-
-    qfFixtures.push(
-      buildCupFixture(
-        'Quarter Final',
-        `FA QF-${matchNumber}B`,
-        opponentTeam,
-        seededTeam,
-        'Leg 2'
-      )
-    );
-  }
-
-  const sfSlots = [1, 2, 3, 4].map(number => ({
-    teamName: `Winner FA QF-${number}`,
-    shortName: `SF${number}`,
-    seed: 300 + number
-  }));
-  const sfFixtures = pairSequentialTeams(sfSlots, 'Semi Final', 'FA SF', 1, true);
-
-  const finalFixture = buildCupFixture(
-    'Final',
-    'FA Final',
-    { teamName: 'Winner FA SF-1', shortName: 'F1' },
-    { teamName: 'Winner FA SF-2', shortName: 'F2' }
-  );
-
   return {
     grouped,
-    qfqBye: qfqDraw.byeTeam,
-    fixtures: [
-      ...round1Fixtures,
-      ...qfqDraw.fixtures,
-      ...qfFixtures,
-      ...sfFixtures,
-      finalFixture
-    ]
+    qfqBye: null,
+    fixtures: [...round1Fixtures]
   };
 }
 
@@ -234,10 +168,9 @@ function buildDrawDescription(roundLabel, isGenerated = false) {
 
   return (
     base +
-    `${safeEmoji(E.trophy_animated || E.FA, '🏆')} **Top 4:** Direct Quarter Final.\n` +
-    `${safeEmoji(E.played, '🎮')} **Seeds 5–18:** Round 1.\n` +
-    `${safeEmoji(E.rank, '🏅')} **QFQ:** 7 Round 1 winners → 3 matches + 1 random bye.\n` +
-    `${safeEmoji(E.vs, '⚔️')} **QF/SF:** 2 legs • **Final:** 1 match.`
+    `${safeEmoji(E.played, '🎮')} **Round 1 Generated:** Seeds 5–18 enter Round 1.\n` +
+    `${safeEmoji(E.rank, '🏅')} **Top 4 Seeds:** Enter later directly in Quarter Finals.\n` +
+    `${safeEmoji(E.info || E.Badge, '📌')} Remaining knockout rounds are generated using /advanceknockout.`
   );
 }
 
@@ -396,11 +329,9 @@ module.exports = {
       fields: [
         { name: 'Active Teams', value: String(activeFaTeams.length), inline: true },
         { name: 'Fixtures', value: String(generatedFixtures.length), inline: true },
-        { name: 'Format', value: 'Top 4 QF • QFQ • QF/SF 2 Legs', inline: true },
-        { name: 'Direct QF', value: String(draw.grouped.top4.length), inline: true },
-        { name: 'Round 1 Teams', value: String(draw.grouped.round1.length), inline: true },
-        { name: 'QFQ Fixtures', value: '3 matches + 1 bye', inline: true },
-        { name: 'QFQ Bye', value: draw.qfqBye ? `\`${draw.qfqBye.shortName}\` ${draw.qfqBye.teamName}` : 'N/A', inline: true }
+        { name: 'Format', value: 'Round 1 only', inline: true },
+        { name: 'Direct QF Teams', value: String(draw.grouped.top4.length), inline: true },
+        { name: 'Round 1 Teams', value: String(draw.grouped.round1.length), inline: true }
       ]
     });
 
@@ -417,8 +348,7 @@ module.exports = {
             { name: 'Top Seed', value: summary.topSeed, inline: true },
             { name: 'Direct QF', value: String(summary.directQfTeams), inline: true },
             { name: 'QFQ Path', value: String(summary.qfqPathTeams), inline: true },
-            { name: 'Format', value: 'QFQ • QF/SF 2 Legs • Final 1 Match', inline: true },
-            { name: 'QFQ Bye', value: draw.qfqBye ? `\`${draw.qfqBye.shortName}\` ${draw.qfqBye.teamName}` : 'N/A', inline: true },
+            { name: 'Format', value: 'R1 → QFQ → QF → SF → Final', inline: true },
             ...formatDrawLines(generatedFixtures).map((value, index) => ({
               name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
               value,
