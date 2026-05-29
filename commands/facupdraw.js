@@ -66,9 +66,12 @@ function pairSequentialTeams(teams, round, prefix, startNumber = 1, twoLegged = 
   const fixtures = [];
   let matchNumber = startNumber;
 
-  for (let i = 0; i < teams.length; i += 2) {
-    const home = teams[i];
-    const away = teams[i + 1];
+  const shuffledTeams = shuffleTeams(teams);
+
+  for (let i = 0; i < shuffledTeams.length; i += 2) {
+    const home = shuffledTeams[i];
+    const away = shuffledTeams[i + 1];
+
     if (!home || !away) continue;
 
     if (twoLegged) {
@@ -98,8 +101,7 @@ function shuffleTeams(teams) {
 function buildQfqFixtures(round1WinnerSlots) {
   const shuffled = shuffleTeams(round1WinnerSlots);
   const byeTeam = shuffled[shuffled.length - 1];
-  const playingTeams = shuffled.slice(0, -1);
-  const fixtures = pairSequentialTeams(playingTeams, 'Quarter Final Qualifier', 'FA QFQ');
+  const fixtures = pairSequentialTeams(shuffled, 'Quarter Final Qualifier', 'FA QFQ');
 
   return {
     fixtures,
@@ -334,20 +336,19 @@ module.exports = {
     }
 
     const rowsToSave = generatedFixtures.map(fixture => [
-      fixture.round,
-      fixture.md,
-      fixture.date,
-      fixture.homeTeam,
-      fixture.awayTeam,
-      fixture.hg,
-      fixture.ag,
-      fixture.result,
-      fixture.homeShort,
-      fixture.awayShort,
-      fixture.status
+      clean(fixture.md),
+      clean(fixture.date),
+      clean(fixture.homeTeam),
+      clean(fixture.awayTeam),
+      clean(fixture.hg),
+      clean(fixture.ag),
+      clean(fixture.result),
+      clean(fixture.homeShort),
+      clean(fixture.awayShort),
+      clean(fixture.status)
     ]);
 
-    await updateData('FA_Cup_Coop_Fixtures!A2:K', rowsToSave);
+    await updateData('FA_Cup_Coop_Fixtures!A2:J', rowsToSave);
     invalidateSheetCache(['FA_Cup_Coop_Fixtures!']);
 
     sendAuditLog(interaction, {
