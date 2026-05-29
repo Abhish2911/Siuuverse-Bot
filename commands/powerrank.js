@@ -101,18 +101,24 @@ async function buildTeamIdMap() {
     const map = new Map();
 
     rows.slice(1).forEach(row => {
-      const teamId = clean(row[0]).toUpperCase();
-      const currentName = clean(row[1]);
-      const oldNames = String(row[2] || '')
-        .split(',')
-        .map(name => clean(name).toLowerCase())
-        .filter(Boolean);
+      const currentShort = clean(row[0]).toLowerCase();
+      const teamId = clean(row[1]).toUpperCase();
+      const currentName = clean(row[2]);
+      const previousName = clean(row[3]);
+      const previousShort = clean(row[4]).toLowerCase();
 
       if (!teamId) return;
 
+      const aliases = [
+        currentName.toLowerCase(),
+        previousName.toLowerCase(),
+        currentShort,
+        previousShort
+      ].filter(Boolean);
+
       map.set(teamId, {
         currentName,
-        aliases: [currentName.toLowerCase(), ...oldNames]
+        aliases
       });
     });
 
@@ -140,9 +146,15 @@ function buildRankingWithTeamMap(ranking, teamRows, headerMap, teamIdMap) {
       if (!matchedRanking && teamId && teamIdMap.has(teamId)) {
         const mapped = teamIdMap.get(teamId);
 
-        matchedRanking = ranking.find(rankRow =>
-          mapped.aliases.includes(rankRow.team.toLowerCase())
-        );
+        matchedRanking = ranking.find(rankRow => {
+          const rankTeam = rankRow.team.toLowerCase();
+          const rankShort = clean(rankRow.shortName).toLowerCase();
+
+          return (
+            mapped.aliases.includes(rankTeam) ||
+            mapped.aliases.includes(rankShort)
+          );
+        });
       }
 
       return {
@@ -171,12 +183,24 @@ function buildRankingWithTeamMap(ranking, teamRows, headerMap, teamIdMap) {
 }
 
 function applyRanksToTeams(teamRows, headerMap, ranking, targetColumn) {
-  const rankingByTeam = new Map(ranking.map(row => [row.team.toLowerCase(), row]));
+  const rankingByTeam = new Map();
+
+  ranking.forEach(row => {
+    rankingByTeam.set(row.team.toLowerCase(), row);
+
+    if (row.shortName) {
+      rankingByTeam.set(clean(row.shortName).toLowerCase(), row);
+    }
+  });
 
   return teamRows.map(row => {
     const next = [...row];
     const teamName = clean(row[headerMap.teamName]).toLowerCase();
-    const rankingRow = rankingByTeam.get(teamName);
+    const shortName = clean(row[headerMap.shortName]).toLowerCase();
+
+    const rankingRow =
+      rankingByTeam.get(teamName) ||
+      rankingByTeam.get(shortName);
 
     next[targetColumn] = rankingRow?.rank || '';
 
