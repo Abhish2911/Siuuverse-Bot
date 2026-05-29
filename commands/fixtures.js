@@ -71,6 +71,7 @@ function getCompetitionConfig(key) {
       key: 'ucl',
       label: 'UCL',
       fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      knockoutRange: 'UCL_Coop_Knockout_Fixtures!A:L',
       reserveLabel: 'UCL',
       matchNoIndex: 0,
       dateIndex: 1,
@@ -669,7 +670,15 @@ module.exports = {
 
     const [data, teams, reserveRows] =
       await Promise.all([
-        cachedGetData(config.fixturesRange),
+        config.key === 'ucl'
+          ? Promise.all([
+              cachedGetData(config.fixturesRange),
+              cachedGetData(config.knockoutRange).catch(() => [])
+            ]).then(([groups, knockouts]) => [
+              ...(groups || []),
+              ...((knockouts || []).slice(1))
+            ])
+          : cachedGetData(config.fixturesRange),
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
@@ -734,7 +743,15 @@ module.exports = {
 
     const [data, teams, reserveRows] =
       await Promise.all([
-        cachedGetData(config.fixturesRange),
+        config.key === 'ucl'
+          ? Promise.all([
+              cachedGetData(config.fixturesRange),
+              cachedGetData(config.knockoutRange).catch(() => [])
+            ]).then(([groups, knockouts]) => [
+              ...(groups || []),
+              ...((knockouts || []).slice(1))
+            ])
+          : cachedGetData(config.fixturesRange),
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
@@ -796,7 +813,15 @@ module.exports = {
 
     const [data, teams, reserveRows] =
       await Promise.all([
-        cachedGetData(config.fixturesRange),
+        config.key === 'ucl'
+          ? Promise.all([
+              cachedGetData(config.fixturesRange),
+              cachedGetData(config.knockoutRange).catch(() => [])
+            ]).then(([groups, knockouts]) => [
+              ...(groups || []),
+              ...((knockouts || []).slice(1))
+            ])
+          : cachedGetData(config.fixturesRange),
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
