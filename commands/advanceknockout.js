@@ -68,9 +68,21 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel) {
 
   if (!fixture || !target) return false;
 
-  if (fixture === target) return true;
+  const aliases = {
+    'round 1': ['r1', 'round 1'],
+    'quarter final qualifier': ['qfq', 'quarter final qualifier'],
+    'round of 16': ['r16', 'round of 16'],
+    'quarter final': ['qf', 'quarter final'],
+    'semi final': ['sf', 'semi final'],
+    'final': ['f', 'final'],
+    'group stage': ['gs', 'group stage']
+  };
 
-  return fixture.startsWith(target);
+  const targetAliases = aliases[target] || [target];
+
+  return targetAliases.some(alias => {
+    return fixture === alias || fixture.startsWith(alias);
+  });
 }
 
 function inferNextRound(currentRound, config) {
