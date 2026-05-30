@@ -104,7 +104,7 @@ function buildGroupFixtures(groupTeams, groupName) {
     matchNumber++;
   });
 
-  return shuffleArray(fixtures);
+  return fixtures;
 }
 
 function buildAllGroupFixtures(rows, headerMap, groupNames) {
