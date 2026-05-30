@@ -25,83 +25,60 @@ function isOwner(interaction) {
 
 function buildGroupFixtures(groupTeams, groupName) {
   const fixtures = [];
-  let matchNumber = 1;
 
-  const homeCount = new Map();
-  const awayCount = new Map();
-
-  groupTeams.forEach(team => {
-    homeCount.set(team.shortName, 0);
-    awayCount.set(team.shortName, 0);
-  });
-
-  const pairings = [];
-
-  for (let i = 0; i < groupTeams.length; i++) {
-    for (let j = i + 1; j < groupTeams.length; j++) {
-      pairings.push([groupTeams[i], groupTeams[j]]);
-    }
+  if (groupTeams.length !== 6) {
+    throw new Error(
+      `Group ${groupName} must contain exactly 6 teams.`
+    );
   }
 
-  pairings.forEach(([teamA, teamB], index) => {
-    let home = teamA;
-    let away = teamB;
+  const teams = [...groupTeams];
 
-    const aHome = homeCount.get(teamA.shortName) || 0;
-    const aAway = awayCount.get(teamA.shortName) || 0;
+  const rounds = [];
 
-    const bHome = homeCount.get(teamB.shortName) || 0;
-    const bAway = awayCount.get(teamB.shortName) || 0;
+  for (let round = 0; round < 5; round++) {
+    const matches = [];
 
-    /*
-      Goal:
-      - Every team gets balanced home/away games
-      - Target ≈ 2-3 home and 2-3 away
-      - Avoid one team having all home or all away
-    */
+    for (let i = 0; i < 3; i++) {
+      let home = teams[i];
+      let away = teams[5 - i];
 
-    const aBalance = aHome - aAway;
-    const bBalance = bHome - bAway;
-
-    if (aBalance > bBalance) {
-      home = teamB;
-      away = teamA;
-    } else if (aBalance === bBalance) {
-      if (aHome > bHome) {
-        home = teamB;
-        away = teamA;
-      } else if (aHome === bHome) {
-        if (Math.random() >= 0.5) {
-          home = teamB;
-          away = teamA;
-        }
+      // Alternate home/away by round
+      if ((round + i) % 2 === 1) {
+        [home, away] = [away, home];
       }
+
+      matches.push({
+        home,
+        away
+      });
     }
 
-    homeCount.set(
-      home.shortName,
-      (homeCount.get(home.shortName) || 0) + 1
-    );
+    rounds.push(matches);
 
-    awayCount.set(
-      away.shortName,
-      (awayCount.get(away.shortName) || 0) + 1
-    );
+    // Circle rotation
+    teams.splice(1, 0, teams.pop());
+  }
 
-    fixtures.push({
-      md: `UCL-GS-${groupName}-${matchNumber}`,
-      date: '',
-      homeTeam: home.teamName,
-      awayTeam: away.teamName,
-      hg: '',
-      ag: '',
-      result: '',
-      homeShort: home.shortName,
-      awayShort: away.shortName,
-      status: 'Upcoming'
+  let matchNumber = 1;
+
+  rounds.forEach(matches => {
+    matches.forEach(match => {
+      fixtures.push({
+        md: `UCL-GS-${groupName}-${matchNumber}`,
+        date: '',
+        homeTeam: match.home.teamName,
+        awayTeam: match.away.teamName,
+        hg: '',
+        ag: '',
+        result: '',
+        homeShort: match.home.shortName,
+        awayShort: match.away.shortName,
+        status: 'Upcoming'
+      });
+
+      matchNumber++;
     });
-
-    matchNumber++;
   });
 
   return fixtures;
@@ -240,7 +217,7 @@ function buildFixturePreview(fixtures) {
         const bNum = Number(String(b.md).split('-').pop()) || 0;
         return aNum - bNum;
       })
-      .slice(0, 5)
+      .slice(0, 3)
       .forEach(fixture => {
         lines.push(
           `\`${fixture.md}\` • ` +
@@ -491,9 +468,10 @@ module.exports = {
       fixture.status
     ]);
 
-await updateData('UCL_Coop_Group_Fixtures!A2:J', fixtureRows);
-
-    await updateData('UCL_Coop_Group_Fixtures!A2:J', fixtureRows);
+await updateData(
+  'UCL_Coop_Group_Fixtures!A2:J',
+  fixtureRows
+);
 
     invalidateSheetCache([
       'Teams!',
