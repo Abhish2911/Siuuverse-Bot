@@ -1,5 +1,3 @@
-
-
 const {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -183,35 +181,34 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0xE67E22)
-      .setTitle(`🔥 ${derbyName}`)
-      .setDescription(`${team1} vs ${team2}`)
+      .setTitle(`${safeEmoji(E.fire, '🔥')} ${derbyName}`)
       .addFields(
         {
-          name: 'Overall Record',
+          name: `${safeEmoji(E.Stats, '📊')} Overall Record`,
           value:
-            `Matches: **${played}**\n` +
-            `${team1}: **${team1Wins}W**\n` +
-            `${team2}: **${team2Wins}W**\n` +
-            `Draws: **${draws}**`
+            `${safeEmoji(E.played, '🎮')} Matches: **${played}**\n` +
+            `${safeEmoji(E.win, '✅')} ${team1}: **${team1Wins}W**\n` +
+            `${safeEmoji(E.win, '✅')} ${team2}: **${team2Wins}W**\n` +
+            `${safeEmoji(E.draw, '🤝')} Draws: **${draws}**`
         },
         {
-          name: 'Goals',
+          name: `${safeEmoji(E.goal, '⚽')} Goals`,
           value:
-            `${team1}: **${team1Goals}**\n` +
-            `${team2}: **${team2Goals}**`
+            `${team1}: ${safeEmoji(E.goal, '⚽')} **${team1Goals}**\n` +
+            `${team2}: ${safeEmoji(E.goal, '⚽')} **${team2Goals}**`
         },
         {
-          name: 'Top Scorers',
+          name: `${safeEmoji(E.goldenBoot, '🥇')} Top Scorers`,
           value: topGoals,
           inline: false
         },
         {
-          name: 'Top Assists',
+          name: `${safeEmoji(E.assist, '🎯')} Top Assists`,
           value: topAssists,
           inline: false
         },
         {
-          name: 'Top MVPs',
+          name: `${safeEmoji(E.mvp, '⭐')} Top MVPs`,
           value: topMvps,
           inline: false
         }
