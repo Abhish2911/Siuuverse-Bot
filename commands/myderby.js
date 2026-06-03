@@ -87,11 +87,15 @@ module.exports = {
       .find(row => {
         const t1 = normalize(row[1]);
         const t2 = normalize(row[2]);
+        const active = normalize(row[3]);
 
         return (
-          normalize(myTeam.teamName) === t1 ||
-          normalize(myTeam.teamName) === t2
-        ) && normalize(row[3]) === 'active';
+          (
+            normalize(myTeam.teamName) === t1 ||
+            normalize(myTeam.teamName) === t2
+          ) &&
+          ['yes', 'active', 'true', '1'].includes(active)
+        );
       });
 
     if (!derbyRow) {
