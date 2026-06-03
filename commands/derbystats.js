@@ -226,7 +226,6 @@ module.exports = {
   },
   async selectMenuHandler(interaction) {
     if (interaction.customId !== 'derbystats_select') return;
-    await interaction.deferUpdate();
     const derbies = await getDerbies();
     const idx = parseInt(interaction.values[0], 10);
     if (isNaN(idx) || !derbies[idx]) return;
@@ -257,14 +256,13 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
         .setEmoji(E.fire || undefined)
     );
-    await interaction.editReply({
+    return {
       embeds: [embed],
-      components: [row, btnRow],
-    });
+      components: [row, btnRow]
+    };
   },
   async buttonHandler(interaction) {
     if (interaction.customId === 'derbystats_back') {
-      await interaction.deferUpdate();
       const derbies = await getDerbies();
       const embed = buildHubEmbed(derbies);
       const options = derbies.map((d, i) => ({
@@ -284,13 +282,12 @@ module.exports = {
           .setStyle(ButtonStyle.Secondary)
           .setEmoji(E.fire || undefined)
       );
-      await interaction.editReply({
+      return {
         embeds: [embed],
-        components: [row, btnRow],
-      });
+        components: [row, btnRow]
+      };
     }
     if (interaction.customId === 'derbystats_refresh') {
-      await interaction.deferUpdate();
       // Try to preserve current selection if possible
       // Find if select menu is present and which value is selected
       const msg = interaction.message;
@@ -331,10 +328,10 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary)
             .setEmoji(E.fire || undefined)
         );
-        await interaction.editReply({
+        return {
           embeds: [embed],
-          components: [row, btnRow],
-        });
+          components: [row, btnRow]
+        };
       } else {
         // Show hub
         const embed = buildHubEmbed(derbies);
@@ -355,10 +352,10 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary)
             .setEmoji(E.fire || undefined)
         );
-        await interaction.editReply({
+        return {
           embeds: [embed],
-          components: [row, btnRow],
-        });
+          components: [row, btnRow]
+        };
       }
     }
   },
