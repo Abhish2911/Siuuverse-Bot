@@ -360,6 +360,18 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // derbystats dropdown handler
+      if (interaction.customId === 'derbystats_select') {
+        const command = client.commands.get('derbystats');
+        if (!command || !command.selectMenuHandler) return;
+
+        const result = await command.selectMenuHandler(interaction);
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
+
       return;
     }
   } catch (error) {
