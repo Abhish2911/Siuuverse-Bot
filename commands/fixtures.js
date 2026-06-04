@@ -11,6 +11,8 @@ const { cachedGetData, getTeamColor } = require('../utils/helpers');
 const { clean: sharedClean } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
+let derbyMapCache = null;
+
 function safeEmoji(value, fallback = '') {
   return value || fallback;
 }
@@ -20,7 +22,9 @@ function clean(value) {
 }
 
 function normalizeMatchNo(value) {
-  return clean(value).toLowerCase();
+  return clean(value)
+    .replace(/\./g, '-')
+    .toLowerCase();
 }
 
 function getCompetitionConfig(key) {
@@ -110,7 +114,10 @@ function getCompetitionConfig(key) {
 
 function getHeaderLabel(row, config) {
   const rawMatchNo = clean(row?.[config.matchNoIndex]);
-  const matchNo = String(rawMatchNo || '').trim().toUpperCase();
+  const matchNo = String(rawMatchNo || '')
+    .replace(/\./g, '-')
+    .trim()
+    .toUpperCase();
 
   if (!matchNo) return '';
 
@@ -124,21 +131,44 @@ function getHeaderLabel(row, config) {
   }
 
   /* ---------------- UCL ----------------
-     UCL-GS-A-1 -> GS-A
+     UCL-GS-A-1 -> GS-1
+     UCL-GS-B-1 -> GS-1
+     UCL-GS-C-1 -> GS-1
+     UCL-GS-A-2 -> GS-2
+     UCL-QF-1-1 -> QF
+     UCL-SF-1-1 -> SF
+     UCL-FINAL -> FINAL
   */
   if (config.key === 'ucl') {
     const parts = matchNo.split('-');
 
-    if (parts.length >= 4) {
-      return `${parts[1]}-${parts[2]}`;
+    if (parts.length >= 4 && parts[1] === 'GS') {
+      return `GS-${parts[3]}`;
     }
 
-    if (parts.length >= 3) {
-      return `${parts[0]}-${parts[1]}`;
-    }
+    if (matchNo.includes('QF')) return 'QF';
+    if (matchNo.includes('SF')) return 'SF';
+    if (matchNo.includes('FINAL')) return 'FINAL';
 
     return matchNo;
   }
+function isDerbyFixture(home, away) {
+  if (!derbyMapCache) return false;
+
+  const h = clean(home).toLowerCase();
+  const a = clean(away).toLowerCase();
+
+  return derbyMapCache.some(d => {
+    const t1 = clean(d.team1).toLowerCase();
+    const t2 = clean(d.team2).toLowerCase();
+
+    return (
+      (h === t1 && a === t2) ||
+      (h === t2 && a === t1)
+    );
+  });
+}
+
 
   /* ---------------- FA CUP ----------------
      FA-R1-1 -> Round 1
@@ -355,8 +385,12 @@ function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
           }`
         : `${safeEmoji(E.calendar, '📅')} Pending`;
 
+    const derbyTag = isDerbyFixture(home, away)
+      ? ` ${safeEmoji(E.fire, '🔥')} DERBY`
+      : '';
+
     return (
-      `**${matchNo || '-'}** • ${getStatusText(
+      `**${matchNo || '-'}**${derbyTag} • ${getStatusText(
         row,
         config,
         reserveMap
@@ -668,7 +702,7 @@ module.exports = {
     const config =
       getCompetitionConfig(competitionKey);
 
-    const [data, teams, reserveRows] =
+    const [data, teams, reserveRows, derbyRows] =
       await Promise.all([
         config.key === 'ucl'
           ? Promise.all([
@@ -682,8 +716,18 @@ module.exports = {
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
-        )
+        ),
+        cachedGetData('Derbies!A:D').catch(() => [])
       ]);
+
+    derbyMapCache = (derbyRows || [])
+      .slice(1)
+      .map(r => ({
+        team1: r[1],
+        team2: r[2],
+        active: r[3]
+      }))
+      .filter(r => String(r.active || '').toLowerCase() === 'yes');
 
     const matchdays = getMatchdays(
       data,
@@ -698,10 +742,10 @@ module.exports = {
       };
     }
 
-    const requestedMd =
-      interaction.options.getString(
-        'matchday'
-      );
+    const requestedMd = clean(
+      interaction.options.getString('matchday') || ''
+    )
+      .replace(/\./g, '-');
 
     const filter =
       interaction.options.getString(
@@ -741,7 +785,7 @@ module.exports = {
     const config =
       getCompetitionConfig(competitionKey);
 
-    const [data, teams, reserveRows] =
+    const [data, teams, reserveRows, derbyRows] =
       await Promise.all([
         config.key === 'ucl'
           ? Promise.all([
@@ -755,8 +799,18 @@ module.exports = {
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
-        )
+        ),
+        cachedGetData('Derbies!A:D').catch(() => [])
       ]);
+
+    derbyMapCache = (derbyRows || [])
+      .slice(1)
+      .map(r => ({
+        team1: r[1],
+        team2: r[2],
+        active: r[3]
+      }))
+      .filter(r => String(r.active || '').toLowerCase() === 'yes');
 
     const matchdays = getMatchdays(
       data,
@@ -811,7 +865,7 @@ module.exports = {
     const config =
       getCompetitionConfig(competitionKey);
 
-    const [data, teams, reserveRows] =
+    const [data, teams, reserveRows, derbyRows] =
       await Promise.all([
         config.key === 'ucl'
           ? Promise.all([
@@ -825,8 +879,18 @@ module.exports = {
         cachedGetData('Teams!A:Z'),
         cachedGetData('Reserve!A:F').catch(
           () => []
-        )
+        ),
+        cachedGetData('Derbies!A:D').catch(() => [])
       ]);
+
+    derbyMapCache = (derbyRows || [])
+      .slice(1)
+      .map(r => ({
+        team1: r[1],
+        team2: r[2],
+        active: r[3]
+      }))
+      .filter(r => String(r.active || '').toLowerCase() === 'yes');
 
     const matchdays = getMatchdays(
       data,
