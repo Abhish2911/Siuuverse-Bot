@@ -775,10 +775,10 @@ module.exports = {
   async buttonHandler(
     interaction,
     action,
-    page
+    value
   ) {
     const decodedState = decodeURIComponent(
-      String(page || 'league__all__')
+      String(value || 'league__all__')
     );
 
     const [
