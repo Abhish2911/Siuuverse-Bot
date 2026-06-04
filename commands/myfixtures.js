@@ -294,21 +294,23 @@ function buildFixtureDescription(team, summary, record, currentBlock, reserveBlo
   );
 }
 
-function createButtons(page, totalPages, targetType, targetValue) {
+function createButtons(page, totalPages, targetType, targetValue, ownerId) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`myfixtures_prev_${page}_${targetType}_${targetValue}`)
+      .setCustomId(`myfixtures_prev_${page}_${targetType}_${targetValue}_${ownerId}`)
       .setLabel('Previous')
       .setEmoji('⬅️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page <= 0),
+
     new ButtonBuilder()
-      .setCustomId(`myfixtures_refresh_${page}_${targetType}_${targetValue}`)
+      .setCustomId(`myfixtures_refresh_${page}_${targetType}_${targetValue}_${ownerId}`)
       .setLabel('Refresh')
       .setEmoji('🔄')
       .setStyle(ButtonStyle.Success),
+
     new ButtonBuilder()
-      .setCustomId(`myfixtures_next_${page}_${targetType}_${targetValue}`)
+      .setCustomId(`myfixtures_next_${page}_${targetType}_${targetValue}_${ownerId}`)
       .setLabel('Next')
       .setEmoji('➡️')
       .setStyle(ButtonStyle.Primary)
@@ -415,7 +417,15 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
 
   return {
     embeds: [embed],
-    components: [createButtons(page, totalPages, `${targetType}_${competitionKey}`, encodeURIComponent(targetValue || interaction.user.id))]
+    components: [
+      createButtons(
+        page,
+        totalPages,
+        `${targetType}_${competitionKey}`,
+        encodeURIComponent(targetValue || interaction.user.id),
+        interaction.user.id
+      )
+    ]
   };
 }
 
