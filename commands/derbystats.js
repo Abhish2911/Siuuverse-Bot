@@ -31,9 +31,9 @@ function addPlayerStat(map, name, val = 1) {
 
 function buildHubEmbed(derbies) {
   const embed = new EmbedBuilder()
-    .setTitle(`${safeEmoji(E.Stats)} Derby Hub`)
+    .setTitle(`${safeEmoji(E.fire)} Derby Hub`)
     .setDescription('Select a derby below to view detailed stats.')
-    .setColor(0xf5b342);
+    .setColor(0xE67E22);
   derbies.forEach((d) => {
     embed.addFields({
       name: `${safeEmoji(E.fire, '🔥')} ${d.derbyName}`,
@@ -45,45 +45,72 @@ function buildHubEmbed(derbies) {
 }
 
 function buildDerbyEmbed(derby, stats) {
-  const { played, team1Wins, team2Wins, draws, team1Goals, team2Goals, goals, assists, mvps } = stats;
+  const {
+    played,
+    team1Wins,
+    team2Wins,
+    draws,
+    team1Goals,
+    team2Goals,
+    goals,
+    assists,
+    mvps
+  } = stats;
+
   const team1 = derby.team1;
   const team2 = derby.team2;
-  // Top scorers/assists/mvps
-  function topPlayers(map, emoji, max = 5) {
-    const arr = Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, max);
-    if (arr.length === 0) return 'None';
-    return arr.map(([name, val], i) => `${emoji} **${name}** - ${val}`).join('\n');
-  }
+
+  const topGoals = Object.entries(goals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([p, v]) => `• ${p} (${v})`)
+    .join('\n') || 'None';
+
+  const topAssists = Object.entries(assists)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([p, v]) => `• ${p} (${v})`)
+    .join('\n') || 'None';
+
+  const topMvps = Object.entries(mvps)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([p, v]) => `• ${p} (${v})`)
+    .join('\n') || 'None';
+
   return new EmbedBuilder()
-    .setTitle(`${safeEmoji(E.fire, '🔥')} ${derby.derbyName}`)
-    .setColor(0x5d7cff)
+    .setColor(0xE67E22)
+    .setTitle(`${safeEmoji(E.fire)} ${derby.derbyName}`)
+    .setDescription(`${team1} vs ${team2}`)
     .addFields(
       {
-        name: `${safeEmoji(E.played)} Overall Record`,
-        value: `**Played:** ${played}\n${safeEmoji(E.win)} ${team1}: ${team1Wins}\n${safeEmoji(E.win)} ${team2}: ${team2Wins}\n${safeEmoji(E.draw)} Draws: ${draws}`,
-        inline: false,
+        name: `${safeEmoji(E.Stats)} Overall Record`,
+        value:
+          `${safeEmoji(E.played)} Matches: **${played}**\n` +
+          `${safeEmoji(E.win)} ${team1}: **${team1Wins}W**\n` +
+          `${safeEmoji(E.win)} ${team2}: **${team2Wins}W**\n` +
+          `${safeEmoji(E.draw)} Draws: **${draws}**`
       },
       {
         name: `${safeEmoji(E.goal)} Goals`,
-        value: `${team1}: ${team1Goals} | ${team2}: ${team2Goals}`,
-        inline: false,
+        value:
+          `${team1}: ${safeEmoji(E.goal)} **${team1Goals}**\n` +
+          `${team2}: ${safeEmoji(E.goal)} **${team2Goals}**`
       },
       {
         name: `${safeEmoji(E.goldenBoot)} Top Scorers`,
-        value: topPlayers(goals, safeEmoji(E.goal)),
-        inline: false,
+        value: topGoals,
+        inline: false
       },
       {
         name: `${safeEmoji(E.assist)} Top Assists`,
-        value: topPlayers(assists, safeEmoji(E.assist)),
-        inline: false,
+        value: topAssists,
+        inline: false
       },
       {
         name: `${safeEmoji(E.mvp)} Top MVPs`,
-        value: topPlayers(mvps, safeEmoji(E.mvp)),
-        inline: false,
+        value: topMvps,
+        inline: false
       }
     );
 }
