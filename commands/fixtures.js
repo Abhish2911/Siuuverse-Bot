@@ -152,22 +152,6 @@ function getHeaderLabel(row, config) {
 
     return matchNo;
   }
-function isDerbyFixture(home, away) {
-  if (!derbyMapCache) return false;
-
-  const h = clean(home).toLowerCase();
-  const a = clean(away).toLowerCase();
-
-  return derbyMapCache.some(d => {
-    const t1 = clean(d.team1).toLowerCase();
-    const t2 = clean(d.team2).toLowerCase();
-
-    return (
-      (h === t1 && a === t2) ||
-      (h === t2 && a === t1)
-    );
-  });
-}
 
 
   /* ---------------- FA CUP ----------------
@@ -232,6 +216,23 @@ function isDerbyFixture(home, away) {
   }
 
   return matchNo;
+}
+
+function isDerbyFixture(home, away) {
+  if (!derbyMapCache) return false;
+
+  const h = clean(home).toLowerCase();
+  const a = clean(away).toLowerCase();
+
+  return derbyMapCache.some(d => {
+    const t1 = clean(d.team1).toLowerCase();
+    const t2 = clean(d.team2).toLowerCase();
+
+    return (
+      (h === t1 && a === t2) ||
+      (h === t2 && a === t1)
+    );
+  });
 }
 
 function getReserveMap(rows, competitionLabel) {
