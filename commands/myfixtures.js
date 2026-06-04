@@ -11,6 +11,7 @@ const E = require('../utils/emojis');
 
 const PAGE_SIZE = 4;
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
+let derbyMapCache = null;
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
@@ -22,6 +23,23 @@ function clean(value) {
 
 function normalizeMatchNo(value) {
   return clean(value).toUpperCase();
+}
+
+function isDerbyFixture(home, away) {
+  if (!Array.isArray(derbyMapCache)) return false;
+
+  const h = normalize(home);
+  const a = normalize(away);
+
+  return derbyMapCache.some(d => {
+    const t1 = normalize(d.team1);
+    const t2 = normalize(d.team2);
+
+    return (
+      (h === t1 && a === t2) ||
+      (h === t2 && a === t1)
+    );
+  });
 }
 
 function getCompetitionConfig(key) {
@@ -237,6 +255,7 @@ function buildFixtureLine(row, team, currentMatchNo, config) {
   const isCurrent = String(row[config.matchNoIndex] || '') === String(currentMatchNo || '');
   const result = getResultText(row, team.teamName, config);
   const played = hasScore(row, config);
+  const derby = isDerbyFixture(home, away);
   const icon = played ? safeEmoji(E.correct, '✅') : isCurrent ? safeEmoji(E.fire, '🔥') : safeEmoji(E.missing, '➖');
   const statusEmoji = played
     ? result === 'Win'
@@ -251,7 +270,7 @@ function buildFixtureLine(row, team, currentMatchNo, config) {
   const scoreText = played ? `**${hg}-${ag}**` : '**Pending**';
 
   return (
-    `${safeEmoji(E.doubleArrow, '➡️')} **${matchNo}** • ${safeEmoji(E.calendar, '📅')} ${date}\n` +
+    `${safeEmoji(E.doubleArrow, '➡️')} **${matchNo}**${derby ? ` ${safeEmoji(E.fire, '🔥')} DERBY` : ''} • ${safeEmoji(E.calendar, '📅')} ${date}\n` +
     `> \`${home}\` ${safeEmoji(E.vs, '⚔️')} \`${away}\` — ${scoreText}\n` +
     `> ${icon} ${statusEmoji} **${played ? result : 'Pending'}**`
   );
@@ -320,12 +339,22 @@ function createButtons(page, totalPages, targetType, targetValue, ownerId) {
 
 async function buildMyFixtures(interaction, page = 0, targetType = 'self', targetValue = '', competitionKey = 'league') {
   const config = getCompetitionConfig(competitionKey);
-  const [teams, fixtures, standings, reserveRows] = await Promise.all([
+  const [teams, fixtures, standings, reserveRows, derbyRows] = await Promise.all([
     cachedGetData('Teams!A:Z'),
     cachedGetData(config.fixturesRange),
     cachedGetData('Standings!A:J').catch(() => []),
-    cachedGetData(RESERVE_SHEET_RANGE).catch(() => [])
+    cachedGetData(RESERVE_SHEET_RANGE).catch(() => []),
+    cachedGetData('Derbies!A:D').catch(() => [])
   ]);
+
+  derbyMapCache = (derbyRows || [])
+    .slice(1)
+    .map(r => ({
+      team1: r[1],
+      team2: r[2],
+      active: r[3]
+    }))
+    .filter(r => String(r.active || '').toLowerCase() === 'yes');
 
   let team = null;
   let targetText = '';
@@ -395,6 +424,7 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
       `> \`${current[config.homeIndex]}\` ${safeEmoji(E.vs, '⚔️')} \`${current[config.awayIndex]}\`\n` +
       `> ${safeEmoji(E.calendar, '📅')} Stage / Matchday **${matchdayOf(current, config)}**\n` +
       `> ${safeEmoji(E.captain, '👑')} Opp. Captain: ${getOpponentCaptainMention(teams, currentOpponent)}\n` +
+      `> ${isDerbyFixture(current[config.homeIndex], current[config.awayIndex]) ? `${safeEmoji(E.fire, '🔥')} **DERBY MATCH**` : `${safeEmoji(E.info, 'ℹ️')} Regular Fixture`}\n` +
       `> ${safeEmoji(E.missing, '➖')} Status: **Pending**\n\n`
     : `${safeEmoji(E.correct, '✅')} **All fixtures completed.**\n\n`;
 
