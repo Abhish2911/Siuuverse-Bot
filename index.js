@@ -218,10 +218,10 @@ client.on('interactionCreate', async interaction => {
     // =========================
     if (interaction.isButton()) {
       const parts = interaction.customId.split('_');
-      const cmd = parts[0];
-      const action = parts[1];
-      const value = parts[2];
-      const extra = parts.slice(3).join('_');
+      const cmd = parts.shift();
+      const action = parts.shift();
+      const value = parts.join('_');
+      const extra = '';
 
       // captainpanel result format button
       if (interaction.customId.startsWith('captainpanel_resultformat:')) {
@@ -313,7 +313,7 @@ client.on('interactionCreate', async interaction => {
       }
 
       // fixtures dropdown handler
-      if (interaction.customId === 'md_select_fixtures') {
+      if (interaction.customId.startsWith('md_select_fixtures')) {
         const command = client.commands.get('fixtures');
         if (!command || !command.selectHandler) return;
 
