@@ -404,9 +404,12 @@ module.exports = {
   async buttonHandler(interaction, action, value, extra) {
     if (action !== 'resultformat') return null;
 
-    const competitionKey = String(value || 'league').trim() || 'league';
+    const raw = String(value || 'league:next');
+    const [competitionKeyRaw, matchNoRaw] = raw.split(':');
+
+    const competitionKey = String(competitionKeyRaw || 'league').trim();
     const config = getCompetitionConfig(competitionKey);
-    const matchNo = String(extra || '<match_no>').trim() || '<match_no>';
+    const matchNo = String(matchNoRaw || extra || '<match_no>').trim() || '<match_no>';
 
     return {
       content:
