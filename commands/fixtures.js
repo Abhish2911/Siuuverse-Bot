@@ -476,7 +476,9 @@ function buildFixtureDescription(summary, config) {
 
 function createButtons(md, matchdays, config, filter = 'all') {
   const currentIndex = matchdays.indexOf(md);
-  const state = `${config.key}__${filter}__${md}`;
+  const state = encodeURIComponent(
+    `${config.key}__${filter}__${md}`
+  );
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -502,7 +504,7 @@ function createDropdown(md, matchdays, config, filter = 'all') {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(
-        `md_select_fixtures__${config.key}__${filter}`
+        `md_select_fixtures__${encodeURIComponent(config.key)}__${encodeURIComponent(filter)}`
       )
       .setPlaceholder(`${config.label} • ${md}`)
       .addOptions(
@@ -775,13 +777,15 @@ module.exports = {
     action,
     page
   ) {
+    const decodedState = decodeURIComponent(
+      String(page || 'league__all__')
+    );
+
     const [
       competitionKey = 'league',
       filter = 'all',
       currentMd = ''
-    ] = String(
-      page || 'league__all__'
-    ).split('__');
+    ] = decodedState.split('__');
 
     const config =
       getCompetitionConfig(competitionKey);
@@ -857,11 +861,13 @@ module.exports = {
       interaction.customId || ''
     ).split('__');
 
-    const competitionKey =
-      parts[1] || 'league';
+    const competitionKey = decodeURIComponent(
+      parts[1] || 'league'
+    );
 
-    const filter =
-      parts[2] || 'all';
+    const filter = decodeURIComponent(
+      parts[2] || 'all'
+    );
 
     const config =
       getCompetitionConfig(competitionKey);
