@@ -101,11 +101,15 @@ module.exports = {
       const setupSummary = buildLiveStandingsSetupSummary(interaction, sent);
       setupSummary.type = standingsType === 'ucl' ? 'UCL Group Stage' : 'COOP League';
 
-      saveLiveStandingsConfig(interaction.guild.id, {
-        channelId: interaction.channel.id,
-        messageId: sent.id,
-        type: standingsType
-      });
+      saveLiveStandingsConfig(
+        interaction.guild.id,
+        {
+          guildId: interaction.guild.id,
+          channelId: interaction.channel.id,
+          messageId: sent.id
+        },
+        standingsType
+      );
 
       try {
         startLiveStandingsUpdater(interaction.client, interaction.guild.id, standingsType);
@@ -156,10 +160,10 @@ module.exports = {
       let restored = false;
 
       for (const guildId of guilds) {
-        const leagueOk = startLiveStandingsUpdater(client, guildId, 'coop_league');
-        if (leagueOk) restored = true;
-        const uclOk = startLiveStandingsUpdater(client, guildId, 'ucl');
-        if (uclOk) restored = true;
+        ['coop_league', 'ucl'].forEach(type => {
+          const ok = startLiveStandingsUpdater(client, guildId, type);
+          if (ok) restored = true;
+        });
       }
 
       return restored;
