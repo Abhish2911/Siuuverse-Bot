@@ -16,7 +16,21 @@ const hasScore = (row) => {
     row[5] !== '' && row[5] !== undefined;
 };
 
-const getMatchday = row => String(row[0] || '').split('.')[0].trim();
+const getMatchday = row => {
+  const matchNo = String(row[0] || '').trim();
+
+  // League format: 1-1, 1-2, 2-1...
+  if (/^\d+-\d+$/i.test(matchNo)) {
+    return matchNo.split('-')[0].trim();
+  }
+
+  // Legacy format: 1.1, 1.2...
+  if (matchNo.includes('.')) {
+    return matchNo.split('.')[0].trim();
+  }
+
+  return matchNo;
+};
 
 const shortTeam = (row, home = true) => {
   if (home) return String(row[7] || row[2] || 'HOME').trim();
@@ -66,7 +80,11 @@ const findNextMatchdayRows = (fixtures, activeMD) => {
 
   if (!rows.length) return { matchday: null, rows: [] };
 
-  const nextMD = String(Math.min(...rows.map(row => Number(getMatchday(row)))));
+  const nextMDNumber = Math.min(
+    ...rows.map(row => Number(getMatchday(row)))
+  );
+
+  const nextMD = String(nextMDNumber);
 
   return {
     matchday: nextMD,
@@ -169,7 +187,7 @@ module.exports = {
       };
     }
 
-    const activeMD = String(allowedMD || '').split('.')[0].trim();
+    const activeMD = String(getMatchday([allowedMD]));
     const rows = fixtures
       .slice(1)
       .filter(r => getMatchday(r) === activeMD);
