@@ -139,7 +139,7 @@ module.exports = {
           lines.push(`+ ${line}`);
         } else if (pos === 3) {
           const isBestThird = bestTwoThird.some(t => t.group === g && t.team === row);
-          lines.push(`${isBestThird ? '+' : '?'} ${line}`);
+          lines.push(`${isBestThird ? '+' : ' '} ${line}`);
         } else {
           lines.push(`  ${line}`);
         }
@@ -148,8 +148,8 @@ module.exports = {
 
     const description =
       `⚽ ${requestedGroup ? `Group ${requestedGroup}` : 'UCL Group Stage'} Standings\n\n` +
-      `🟢 Top 2 teams qualify automatically\n` +
-      `🟢 Best 2 third-place teams qualify`;
+      `${safeEmoji(E.up, '🟢')} Top 2 teams qualify automatically\n` +
+      `${safeEmoji(E.up, '🟢')} Best 2 third-place teams qualify`;
 
     const embed = new EmbedBuilder()
       .setTitle(`${safeEmoji(E.UCL, '🏆')} UCL Group Standings`)
@@ -180,7 +180,7 @@ module.exports = {
                 if (pos <= 2) groupLines.push(`+ ${line}`);
                 else if (pos === 3) {
                   const isBestThird = bestTwoThird.some(t => t.group === groupKey && t.team === row);
-                  groupLines.push(`${isBestThird ? '+' : '?'} ${line}`);
+                  groupLines.push(`${isBestThird ? '+' : ' '} ${line}`);
                 } else groupLines.push(`  ${line}`);
               }
 
@@ -191,12 +191,14 @@ module.exports = {
         },
         {
           name: `${safeEmoji(E.correct, '🟢')} Qualification`,
-          value: 'Top 2 qualify automatically\nBest 2 third-place teams qualify',
+          value:
+            `${safeEmoji(E.up, '🟢')} Top 2 qualify automatically\n` +
+            `${safeEmoji(E.up, '🟢')} Best 2 third-place teams qualify`,
           inline: false
         }
       )
       .setColor(0x0A1E5E)
-      .setFooter({ text: 'UCL Group Standings • 🟢 Qualified • ? Third Place Contender' })
+      .setFooter({ text: 'UCL Group Standings • + Qualified Teams' })
       .setTimestamp();
 
     return {
