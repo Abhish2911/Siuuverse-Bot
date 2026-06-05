@@ -68,7 +68,7 @@ module.exports = {
         .setDescription('Standings type')
         .setRequired(true)
         .addChoices(
-          { name: 'League', value: 'coop_league' },
+          { name: 'League', value: 'league' },
           { name: 'UCL', value: 'ucl' }
         )
     ),
@@ -94,7 +94,7 @@ module.exports = {
 
     try {
       const setupPreview = buildLiveStandingsSetupSummary(interaction);
-      const standingsType = interaction.options.getString('type') || 'coop_league';
+      const standingsType = interaction.options.getString('type') || 'league';
       const embed = await buildLiveStandingsEmbed(standingsType);
       console.log(`📊 Creating live standings message type: ${standingsType}`);
       const sent = await interaction.channel.send({ embeds: [embed] });
@@ -160,7 +160,7 @@ module.exports = {
       let restored = false;
 
       for (const guildId of guilds) {
-        ['coop_league', 'ucl'].forEach(type => {
+        ['league', 'ucl'].forEach(type => {
           const ok = startLiveStandingsUpdater(client, guildId, type);
           if (ok) restored = true;
         });
