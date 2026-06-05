@@ -1,51 +1,99 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
+const { cachedGetData } = require('../utils/helpers');
 const {
-  cachedGetData,
-  cleanId,
-  getTeamColor,
-  normalize,
-  splitList,
-  createPaginationButtons,
-  createCompetitionDropdown
-} = require('../utils/helpers');
-const { clean: sharedClean } = require('../utils/competitionHelpers');
+  getCompetitionSuspensions,
+  getYellowThreshold,
+  getCompetitionPhase
+} = require('../utils/suspensionService');
 const E = require('../utils/emojis');
 
-const LEAGUE_PAGE_SIZE = 4;
-const CUP_PAGE_SIZE = 2;
-const RESERVE_SHEET_RANGE = 'Reserve!A:F';
-let derbyMapCache = null;
+const PER_PAGE = 5;
+const SUSP_PER_PAGE = 4;
 
-function safeEmoji(value, fallback = '') {
-  return value || fallback;
-}
+const padEnd = (value, len) => String(value ?? '').padEnd(len, ' ');
+const padStart = (value, len) => String(value ?? '').padStart(len, ' ');
+const shorten = (value, len) => {
+  const str = String(value ?? '');
+  return str.length > len ? `${str.slice(0, len - 1)}…` : str;
+};
+
+const safeEmoji = (value, fallback = '') => value || fallback;
 
 function clean(value) {
-  return sharedClean(value);
+  return String(value || '').trim();
 }
 
-function normalizeMatchNo(value) {
-  return clean(value).toUpperCase();
+function getRoundDisplayLabel(value) {
+  const text = clean(value).toUpperCase();
+
+  const gsMatch = text.match(/GS-[A-Z]-([0-9]+)-([0-9]+)/i);
+  if (gsMatch) return `GS MD${gsMatch[1]}`;
+
+  if (text.includes('QFQ')) return 'QFQ';
+  if (text.includes('R1')) return 'R1';
+  if (text.includes('R16') || text.includes('RO16')) return 'R16';
+  if (text.includes('QF')) return 'QF';
+  if (text.includes('SF')) return 'SF';
+  if (text.includes('FINAL') || /\bF\b/.test(text)) return 'FINAL';
+  if (text.includes('GS')) return 'GS';
+
+  const mdMatch = text.match(/^(\d+)/);
+  if (mdMatch) return `MD${mdMatch[1]}`;
+
+  return text || '-';
 }
 
-function isDerbyFixture(home, away) {
-  if (!Array.isArray(derbyMapCache)) return false;
+function formatMatchDisplay(value) {
+  const text = clean(value);
+  if (!text || text === '-') return '-';
 
-  const h = normalize(home);
-  const a = normalize(away);
+  const label = getRoundDisplayLabel(text);
+  return label && label !== text.toUpperCase() ? `${text} (${label})` : text;
+}
 
-  return derbyMapCache.some(d => {
-    const t1 = normalize(d.team1);
-    const t2 = normalize(d.team2);
+function getDisciplineMatchOrderValue(value) {
+  const text = clean(value).toUpperCase();
+  if (!text || text === '-') return Number.MAX_SAFE_INTEGER;
 
-    return (
-      (h === t1 && a === t2) ||
-      (h === t2 && a === t1)
-    );
-  });
+  const leagueMatch = text.match(/^(\d+)(?:[-.](\d+))?/);
+  if (leagueMatch) {
+    return (Number(leagueMatch[1]) || 0) * 100 + (Number(leagueMatch[2]) || 0);
+  }
+
+  const uclGsMatch = text.match(/GS-[A-Z]-([0-9]+)-([0-9]+)/i);
+
+  if (uclGsMatch) {
+    const md = Number(uclGsMatch[1]) || 0;
+    const fixture = Number(uclGsMatch[2]) || 0;
+
+    return 1000 + (md * 100) + fixture;
+  }
+
+  const stageMatch = text.match(/(GS|R1|R16|RO16|QFQ|QF|SF|FINAL|\bF\b)[^\d]*(\d+)?/i);
+  if (stageMatch) {
+    const stageKey = String(stageMatch[1] || '').toUpperCase();
+    const stageMap = {
+      GS: 10,
+      R1: 15,
+      R16: 20,
+      RO16: 20,
+      QFQ: 25,
+      QF: 30,
+      SF: 40,
+      FINAL: 50,
+      F: 50
+    };
+
+    return (stageMap[stageKey] || 99) * 100 + (Number(stageMatch[2]) || 0);
+  }
+
+  return Number.MAX_SAFE_INTEGER;
 }
 
 function getCompetitionConfig(key) {
@@ -55,18 +103,11 @@ function getCompetitionConfig(key) {
     return {
       key: 'fa',
       label: 'FA Cup',
-      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
-      reserveLabel: 'FA Cup',
-      matchNoIndex: 1,
-      dateIndex: 2,
-      homeIndex: 3,
-      awayIndex: 4,
-      hgIndex: 5,
-      agIndex: 6,
-      resultIndex: 7,
-      homeShortIndex: 8,
-      awayShortIndex: 9,
-      statusIndex: 10
+      rankingYellowRange: 'FA_Cup_Coop_Ranking!H:I',
+      rankingRedRange: 'FA_Cup_Coop_Ranking!K:L',
+      fairPlayRange: 'Fair_Play!H:K',
+      suspensionRange: 'FA_Cup_Coop_Suspension!A:G',
+      footerText: 'FA Cup'
     };
   }
 
@@ -74,18 +115,11 @@ function getCompetitionConfig(key) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
-      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
-      reserveLabel: 'Carabao Cup',
-      matchNoIndex: 1,
-      dateIndex: 2,
-      homeIndex: 3,
-      awayIndex: 4,
-      hgIndex: 5,
-      agIndex: 6,
-      resultIndex: 7,
-      homeShortIndex: 8,
-      awayShortIndex: 9,
-      statusIndex: 10
+      rankingYellowRange: 'Carabao_Coop_Ranking!H:I',
+      rankingRedRange: 'Carabao_Coop_Ranking!K:L',
+      fairPlayRange: 'Fair_Play!H:K',
+      suspensionRange: 'Carabao_Coop_Suspension!A:G',
+      footerText: 'Carabao Cup'
     };
   }
 
@@ -93,389 +127,113 @@ function getCompetitionConfig(key) {
     return {
       key: 'ucl',
       label: 'UCL',
-      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
-      reserveLabel: 'UCL',
-      matchNoIndex: 0,
-      dateIndex: 1,
-      homeIndex: 2,
-      awayIndex: 3,
-      hgIndex: 4,
-      agIndex: 5,
-      resultIndex: 6,
-      homeShortIndex: 7,
-      awayShortIndex: 8,
-      statusIndex: 9
+      rankingYellowRange: 'UCL_Coop_Ranking!H:I',
+      rankingRedRange: 'UCL_Coop_Ranking!K:L',
+      fairPlayRange: 'Fair_Play!H:K',
+      suspensionRange: 'UCL_Coop_Suspension!A:G',
+      footerText: 'UCL'
     };
   }
 
   return {
     key: 'league',
     label: 'League',
-    fixturesRange: 'Fixtures!A:J',
-    reserveLabel: 'League',
-    matchNoIndex: 0,
-    dateIndex: 1,
-    homeIndex: 2,
-    awayIndex: 3,
-    hgIndex: 4,
-    agIndex: 5,
-    resultIndex: 6,
-    homeShortIndex: 7,
-    awayShortIndex: 8,
-    statusIndex: 9
+    rankingYellowRange: 'Ranking!H:I',
+    rankingRedRange: 'Ranking!K:L',
+    fairPlayRange: 'Fair_Play!H:K',
+    suspensionRange: 'Suspension!A:G',
+    footerText: 'Coop league'
   };
 }
 
-function toNumber(value) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : 0;
+function getSuspensionCurrentMatch(record) {
+  return record?.bannedMatchNo || '-';
 }
 
-function hasScore(row, config) {
-  return row?.[config.hgIndex] !== '' && row?.[config.hgIndex] !== undefined &&
-    row?.[config.agIndex] !== '' && row?.[config.agIndex] !== undefined;
-}
+function buildMongoSuspensionRows(records) {
+  return records.map(record => {
+    const displayPlayer = record.teamShort
+      ? `${record.teamShort}-${record.playerName || '-'}`
+      : (record.playerName || '-');
 
-function matchdayOf(row, config) {
-  const matchNo = String(row?.[config.matchNoIndex] || '').trim();
-
-  if (!matchNo) return '-';
-
-  if (/^UCL-GS-/i.test(matchNo)) {
-    const parts = matchNo.split('-');
-    return parts.length >= 5 ? parts[4] : matchNo;
-  }
-
-  const parts = matchNo.split('-');
-
-  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
-    return parts[0];
-  }
-
-  return matchNo;
-}
-
-function getTeamFromUserId(teams, userId) {
-  const id = cleanId(userId);
-  if (!id || !Array.isArray(teams)) return null;
-
-  for (const row of teams.slice(1)) {
-    const teamName = String(row[0] || '').trim();
-    const shortName = String(row[2] || teamName).trim();
-    const logo = String(row[3] || '').trim();
-    const captainId = cleanId(row[4]);
-    const memberIds = splitList(row[5]).map(cleanId);
-    const stadium = String(row[6] || 'Not set').trim();
-    const color = String(row[7] || '').trim();
-
-    if (captainId === id || memberIds.includes(id)) {
-      return { teamName, shortName, logo, stadium, color };
-    }
-  }
-
-  return null;
-}
-
-function getTeamFromPlayerName(teams, playerName) {
-  const key = normalize(playerName);
-  if (!key || !Array.isArray(teams)) return null;
-
-  for (const row of teams.slice(1)) {
-    const teamName = String(row[0] || '').trim();
-    const shortName = String(row[2] || teamName).trim();
-    const logo = String(row[3] || '').trim();
-    const stadium = String(row[6] || 'Not set').trim();
-    const color = String(row[7] || '').trim();
-    const players = splitList(row[1]);
-
-    if (players.some(p => normalize(p) === key)) {
-      return { teamName, shortName, logo, stadium, color };
-    }
-  }
-
-  return null;
-}
-
-function getRecord(standings, teamName, shortName) {
-  const empty = { wins: 0, draws: 0, losses: 0, gd: 0, pts: 0 };
-  if (!Array.isArray(standings)) return empty;
-
-  const key = normalize(teamName);
-  const shortKey = normalize(shortName);
-  const row = standings.slice(1).find(r => normalize(r[1]) === key || normalize(r[1]) === shortKey);
-
-  if (!row) return empty;
-
-  return {
-    wins: Number(row[3] || 0) || 0,
-    draws: Number(row[4] || 0) || 0,
-    losses: Number(row[5] || 0) || 0,
-    gd: toNumber(row[8]),
-    pts: toNumber(row[9])
-  };
-}
-
-function getOpponentCaptainMention(teams, opponentTeam) {
-  const key = normalize(opponentTeam);
-  const row = Array.isArray(teams)
-    ? teams.slice(1).find(r => normalize(r[0]) === key || normalize(r[2]) === key)
-    : null;
-
-  const captainId = cleanId(row?.[4]);
-  return captainId ? `<@${captainId}>` : 'Not linked';
-}
-
-function getReserveMatches(reserveRows, team, competitionLabel) {
-  if (!Array.isArray(reserveRows) || reserveRows.length <= 1 || !team) return [];
-
-  const teamKey = normalize(team.teamName);
-  const shortKey = normalize(team.shortName);
-  const targetCompetition = clean(competitionLabel).toLowerCase();
-
-  return reserveRows
-    .slice(1)
-    .filter(row => row && row.length)
-    .filter(row => clean(row[0]).toLowerCase() === targetCompetition)
-    .filter(row => {
-      const home = normalize(row[2]);
-      const away = normalize(row[3]);
-      return home === teamKey || home === shortKey || away === teamKey || away === shortKey;
-    })
-    .map(row => ({
-      matchNo: String(row[1] || '-').trim(),
-      home: String(row[2] || 'HOME').trim(),
-      away: String(row[3] || 'AWAY').trim(),
-      by: clean(row[4]),
-      playerName: clean(row[5])
-    }));
-}
-
-function getResultText(row, teamName, config) {
-  if (!hasScore(row, config)) return 'Pending';
-
-  const home = normalize(row[config.homeIndex]);
-  const away = normalize(row[config.awayIndex]);
-  const hg = Number(row[config.hgIndex]);
-  const ag = Number(row[config.agIndex]);
-  const key = normalize(teamName);
-
-  if (hg === ag) return 'Draw';
-  if (home === key) return hg > ag ? 'Win' : 'Loss';
-  if (away === key) return ag > hg ? 'Win' : 'Loss';
-  return 'Played';
-}
-
-function buildFixtureLine(row, team, currentMatchNo, config) {
-  const matchNo = String(row[config.matchNoIndex] || '-').trim();
-  const date = String(row[config.dateIndex] || 'TBD').trim();
-  const home = String(row[config.homeIndex] || 'HOME').trim();
-  const away = String(row[config.awayIndex] || 'AWAY').trim();
-  const hg = row[config.hgIndex];
-  const ag = row[config.agIndex];
-  const isCurrent = String(row[config.matchNoIndex] || '') === String(currentMatchNo || '');
-  const result = getResultText(row, team.teamName, config);
-  const played = hasScore(row, config);
-  const derby = isDerbyFixture(home, away);
-  const icon = played ? safeEmoji(E.correct, '✅') : isCurrent ? safeEmoji(E.fire, '🔥') : safeEmoji(E.missing, '➖');
-  const statusEmoji = played
-    ? result === 'Win'
-      ? safeEmoji(E.win, '✅')
-      : result === 'Draw'
-        ? safeEmoji(E.draw, '🤝')
-        : result === 'Loss'
-          ? safeEmoji(E.lose, '❌')
-          : safeEmoji(E.correct, '✅')
-    : safeEmoji(E.missing, '➖');
-
-  const scoreText = played ? `**${hg}-${ag}**` : '**Pending**';
-
-  return (
-    `${safeEmoji(E.doubleArrow, '➡️')} **${matchNo}**${derby ? ` ${safeEmoji(E.fire, '🔥')} DERBY` : ''} • ${safeEmoji(E.calendar, '📅')} ${date}\n` +
-    `> \`${home}\` ${safeEmoji(E.vs, '⚔️')} \`${away}\` — ${scoreText}\n` +
-    `> ${icon} ${statusEmoji} **${played ? result : 'Pending'}**`
-  );
-}
-
-function buildFixtureSummary(team, rows, upcoming, played, reserveMatches, current, config) {
-  const currentMatchNo = current ? clean(current[config.matchNoIndex]) : 'None';
-  const currentPairing = current
-    ? `\`${clean(current[config.homeShortIndex] || current[config.homeIndex])}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(current[config.awayShortIndex] || current[config.awayIndex])}\``
-    : 'All fixtures completed';
-
-  return {
-    total: rows.length,
-    upcoming: upcoming.length,
-    played: played.length,
-    reserved: reserveMatches.length,
-    currentMatchNo,
-    currentPairing,
-    competition: config.label,
-    shortName: team.shortName || team.teamName,
-    stadium: team.stadium || 'Not set'
-  };
-}
-
-function buildFixtureDescription(team, summary, record, currentBlock, reserveBlock, pageRows, page, orderedRows) {
-  return (
-    `# ${summary.shortName}\n` +
-    `${safeEmoji(E.blueIcon, '🔵')} **Team:** ${team.teamName}\n` +
-    `🏟️ **Stadium:** ${summary.stadium}\n` +
-    `${safeEmoji(E.trophy_animated || E.calendar, '🏆')} **Competition:** ${summary.competition}\n` +
-    `${summary.competition === 'League'
-      ? `${safeEmoji(E.played, '🎮')} **Record:** ${record.wins}W / ${record.draws}D / ${record.losses}L\n${safeEmoji(E.goal, '⚽')} **GD:** ${record.gd} | **Pts:** ${record.pts}\n`
-      : ''}` +
-    `${safeEmoji(E.played, '🎮')} **Total:** ${summary.total} • ${safeEmoji(E.missing, '➖')} **Upcoming:** ${summary.upcoming} • ${safeEmoji(E.correct, '✅')} **Played:** ${summary.played} • ${safeEmoji(E.lock, '🔒')} **Reserved:** ${summary.reserved}\n` +
-    `${safeEmoji(E.calendar, '📅')} **Current Match:** ${summary.currentMatchNo}\n` +
-    `${safeEmoji(E.Badge || E.info, '📌')} **Current Pairing:** ${summary.currentPairing}\n\n` +
-    `${currentBlock}` +
-    `${reserveBlock}` +
-    `${safeEmoji(E.calendar, '📅')} **Showing ${pageRows.length ? page * pageRows.length + 1 : 0}-${page * pageRows.length + pageRows.length} of ${orderedRows.length} fixtures**`
-  );
-}
-
-async function buildMyFixtures(interaction, page = 0, targetType = 'self', targetValue = '', competitionKey = 'league') {
-  const config = getCompetitionConfig(competitionKey);
-  const pageSize = config.key === 'league'
-    ? LEAGUE_PAGE_SIZE
-    : CUP_PAGE_SIZE;
-  const [teams, fixtures, standings, reserveRows, derbyRows] = await Promise.all([
-    cachedGetData('Teams!A:Z'),
-    cachedGetData(config.fixturesRange),
-    cachedGetData('Standings!A:J').catch(() => []),
-    cachedGetData(RESERVE_SHEET_RANGE).catch(() => []),
-    cachedGetData('Derbies!A:D').catch(() => [])
-  ]);
-
-  derbyMapCache = (derbyRows || [])
-    .slice(1)
-    .map(r => ({
-      team1: r[1],
-      team2: r[2],
-      active: r[3]
-    }))
-    .filter(r => String(r.active || '').toLowerCase() === 'yes');
-
-  let team = null;
-  let targetText = '';
-
-  if (targetType === 'user') {
-    team = getTeamFromUserId(teams, targetValue);
-    targetText = `<@${targetValue}>`;
-  } else if (targetType === 'player') {
-    team = getTeamFromPlayerName(teams, targetValue);
-    targetText = targetValue;
-  } else {
-    team = getTeamFromUserId(teams, interaction.user.id);
-    targetText = `${interaction.user}`;
-  }
-
-  if (!team) {
-    return { content: `${safeEmoji(E.wrong, '❌')} Could not find a team for **${targetText || 'you'}**. Check Teams player name / Discord ID.` };
-  }
-
-  const teamKey = normalize(team.teamName);
-  const shortKey = normalize(team.shortName);
-  const rows = Array.isArray(fixtures)
-    ? fixtures
-        .slice(1)
-        .filter(row => normalize(row[config.homeIndex]) === teamKey || normalize(row[config.awayIndex]) === teamKey || normalize(row[config.homeIndex]) === shortKey || normalize(row[config.awayIndex]) === shortKey)
-    : [];
-
-  if (!rows.length) {
-    return { content: `${safeEmoji(E.wrong, '❌')} No fixtures found for **${team.teamName}**.` };
-  }
-
-  const upcoming = rows.filter(row => !hasScore(row, config));
-  const played = rows.filter(row => hasScore(row, config));
-  const current = upcoming[0] || null;
-  const orderedRows = [...upcoming, ...played].sort((a, b) => {
-    const aPlayed = hasScore(a, config) ? 1 : 0;
-    const bPlayed = hasScore(b, config) ? 1 : 0;
-    if (aPlayed !== bPlayed) return aPlayed - bPlayed;
-
-    const aNo = clean(a[config.matchNoIndex]);
-    const bNo = clean(b[config.matchNoIndex]);
-    return aNo.localeCompare(bNo, undefined, { numeric: true, sensitivity: 'base' });
+    return [
+      displayPlayer,
+      record.yellowCards || 0,
+      formatMatchDisplay(record.redMatchNo || '-'),
+      formatMatchDisplay(record.yellowBanTriggeredAt || '-'),
+      formatMatchDisplay(record.bannedMatchNo || '-'),
+      record.status || '-',
+      formatMatchDisplay(getSuspensionCurrentMatch(record))
+    ];
   });
+}
 
-  const totalPages = Math.max(1, Math.ceil(orderedRows.length / pageSize));
-  page = Math.max(0, Math.min(page, totalPages - 1));
+function buildMongoRiskRows(records, competitionKey) {
+  return records
+    .map(record => {
+      const phase = getCompetitionPhase(
+        competitionKey,
+        record?.yellowBanTriggeredAt || record?.redMatchNo || record?.bannedMatchNo || ''
+      );
+      const threshold = getYellowThreshold(competitionKey, phase);
+      const displayPlayer = record.teamShort
+        ? `${record.teamShort}-${record.playerName || '-'}`
+        : (record.playerName || '-');
 
-  const pageRows = orderedRows.slice(page * pageSize, page * pageSize + pageSize);
-  const record = config.key === 'league' ? getRecord(standings, team.teamName, team.shortName) : { wins: 0, draws: 0, losses: 0, gd: 0, pts: 0 };
-  const reserveMatches = getReserveMatches(reserveRows, team, config.reserveLabel);
-  const summary = buildFixtureSummary(team, rows, upcoming, played, reserveMatches, current, config);
-  const currentOpponent = current ? (normalize(current[config.homeIndex]) === teamKey ? current[config.awayIndex] : current[config.homeIndex]) : null;
-  const reserveBlock = reserveMatches.length
-    ? `${safeEmoji(E.lock, '🔒')} **Reserved Matches**\n` +
-      reserveMatches
-        .slice(0, 5)
-        .map(match =>
-          `> **${match.matchNo}** • \`${match.home}\` ${safeEmoji(E.vs, '⚔️')} \`${match.away}\`${match.by ? ` • by <@${match.by}>` : ''}${match.playerName ? ` • **${match.playerName}**` : ''}`
-        )
-        .join('\n') +
-      (reserveMatches.length > 5 ? `\n> +${reserveMatches.length - 5} more reserved matches` : '') +
-      '\n\n'
-    : '';
+      return {
+        player: displayPlayer,
+        yellowCards: record.yellowCards || 0,
+        threshold,
+        remaining: Math.max(0, threshold - (record.yellowCards || 0)),
+        phase: getRoundDisplayLabel(phase || 'standard')
+      };
+    })
+    .filter(row => row.yellowCards > 0 && row.remaining === 1);
+}
 
-  const currentBlock = current
-    ? `${safeEmoji(E.fire, '🔥')} **Next Match**\n` +
-      `> \`${current[config.homeIndex]}\` ${safeEmoji(E.vs, '⚔️')} \`${current[config.awayIndex]}\`\n` +
-      `> ${safeEmoji(E.calendar, '📅')} Stage / Matchday **${matchdayOf(current, config)}**\n` +
-      `> ${safeEmoji(E.captain, '👑')} Opp. Captain: ${getOpponentCaptainMention(teams, currentOpponent)}\n` +
-      `> ${isDerbyFixture(current[config.homeIndex], current[config.awayIndex]) ? `${safeEmoji(E.fire, '🔥')} **DERBY MATCH**` : `${safeEmoji(E.info, 'ℹ️')} Regular Fixture`}\n` +
-      `> ${safeEmoji(E.missing, '➖')} Status: **Pending**\n\n`
-    : `${safeEmoji(E.correct, '✅')} **All fixtures completed.**\n\n`;
+function buildSheetSuspensionRows(data = []) {
+  return data
+    .slice(1)
+    .filter(r => r[0] && r[5] && String(r[5]).toLowerCase().includes('suspend'))
+    .sort((a, b) => getDisciplineMatchOrderValue(a[4]) - getDisciplineMatchOrderValue(b[4]))
+    .map(row => {
+      const next = [...row];
+      next[2] = formatMatchDisplay(next[2]);
+      next[3] = formatMatchDisplay(next[3]);
+      next[4] = formatMatchDisplay(next[4]);
+      return next;
+    });
+}
 
-  const lines = pageRows.map(row => buildFixtureLine(row, team, current?.[config.matchNoIndex], config));
+function buildAnsiTable(rows, columns) {
+  const header = columns.map(col => padEnd(col.label, col.width)).join(' ');
+  const body = rows.map(row => {
+    const line = columns.map(col => padEnd(shorten(row[col.key] ?? '-', col.width), col.width)).join(' ');
+    return `\u001b[1;31m${line}\u001b[0m`;
+  }).join('\n');
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${safeEmoji(E.calendar, '📅')} ${team.teamName.toUpperCase()} ${config.label} Fixtures`)
-    .setDescription(buildFixtureDescription(team, summary, record, currentBlock, reserveBlock, pageRows, page, orderedRows))
-    .addFields(
-      {
-        name: `${safeEmoji(E.fire, '🔥')} Fixture List`,
-        value: lines.join('\n\n') || 'No fixtures on this page.',
-        inline: false
-      }
-    )
-    .setColor(getTeamColor(teams, team.teamName, 0x5865F2))
-    .setFooter({ text: `${config.label} • Page ${page + 1}/${totalPages} • Showing ${pageSize} matches per page` });
-
-  if (team.logo && /^https?:\/\//i.test(team.logo)) embed.setThumbnail(team.logo);
-
-  return {
-    embeds: [embed],
-    components: [
-      createCompetitionDropdown({
-        prefix: 'myfixtures',
-        selectedCompetition: competitionKey,
-        targetType,
-        targetValue: encodeURIComponent(targetValue || interaction.user.id),
-        ownerId: interaction.user.id
-      }),
-      createPaginationButtons({
-        prefix: 'myfixtures',
-        page,
-        totalPages,
-        targetType: `${targetType}|${competitionKey}`,
-        targetValue: encodeURIComponent(targetValue || interaction.user.id),
-        ownerId: interaction.user.id
-      })
-    ]
-  };
+  return `\`\`\`ansi\n${header}\n${body || 'No data'}\n\`\`\``;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('myfixtures')
-    .setDescription('Show your coop team fixtures automatically')
-    .addStringOption(opt => opt.setName('player').setDescription('Player name to search fixtures for').setRequired(false))
-    .addUserOption(opt => opt.setName('user').setDescription('Discord user to search fixtures for').setRequired(false))
+    .setName('discipline')
+    .setDescription('View coop league cards, fair play table, or suspensions')
+    .addStringOption(opt =>
+      opt
+        .setName('type')
+        .setDescription('Which discipline view to show')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Cards', value: 'cards' },
+          { name: 'Fair Play', value: 'fairplay' },
+          { name: 'Suspensions', value: 'suspension' }
+        )
+    )
     .addStringOption(opt =>
       opt
         .setName('competition')
-        .setDescription('Competition to show fixtures for')
+        .setDescription('Competition to view discipline for')
         .setRequired(false)
         .addChoices(
           { name: 'League', value: 'league' },
@@ -486,52 +244,284 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const playerInput = interaction.options.getString('player');
-    const userInput = interaction.options.getUser('user');
-    let targetType = 'self';
-    let targetValue = interaction.user.id;
+    const type = interaction.options.getString('type');
     const competitionKey = interaction.options.getString('competition') || 'league';
 
-    if (userInput) {
-      targetType = 'user';
-      targetValue = userInput.id;
-    } else if (playerInput) {
-      targetType = 'player';
-      targetValue = playerInput;
-    }
+    if (type === 'cards') return buildCardsPage(0, competitionKey);
+    if (type === 'fairplay') return buildFairPlay(competitionKey);
+    if (type === 'suspension') return buildSuspensions(interaction, 0, competitionKey);
 
-    return buildMyFixtures(interaction, 0, targetType, targetValue, competitionKey);
+    return { content: '❌ Invalid discipline type.' };
   },
 
-  async buttonHandler(interaction, action, page, targetType, targetValue) {
-    const currentPage = Number(page) || 0;
-    const nextPage = action === 'next'
-      ? currentPage + 1
-      : action === 'prev'
-        ? currentPage - 1
-        : currentPage;
-    const rawType = String(targetType || 'self|league');
-    const [resolvedTargetType = 'self', competitionKey = 'league'] = rawType.split('|');
-    const value = decodeURIComponent(targetValue || interaction.user.id);
-    return buildMyFixtures(
-      interaction,
-      nextPage,
-      resolvedTargetType || 'self',
-      value,
-      competitionKey || 'league'
-    );
-  },
+  async buttonHandler(interaction, section, action, page) {
+    let newPage = parseInt(page, 10);
+    if (Number.isNaN(newPage)) newPage = 0;
 
-  async selectMenuHandler(interaction, targetType, targetValue) {
-    const competitionKey = interaction.values[0] || 'league';
-    const value = decodeURIComponent(targetValue || interaction.user.id);
+    if (action === 'prev') newPage--;
+    if (action === 'next') newPage++;
 
-    return buildMyFixtures(
-      interaction,
-      0,
-      targetType || 'self',
-      value,
-      competitionKey
-    );
-  },
+    const [resolvedSection = section, competitionKey = 'league'] = String(section || '').split('__');
+
+    if (resolvedSection === 'cards') return buildCardsPage(newPage, competitionKey);
+    if (resolvedSection === 'suspension') return buildSuspensions(interaction, newPage, competitionKey);
+
+    return { content: '❌ Invalid discipline action.', components: [] };
+  }
 };
+
+async function buildCardsPage(page, competitionKey = 'league') {
+  const competition = getCompetitionConfig(competitionKey);
+  const yellow = await cachedGetData(competition.rankingYellowRange).catch(() => []);
+  const red = await cachedGetData(competition.rankingRedRange).catch(() => []);
+
+  const yRows = yellow.slice(2).filter(r => r[0] && r[1]);
+  const rRows = red.slice(2).filter(r => r[0] && r[1]);
+
+  const totalPages = Math.max(1, Math.ceil(Math.max(yRows.length, rRows.length) / PER_PAGE));
+  page = Math.max(0, Math.min(page, totalPages - 1));
+
+  const yPage = yRows.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const rPage = rRows.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+
+  const buildTable = (rows, label, offset) => {
+    const header = ` # PLAYER         ${label}`;
+    const body = rows.map((r, i) => {
+      const rank = padStart(offset + i + 1, 2);
+      const name = padEnd(shorten(r[0], 13), 13);
+      const value = padStart(r[1], 3);
+      return `${rank} ${name} ${value}`;
+    }).join('\n');
+
+    return `\`\`\`ini\n${header}\n${body || 'No data'}\n\`\`\``;
+  };
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`discipline_cards__${competitionKey}_prev_${page}`)
+      .setLabel('◀ Prev')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page === 0),
+
+    new ButtonBuilder()
+      .setCustomId(`discipline_cards__${competitionKey}_next_${page}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages - 1)
+  );
+
+  return {
+    embeds: [
+      new EmbedBuilder()
+        .setTitle(`${safeEmoji(E.redCard, '🟥')} ${competition.label} Discipline Leaders`)
+        .setDescription(
+          `${competition.label} card leaders from player ranking data.\n` +
+          `${competition.key === 'fa' || competition.key === 'carabao' ? 'Cup order: **R1 → QFQ → QF → SF → Final**.' : competition.key === 'ucl' ? 'UCL order: **GS → QF → SF → Final**.' : 'League order follows matchdays.'}`
+        )
+        .addFields(
+          { name: `${safeEmoji(E.yellowCard, '🟨')} Yellow Cards`, value: buildTable(yPage, 'YC', page * PER_PAGE), inline: false },
+          { name: `${safeEmoji(E.redCard, '🟥')} Red Cards`, value: buildTable(rPage, 'RC', page * PER_PAGE), inline: false },
+          { name: `${safeEmoji(E.page || E.calendar, '📄')} Page`, value: `${page + 1}/${totalPages}`, inline: true },
+          { name: `${safeEmoji(E.team, '👥')} Entries`, value: String(Math.max(yRows.length, rRows.length)), inline: true }
+        )
+        .setColor(0xE67E22)
+        .setFooter({ text: `${competition.footerText} • Use buttons to view more card leaders` })
+    ],
+    components: [buttons]
+  };
+}
+
+async function buildFairPlay(competitionKey = 'league') {
+  const competition = getCompetitionConfig(competitionKey);
+  const fairplay = await cachedGetData(competition.fairPlayRange).catch(() => []);
+  const teams = await cachedGetData('Teams!A:C');
+
+  if (!fairplay || fairplay.length <= 1) {
+    return { content: `❌ No ${competition.label} fair play data found` };
+  }
+
+  const shortMap = {};
+  teams.slice(1).forEach(row => {
+    const teamName = row[0];
+    const shortName = row[2];
+    if (teamName && shortName) {
+      shortMap[String(teamName).trim().toLowerCase()] = String(shortName).trim().toUpperCase();
+    }
+  });
+
+  const rows = fairplay.slice(1).filter(r => r[0]);
+
+  const table = rows.map((r, i) => {
+    const fullTeam = String(r[0] || '').trim().toLowerCase();
+    const tm = padEnd(shortMap[fullTeam] || String(r[0] || '').slice(0, 6).toUpperCase() || 'N/A', 6);
+    const yc = padStart(r[1] || 0, 2);
+    const rc = padStart(r[2] || 0, 2);
+    const pts = padStart(r[3] || 0, 3);
+
+    const line = `${padStart(i + 1, 2)} ${tm} ${yc} ${rc} ${pts}`;
+
+    if (i < 3) return `+ ${line}`;
+    if (i >= rows.length - 2) return `- ${line}`;
+    return `  ${line}`;
+  }).join('\n');
+
+  const header = `   # TEAM   YC RC  PTS`;
+
+  return {
+    embeds: [
+      new EmbedBuilder()
+        .setTitle(`${safeEmoji(E.fairPlay || E.fairplay, '🤝')} ${competition.label} Fair Play Table`)
+        .setDescription(`\`\`\`diff\n${header}\n${table}\n\`\`\``)
+        .addFields(
+          { name: `${safeEmoji(E.team, '👥')} Teams`, value: String(rows.length), inline: true },
+          { name: `${safeEmoji(E.info || E.calendar, '📌')} Rule`, value: 'Lower points is better', inline: true }
+        )
+        .setColor(0x2ECC71)
+        .setFooter({ text: `${competition.footerText} • - Worst 2 • Lower is better` })
+    ]
+  };
+}
+
+async function buildSuspensions(interaction, page, competitionKey = 'league') {
+  const competition = getCompetitionConfig(competitionKey);
+
+  let suspendedRows = [];
+  let riskRows = [];
+  let sourceText = 'Sheets';
+
+  const [sheetData, mongoRows] = await Promise.all([
+    cachedGetData(competition.suspensionRange).catch(() => []),
+    getCompetitionSuspensions(interaction.guild.id, competition.key).catch(() => [])
+  ]);
+
+  const sheetSuspendedRows = buildSheetSuspensionRows(Array.isArray(sheetData) ? sheetData : []);
+  const allMongoRows = Array.isArray(mongoRows) ? mongoRows : [];
+  const activeMongoRows = allMongoRows.filter(
+    row => String(row?.status || '').toLowerCase() === 'suspended'
+  );
+  const atRiskMongoRows = buildMongoRiskRows(
+    allMongoRows.filter(row => String(row?.status || '').toLowerCase() !== 'suspended'),
+    competition.key
+  );
+
+  // Prefer Sheets for active suspensions so resetseason immediately reflects cleared data.
+  // Use MongoDB primarily for one-card-away / at-risk tracking.
+  if (sheetSuspendedRows.length) {
+    suspendedRows = sheetSuspendedRows;
+    sourceText = 'Sheets + Mongo risk';
+  } else if (activeMongoRows.length) {
+    suspendedRows = buildMongoSuspensionRows(activeMongoRows);
+    sourceText = 'Mongo fallback';
+  }
+
+  riskRows = atRiskMongoRows;
+
+  if (!suspendedRows.length && !riskRows.length) {
+    return {
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`${safeEmoji(E.ban || E.lock, '🚫')} ${competition.label} Discipline Watch`)
+          .setDescription(
+            `\`\`\`ini\nNo suspended or at-risk players right now.\n\`\`\`\n` +
+            `${competition.key === 'fa' || competition.key === 'carabao' ? 'Cup discipline order: **R1 → QFQ → QF → SF → Final**.' : competition.key === 'ucl' ? 'UCL discipline order: **GS → QF → SF → Final**.' : 'League discipline order follows matchdays.'}`
+          )
+          .setColor(0xE74C3C)
+          .setFooter({ text: `${competition.footerText} • All players available` })
+      ]
+    };
+  }
+
+  const totalPages = Math.max(1, Math.ceil(Math.max(suspendedRows.length, 1) / SUSP_PER_PAGE));
+  page = Math.max(0, Math.min(page, totalPages - 1));
+
+  const pageRows = suspendedRows.slice(page * SUSP_PER_PAGE, page * SUSP_PER_PAGE + SUSP_PER_PAGE);
+
+  const suspendedTableRows = pageRows.map((r, i) => ({
+    rank: padStart(page * SUSP_PER_PAGE + i + 1, 2),
+    player: r[0] || '-',
+    banMatch: formatMatchDisplay(r[4] || '-'),
+    status: r[5] || '-'
+  }));
+
+  const suspendedTable = buildAnsiTable(suspendedTableRows, [
+    { key: 'rank', label: '#', width: 2 },
+    { key: 'player', label: 'PLAYER', width: 20 },
+    { key: 'banMatch', label: 'BAN MATCH', width: 12 },
+    { key: 'status', label: 'STATUS', width: 10 }
+  ]);
+
+  const riskTable = riskRows.length
+    ? buildAnsiTable(
+        riskRows.slice(0, 6).map((row, index) => ({
+          rank: padStart(index + 1, 2),
+          player: row.player,
+          yellow: `${row.yellowCards}/${row.threshold}`,
+          phase: row.phase,
+          left: `${row.remaining} left`
+        })),
+        [
+          { key: 'rank', label: '#', width: 2 },
+          { key: 'player', label: 'AT RISK PLAYER', width: 20 },
+          { key: 'yellow', label: 'YC', width: 4 },
+          { key: 'phase', label: 'PHASE', width: 8 },
+          { key: 'left', label: 'RISK', width: 8 }
+        ]
+      )
+    : '\`\`\`ini\nNo one-card-away players right now.\n\`\`\`';
+
+  const suspensionCards = pageRows.map((r, i) => {
+    const player = r[0] || '-';
+    const yellow = r[1] || 0;
+    const redMatch = formatMatchDisplay(r[2] || '-');
+    const yellowBan = formatMatchDisplay(r[3] || '-');
+    const bannedMatch = formatMatchDisplay(r[4] || '-');
+
+    return {
+      name: `${safeEmoji(E.ban || E.lock, '🚫')} ${i + 1}. ${player}`,
+      value:
+        `${safeEmoji(E.yellowCard, '🟨')} **Yellow Cards:** ${yellow}\n` +
+        `${safeEmoji(E.redCard, '🟥')} **Red Card Match:** ${redMatch}\n` +
+        `${safeEmoji(E.ban || E.lock, '🚫')} **Yellow Trigger Match:** ${yellowBan}\n` +
+        `${safeEmoji(E.ban || E.lock, '⛔')} **Next Banned Match:** ${bannedMatch}\n` +
+        `${safeEmoji(E.info || E.Badge, '📌')} **Status:** ${r[5] || '-'}`,
+      inline: true
+    };
+  });
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`discipline_suspension__${competitionKey}_prev_${page}`)
+      .setLabel('◀ Prev')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page === 0),
+
+    new ButtonBuilder()
+      .setCustomId(`discipline_suspension__${competitionKey}_next_${page}`)
+      .setLabel('Next ▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages - 1)
+  );
+
+  return {
+    embeds: [
+      new EmbedBuilder()
+        .setTitle(`${safeEmoji(E.ban || E.lock, '🚫')} ${competition.label} Discipline Watch`)
+        .setDescription(
+          `${competition.key === 'fa' || competition.key === 'carabao' ? `${safeEmoji(E.rank, '🏅')} **Cup Order:** R1 → QFQ → QF → SF → Final\n` : competition.key === 'ucl' ? `${safeEmoji(E.UCL || E.trophy_animated, '🏆')} **UCL Order:** GS → QF → SF → Final\n` : ''}` +
+          suspendedTable
+        )
+        .addFields(
+          { name: `${safeEmoji(E.team, '📄')} Suspended`, value: String(suspendedRows.length), inline: true },
+          { name: `${safeEmoji(E.yellowCard, '🟨')} At Risk`, value: String(riskRows.length), inline: true },
+          { name: `${safeEmoji(E.page || E.calendar, '📄')} Page`, value: `${page + 1}/${totalPages}`, inline: true },
+          { name: `${safeEmoji(E.warning || E.yellowCard, '⚠️')} One Card Away`, value: riskTable, inline: false },
+          ...(suspensionCards.length
+            ? [{ name: `${safeEmoji(E.profile, '📋')} Suspended Player Cards`, value: 'Detailed suspension data below.', inline: false }, ...suspensionCards]
+            : [{ name: `${safeEmoji(E.profile, '📋')} Suspended Player Cards`, value: 'No active suspensions on this page.', inline: false }])
+        )
+        .setColor(0xE74C3C)
+        .setFooter({ text: `${competition.footerText} • ${sourceText} • Suspended + At-risk view • QFQ supported` })
+    ],
+    components: [buttons]
+  };
+}
