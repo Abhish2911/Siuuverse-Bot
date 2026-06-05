@@ -99,7 +99,7 @@ module.exports = {
     //  1 🟢 TeamName          6  4  1  1 12  5  7 13
 
     const lines = [];
-    const header = ' # TEAM    P  W  D  L   GD  PTS';
+    const header = '      # TEAM    P  W  D  L   GD  PTS';
 
     for (const g of Object.keys(groupsToShow).sort()) {
       const groupTeams = groupsToShow[g];
