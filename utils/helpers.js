@@ -186,6 +186,27 @@ async function sendAuditLog(interaction, payload = {}) {
   }
 }
 
+function getFixtureMatchday(matchNo) {
+  const id = String(matchNo || '').trim().toUpperCase();
+
+  const leagueMatch = id.match(/^(\d+)(?:[.-]\d+)?$/);
+  if (leagueMatch) {
+    return leagueMatch[1];
+  }
+
+  const uclNew = id.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
+  if (uclNew) {
+    return `UCL-GS-${uclNew[1]}`;
+  }
+
+  const uclOld = id.match(/^UCL-GS-[A-H]-(\d+)$/);
+  if (uclOld) {
+    return `UCL-GS-${Math.ceil(Number(uclOld[1]) / 3)}`;
+  }
+
+  return id;
+}
+
 function getAllowedMatchday(fixtures) {
   if (!Array.isArray(fixtures) || fixtures.length <= 1) {
     return null;
@@ -195,7 +216,7 @@ function getAllowedMatchday(fixtures) {
   const grouped = new Map();
 
   rows.forEach(row => {
-    const md = String(row[0] || '').split('.')[0].trim();
+    const md = getFixtureMatchday(row[0]);
     if (!md) return;
     if (!grouped.has(md)) grouped.set(md, []);
     grouped.get(md).push(row);
@@ -305,6 +326,7 @@ module.exports = {
   invalidateSheetCache,
   getAuditLogChannelId,
   sendAuditLog,
+  getFixtureMatchday,
   getAllowedMatchday,
   createPaginationButtons,
   createCompetitionDropdown,
