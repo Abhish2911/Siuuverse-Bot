@@ -139,9 +139,9 @@ module.exports = {
           lines.push(`+ ${line}`);
         } else if (pos === 3) {
           const isBestThird = bestTwoThird.some(t => t.group === g && t.team === row);
-          lines.push(`${isBestThird ? '+' : ' '} ${line}`);
+          lines.push(`${isBestThird ? '+' : '-'} ${line}`);
         } else {
-          lines.push(`  ${line}`);
+          lines.push(`- ${line}`);
         }
       }
     }
@@ -180,8 +180,8 @@ module.exports = {
                 if (pos <= 2) groupLines.push(`+ ${line}`);
                 else if (pos === 3) {
                   const isBestThird = bestTwoThird.some(t => t.group === groupKey && t.team === row);
-                  groupLines.push(`${isBestThird ? '+' : ' '} ${line}`);
-                } else groupLines.push(`  ${line}`);
+                  groupLines.push(`${isBestThird ? '+' : '-'} ${line}`);
+                } else groupLines.push(`- ${line}`);
               }
 
               return `**Group ${groupKey}**\n\`\`\`diff\n` + groupLines.join('\n') + '\n```';
