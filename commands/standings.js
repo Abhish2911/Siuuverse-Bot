@@ -119,7 +119,7 @@ module.exports = {
     const header = '      # TEAM    P  W  D  L   GD  PTS';
     const summary = buildStandingsSummary(rows);
     const leader = rows[0]?.[1] || '';
-    const bottomZone = rows.slice(-2).map(row => row[1]).filter(Boolean).join('\n') || 'N/A';
+    const bottomZone = rows.slice(-3).map(row => row[1]).filter(Boolean).join('\n') || 'N/A';
 
     return {
       embeds: [
@@ -127,13 +127,10 @@ module.exports = {
           .setTitle(`${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} Coop League Table`)
           .setDescription(buildStandingsDescription(summary))
           .addFields(
-            { name: `${safeEmoji(E.stats || E.rank, '📊')} Table`, value: `\`\`\`diff\n${header}\n${table || 'No teams'}\n\`\`\``, inline: false },
-            { name: `${safeEmoji(E.team, '👥')} Teams`, value: String(rows.length), inline: true },
-            { name: `${safeEmoji(E.goldenBoot, '👑')} Leader`, value: summary.leader, inline: true },
-            { name: '🔻 Bottom Zone', value: bottomZone, inline: true }
+            { name: '🔻 Bottom Zone', value: bottomZone, inline: false }
           )
           .setColor(getTeamColor(teams, leader, 0x5865F2))
-          .setFooter({ text: 'Coop league standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 2' })
+          .setFooter({ text: 'Coop league standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 3' })
       ]
     };
   }
