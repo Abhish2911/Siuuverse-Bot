@@ -64,7 +64,7 @@ const findNextMatchdayRows = (fixtures, activeMD) => {
       .filter(Boolean)
   )];
 
-  const currentIndex = allMatchdays.indexOf(activeMD);
+  const currentIndex = allMatchdays.findIndex(md => String(md) === String(activeMD));
   const nextMD = currentIndex >= 0
     ? allMatchdays[currentIndex + 1]
     : null;
@@ -77,7 +77,6 @@ const findNextMatchdayRows = (fixtures, activeMD) => {
     matchday: nextMD,
     rows: fixtures
       .slice(1)
-      .filter(row => !hasScore(row))
       .filter(row => getFixtureMatchday(row[0]) === nextMD)
   };
 };
@@ -154,7 +153,7 @@ const buildMatchdayDescription = summary => {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('matchday')
-    .setDescription('Show the current active matchday automatically')
+    .setDescription('Show active matchday for League, FA Cup, Carabao Cup or UCL')
     .addStringOption(option =>
       option
         .setName('competition')
@@ -199,7 +198,7 @@ module.exports = {
       };
     }
 
-    const activeMD = String(allowedMD);
+    const activeMD = String(allowedMD).trim();
 
     const rows = fixtures
       .slice(1)
@@ -217,7 +216,9 @@ module.exports = {
     const completedLines = completed.map(row => makeCompletedLine(row));
     const remainingLines = remaining.map(row => makeRemainingLine(row));
     const nextMatchday = findNextMatchdayRows(fixtures, activeMD);
-    const nextLines = nextMatchday.rows.slice(0, 3).map((row, index) => makeNextLine(row, index));
+    const nextLines = nextMatchday.rows
+      .slice(0, 10)
+      .map((row, index) => makeNextLine(row, index));
     const summary = buildMatchdaySummary(activeMD, rows, completed, remaining, percent, nextMatchday);
 
     const embedColor = remaining.length
@@ -225,7 +226,7 @@ module.exports = {
       : 0x2ECC71;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.calendar, '📅')} ${competition.toUpperCase()} • ${activeMD}`)
+      .setTitle(`${safeEmoji(E.calendar, '📅')} ${competition.toUpperCase()} • Active Matchday ${activeMD}`)
       .setDescription(buildMatchdayDescription(summary))
       .addFields(
         {
@@ -234,7 +235,7 @@ module.exports = {
             `${safeEmoji(E.played, '🎮')} **Bar:** ${progress}\n` +
             `${safeEmoji(E.correct, '✅')} **Completed:** ${completed.length}/${rows.length}\n` +
             `${safeEmoji(E.missing, '➖')} **Remaining:** ${remaining.length}\n` +
-            `📌 **Competition:** ${competition.toUpperCase()}`,
+            `📌 **Competition:** ${competition.toUpperCase()}\n🎛️ Use /matchday competition:<league|fa|carabao|ucl>`,
           inline: false
         },
         {
