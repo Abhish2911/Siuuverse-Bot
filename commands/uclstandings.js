@@ -1,17 +1,23 @@
-const {
-  SlashCommandBuilder,
-  EmbedBuilder
-} = require('discord.js');
-
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
-const E = require('../utils/emojis');
-
-function safeEmoji(value, fallback = '') {
-  return value || fallback;
-}
 
 function clean(value) {
   return String(value || '').trim();
+}
+
+function sortTeams(a, b) {
+  // Sort by PTS (col 10), GD (col 9), GF (col 7)
+  const ptsA = Number(a[10] || 0);
+  const ptsB = Number(b[10] || 0);
+  if (ptsB !== ptsA) return ptsB - ptsA;
+
+  const gdA = Number(a[9] || 0);
+  const gdB = Number(b[9] || 0);
+  if (gdB !== gdA) return gdB - gdA;
+
+  const gfA = Number(a[7] || 0);
+  const gfB = Number(b[7] || 0);
+  return gfB - gfA;
 }
 
 module.exports = {
@@ -21,7 +27,7 @@ module.exports = {
     .addStringOption(option =>
       option
         .setName('group')
-        .setDescription('Group name (A, B, C)')
+        .setDescription('Group name (A, B, C, etc.)')
         .setRequired(false)
     ),
 
@@ -34,157 +40,136 @@ module.exports = {
       };
     }
 
-    const requestedGroup = clean(
-      interaction.options.getString('group') || 'A'
-    ).toUpperCase();
+    // Group data by group letter
+    const groups = {};
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const group = clean(row[0]).toUpperCase();
+      if (!group) continue;
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(row);
+    }
 
-    const standings = rows
-      .slice(1)
-      .filter(r => clean(r[0]).toUpperCase() === requestedGroup)
-      .sort((a, b) => Number(b[10] || 0) - Number(a[10] || 0));
+    // Sort each group by PTS, GD, GF
+    for (const g in groups) {
+      groups[g].sort(sortTeams);
+    }
 
-    if (!standings.length) {
+    // Collect all 3rd place teams across groups
+    const thirdPlaceTeams = [];
+    for (const g in groups) {
+      if (groups[g].length >= 3) {
+        thirdPlaceTeams.push({
+          group: g,
+          team: groups[g][2],
+        });
+      }
+    }
+
+    // Sort third place teams to find best two
+    thirdPlaceTeams.sort((a, b) => sortTeams(a.team, b.team));
+
+    // Best two third place teams qualify
+    const bestTwoThird = thirdPlaceTeams.slice(0, 2);
+
+    // Determine requested group
+    const requestedGroup = clean(interaction.options.getString('group') || '').toUpperCase();
+
+    // If group specified, show only that group, else show all groups
+    const groupsToShow = requestedGroup ? { [requestedGroup]: groups[requestedGroup] || [] } : groups;
+
+    if (requestedGroup && (!groups[requestedGroup] || groups[requestedGroup].length === 0)) {
       return {
         content: `❌ No standings found for Group ${requestedGroup}.`
       };
     }
 
-    const table = standings
-      .map((r, i) => {
-        const pos = String(i + 1).padStart(2, ' ');
-        const team = clean(r[1] || r[2]).padEnd(4, ' ');
+    // Build table lines
+    // Format: position + marker (🟢 or ?), short name or team, P, W, D, L, GF, GA, GD, PTS
+    // Mark positions 1 and 2 with 🟢
+    // Mark 3rd place with 🟢 if best two third-place teams, else ?
 
-        return (
-          `${pos}. ${team} | ` +
-          `P:${r[3] || 0} ` +
-          `W:${r[4] || 0} ` +
-          `D:${r[5] || 0} ` +
-          `L:${r[6] || 0} ` +
-          `GD:${r[9] || 0} ` +
-          `PTS:${r[10] || 0}`
+    // We'll build a diff-style table: 
+    // Pos Marker Team          P  W  D  L  GF GA GD PTS
+    //  1 🟢 TeamName          6  4  1  1 12  5  7 13
+
+    const lines = [];
+    const header = 'Pos Mark Group Team           P  W  D  L  GF GA GD PTS';
+    lines.push(header);
+
+    for (const g of Object.keys(groupsToShow).sort()) {
+      const groupTeams = groupsToShow[g];
+      if (!groupTeams || groupTeams.length === 0) continue;
+
+      lines.push(`\nGroup ${g}:`);
+      for (let i = 0; i < groupTeams.length; i++) {
+        const row = groupTeams[i];
+        const pos = i + 1;
+
+        let mark = ' ';
+        if (pos === 1 || pos === 2) {
+          mark = '🟢';
+        } else if (pos === 3) {
+          // Check if this third place team is in best two third place teams
+          const isBestThird = bestTwoThird.some(t =>
+            t.group === g && t.team === row
+          );
+          mark = isBestThird ? '🟢' : '?';
+        }
+
+        const shortName = clean(row[1]) || clean(row[2]) || '';
+        const teamName = shortName.padEnd(14, ' ');
+
+        const p = row[3] || '0';
+        const w = row[4] || '0';
+        const d = row[5] || '0';
+        const l = row[6] || '0';
+        const gf = row[7] || '0';
+        const ga = row[8] || '0';
+        const gd = row[9] || '0';
+        const pts = row[10] || '0';
+
+        // Align numbers to 2 chars
+        const pStr = String(p).padStart(2, ' ');
+        const wStr = String(w).padStart(2, ' ');
+        const dStr = String(d).padStart(2, ' ');
+        const lStr = String(l).padStart(2, ' ');
+        const gfStr = String(gf).padStart(2, ' ');
+        const gaStr = String(ga).padStart(2, ' ');
+        const gdStr = String(gd).padStart(3, ' ');
+        const ptsStr = String(pts).padStart(3, ' ');
+
+        lines.push(
+          `${pos.toString().padStart(3, ' ')} ${mark}  ${g}   ${teamName}${pStr} ${wStr} ${dStr} ${lStr} ${gfStr} ${gaStr} ${gdStr} ${ptsStr}`
         );
-      })
-      .join('\n');
+      }
+    }
+
+    const description =
+      `⚽ ${requestedGroup ? `Group ${requestedGroup}` : 'UCL Group Stage'} Standings\n\n` +
+      `🟢 Top 2 teams qualify automatically\n` +
+      `🟢 Best 2 third-place teams qualify`;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.trophy, '🏆')} UCL Group ${requestedGroup} Standings`)
-      .setDescription(`\`\`\`\n${table}\n\`\`\``)
-      .setFooter({ text: 'SiuuVerse UCL' })
+      .setTitle('⚽ UCL Group Standings')
+      .setDescription(description)
+      .addFields(
+        {
+          name: '📊 Table',
+          value: '```diff\n' + lines.join('\n') + '\n```',
+          inline: false
+        },
+        {
+          name: '🟢 Qualification',
+          value: 'Top 2 qualify automatically\nBest 2 third-place teams qualify',
+          inline: false
+        }
+      )
+      .setFooter({ text: 'UCL Group Standings • 🟢 Qualified • ? Third Place Contender' })
       .setTimestamp();
 
     return {
       embeds: [embed]
     };
-  }
-};
-
-const { MessageEmbed } = require('discord.js');
-const { getSheet } = require('../lib/sheets');
-const { getRankIcon } = require('./standings');
-
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-
-module.exports = {
-  name: 'uclstandings',
-  description: 'Show the current UCL group standings.',
-  args: false,
-  usage: '[group]',
-  async execute(message, args) {
-    // Determine group
-    let group = (args[0] || '').toUpperCase();
-    if (!GROUPS.includes(group)) group = 'A';
-
-    // Fetch all standings data
-    const sheet = await getSheet('UCL_Coop_Group_Standings');
-    // Read all rows (skip header row)
-    const rows = await sheet.getRows();
-    // Each row: [Group, Team, P, W, D, L, GF, GA, GD, PTS]
-
-    // Group teams by group
-    const groupMap = {};
-    for (const row of rows) {
-      const g = row[0];
-      if (!GROUPS.includes(g)) continue;
-      if (!groupMap[g]) groupMap[g] = [];
-      groupMap[g].push(row);
-    }
-
-    // Sort teams in each group
-    for (const g of GROUPS) {
-      if (!groupMap[g]) continue;
-      groupMap[g] = groupMap[g]
-        .sort((a, b) =>
-          Number(b[10] || 0) - Number(a[10] || 0) ||
-          Number(b[9] || 0) - Number(a[9] || 0) ||
-          Number(b[7] || 0) - Number(a[7] || 0)
-        );
-    }
-
-    // Collect all 3rd place teams
-    let thirdPlaceTeams = [];
-    for (const g of GROUPS) {
-      if (!groupMap[g] || groupMap[g].length < 3) continue;
-      thirdPlaceTeams.push({
-        group: g,
-        row: groupMap[g][2],
-      });
-    }
-    // Sort third-place teams by PTS, GD, GF
-    thirdPlaceTeams = thirdPlaceTeams.sort((a, b) =>
-      Number(b.row[10] || 0) - Number(a.row[10] || 0) ||
-      Number(b.row[9] || 0) - Number(a.row[9] || 0) ||
-      Number(b.row[7] || 0) - Number(a.row[7] || 0)
-    );
-    // Best 2 third-place teams
-    const bestThirds = thirdPlaceTeams.slice(0, 2).map(t => `${t.group}:${t.row[1]}`);
-
-    // Prepare standings table for the selected group
-    const teams = groupMap[group] || [];
-    const header = '      # TEAM    P  W  D  L   GD  PTS';
-    const tableRows = teams.map((row, idx) => {
-      const rankIcon = getRankIcon(idx);
-      const team = row[1];
-      const P = row[2] || '0';
-      const W = row[3] || '0';
-      const D = row[4] || '0';
-      const L = row[5] || '0';
-      const GD = row[9] || '0';
-      const PTS = row[10] || '0';
-      const line = `${rankIcon} ${team.padEnd(7)} ${P.padStart(2)} ${W.padStart(2)} ${D.padStart(2)} ${L.padStart(2)}  ${GD.padStart(3)} ${PTS.padStart(3)}`;
-      // Qualification formatting
-      if (idx < 2) return `+ ${line}`;
-      if (idx === 2) {
-        // If this 3rd place is among best two third-place teams, mark as qualified
-        const id = `${group}:${team}`;
-        if (bestThirds.includes(id)) return `+ ${line}`;
-        return `? ${line}`;
-      }
-      return `  ${line}`;
-    });
-
-    // Leader info
-    const leader = teams[0] ? teams[0][1] : 'N/A';
-    // Table block
-    const table = ['```diff', header, ...tableRows, '```'].join('\n');
-
-    // Summary
-    const summary =
-      `**Group ${group} Standings**\n` +
-      `**Leader:** ${leader}\n` +
-      `**Teams:** ${teams.length}`;
-
-    // Embed
-    const embed = new MessageEmbed()
-      .setTitle(`UCL Group ${group}`)
-      .addField('Standings', table, false)
-      .addField('Summary', summary, false)
-      .addField('🟢 Qualification',
-        'Top 2 qualify automatically\n' +
-        'Best 2 third-place teams qualify',
-        false
-      )
-      .setFooter('UCL Group Standings • 🟢 Qualified • ? Third Place Contender');
-
-    await message.channel.send({ embeds: [embed] });
   }
 };
