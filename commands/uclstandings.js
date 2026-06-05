@@ -180,7 +180,7 @@ module.exports = {
                 if (pos <= 2) groupLines.push(`+ ${line}`);
                 else if (pos === 3) {
                   const isBestThird = bestTwoThird.some(t => t.group === groupKey && t.team === row);
-                  groupLines.push(`${isBestThird ? '+' : '?'} ${line}`);
+                  groupLines.push(`${isBestThird ? '+' : '▫️'} ${line}`);
                 } else groupLines.push(`  ${line}`);
               }
 
@@ -196,7 +196,7 @@ module.exports = {
         }
       )
       .setColor(0x0A1E5E)
-      .setFooter({ text: 'UCL Group Standings • 🟢 Qualified • ? Third Place Contender' })
+      .setFooter({ text: `UCL Group Standings • ${safeEmoji(E.correct, '✅')} Qualified`})
       .setTimestamp();
 
     return {
