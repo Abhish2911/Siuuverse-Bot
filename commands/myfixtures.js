@@ -138,7 +138,21 @@ function hasScore(row, config) {
 
 function matchdayOf(row, config) {
   const matchNo = String(row?.[config.matchNoIndex] || '').trim();
-  return matchNo.includes('.') ? matchNo.split('.')[0].trim() : matchNo || '-';
+
+  if (!matchNo) return '-';
+
+  if (/^UCL-GS-/i.test(matchNo)) {
+    const parts = matchNo.split('-');
+    return parts.length >= 5 ? parts[4] : matchNo;
+  }
+
+  const parts = matchNo.split('-');
+
+  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
+    return parts[0];
+  }
+
+  return matchNo;
 }
 
 function getTeamFromUserId(teams, userId) {
