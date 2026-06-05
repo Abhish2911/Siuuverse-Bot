@@ -7,9 +7,13 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'liveStandings.json');
 
 function normalizeType(type) {
-  const value = String(type || 'coop_league').trim().toLowerCase();
+  const value = String(type || '').trim().toLowerCase();
+
+  if (value === 'ucl') return 'ucl';
   if (value === 'league') return 'coop_league';
-  return value || 'coop_league';
+  if (value === 'coop_league') return 'coop_league';
+
+  return 'coop_league';
 }
 
 function normalizeTeamKey(value) {
@@ -87,7 +91,10 @@ function saveLiveStandingsConfig(guildId, config, type = 'coop_league') {
       }
     };
   } else {
-    store[key].types[normalizedType] = { ...config, type: normalizedType };
+    store[key].types[normalizedType] = {
+      ...config,
+      type: normalizedType
+    };
   }
 
   writeStore(store);
@@ -105,7 +112,12 @@ function getLiveStandingsConfig(guildId, type = 'coop_league') {
 
   if (entry.types && typeof entry.types === 'object') {
     const config = entry.types[normalizedType] || null;
-    return config ? { ...config, type: normalizeType(config.type) } : null;
+    if (!config) return null;
+
+    return {
+      ...config,
+      type: normalizedType
+    };
   }
 
   const legacyConfig = { ...entry };
@@ -311,7 +323,9 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
   const leaderName = clean(normalizedType === 'ucl' ? rows[0]?.[2] : rows[0]?.[1]) || 'N/A';
   const leaderPts = toNumber(normalizedType === 'ucl' ? rows[0]?.[10] : rows[0]?.[9]);
   const bottomZone = rows.slice(-2).map(row => clean(normalizedType === 'ucl' ? row?.[2] : row?.[1])).filter(Boolean).join('\n') || 'N/A';
-  const boardLabel = normalizedType === 'coop_league' ? 'COOP auto-updated board' : `${normalizedType} auto-updated board`;
+  const boardLabel = normalizedType === 'ucl'
+    ? 'UCL auto-updated board'
+    : 'COOP auto-updated board';
 
   return new EmbedBuilder()
     .setTitle(
@@ -337,6 +351,12 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
 async function refreshLiveStandings(client, guildId, type = 'coop_league') {
   const normalizedType = normalizeType(type);
   const config = getLiveStandingsConfig(guildId, normalizedType);
+  if (config && normalizeType(config.type) !== normalizedType) {
+    return {
+      ok: false,
+      reason: `Type mismatch. Expected ${normalizedType}, got ${config.type}`
+    };
+  }
   if (!config) {
     return {
       ok: false,
@@ -368,6 +388,10 @@ async function refreshLiveStandings(client, guildId, type = 'coop_league') {
 function startLiveStandingsUpdater(client, guildId, type = 'coop_league') {
   const normalizedType = normalizeType(type);
   const config = getLiveStandingsConfig(guildId, normalizedType);
+
+  if (config && normalizeType(config.type) !== normalizedType) {
+    return false;
+  }
 
   if (!config) {
     return false;
