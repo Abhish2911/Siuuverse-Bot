@@ -96,6 +96,7 @@ module.exports = {
       const setupPreview = buildLiveStandingsSetupSummary(interaction);
       const standingsType = interaction.options.getString('type') || 'coop_league';
       const embed = await buildLiveStandingsEmbed(standingsType);
+      console.log(`📊 Creating live standings message type: ${standingsType}`);
       const sent = await interaction.channel.send({ embeds: [embed] });
       const setupSummary = buildLiveStandingsSetupSummary(interaction, sent);
       setupSummary.type = standingsType === 'ucl' ? 'UCL Group Stage' : 'COOP League';
@@ -104,7 +105,7 @@ module.exports = {
         channelId: interaction.channel.id,
         messageId: sent.id,
         type: standingsType
-      }, standingsType);
+      });
 
       try {
         startLiveStandingsUpdater(interaction.client, interaction.guild.id, standingsType);
@@ -113,7 +114,7 @@ module.exports = {
       }
 
       sendAuditLog(interaction, {
-        title: `🏆 ${standingsType === 'ucl' ? 'UCL' : 'League'} Live Standings Set`,
+        title: `🏆 ${setupSummary.type} Live Standings Set`,
         description: `${standingsType === 'ucl' ? 'UCL' : 'League'} live standings message was created in <#${interaction.channel.id}> and live updates were started.`,
         color: 0x5865F2,
         fields: [
@@ -125,7 +126,7 @@ module.exports = {
       return finishInteraction(interaction, {
         embeds: [
           new (require('discord.js').EmbedBuilder)()
-            .setTitle(`✅ ${standingsType === 'ucl' ? 'UCL' : 'League'} Live Standings Set`)
+            .setTitle(`✅ ${setupSummary.type} Live Standings Set`)
             .setDescription(buildLiveStandingsSetupDescription(setupSummary, true))
             .addFields(
               { name: '📢 Channel', value: setupSummary.channel, inline: true },
