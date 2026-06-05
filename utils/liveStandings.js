@@ -235,12 +235,12 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
         toNumber(b?.[7]) - toNumber(a?.[7])
       );
 
-      if (sorted[0]) qualifiedTeams.add(clean(sorted[0][1]));
-      if (sorted[1]) qualifiedTeams.add(clean(sorted[1][1]));
+      if (sorted[0]) qualifiedTeams.add(clean(sorted[0][2]));
+      if (sorted[1]) qualifiedTeams.add(clean(sorted[1][2]));
 
       if (sorted[2]) {
         thirdPlaced.push({
-          shortName: clean(sorted[2][1]),
+          teamName: clean(sorted[2][2]),
           pts: toNumber(sorted[2][10]),
           gd: toNumber(sorted[2][9]),
           gf: toNumber(sorted[2][7])
@@ -255,7 +255,7 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
         b.gf - a.gf
       )
       .slice(0, 2)
-      .forEach(team => qualifiedTeams.add(team.shortName));
+      .forEach(team => qualifiedTeams.add(team.teamName));
   }
 
   let table;
@@ -290,7 +290,7 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
           const pts = pad(toNumber(r?.[10]), 3, 'start');
           const line = `${rankIcon(i, groupRows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
 
-          return qualifiedTeams.has(clean(r?.[1]))
+          return qualifiedTeams.has(clean(r?.[2]))
             ? `+ ${line}`
             : `  ${line}`;
         }).join('\n');
@@ -320,9 +320,18 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
   const header = normalizedType === 'ucl'
     ? '      # TEAM    P  W  D  L   GD  PTS'
     : '      # TEAM    P  W  D  L   GD  PTS';
-  const leaderName = clean(normalizedType === 'ucl' ? rows[0]?.[2] : rows[0]?.[1]) || 'N/A';
-  const leaderPts = toNumber(normalizedType === 'ucl' ? rows[0]?.[10] : rows[0]?.[9]);
-  const bottomZone = rows.slice(-2).map(row => clean(normalizedType === 'ucl' ? row?.[2] : row?.[1])).filter(Boolean).join('\n') || 'N/A';
+  const leaderName = normalizedType === 'ucl'
+    ? 'Group Stage'
+    : clean(rows[0]?.[1]) || 'N/A';
+  const leaderPts = normalizedType === 'ucl'
+    ? qualifiedTeams.size
+    : toNumber(rows[0]?.[9]);
+  const bottomZone = normalizedType === 'ucl'
+    ? 'Qualification Based'
+    : rows.slice(-2)
+        .map(row => clean(row?.[1]))
+        .filter(Boolean)
+        .join('\n') || 'N/A';
   const boardLabel = normalizedType === 'ucl'
     ? 'UCL auto-updated board'
     : 'COOP auto-updated board';
@@ -340,11 +349,21 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
     )
     .addFields(
       { name: '👥 Teams', value: String(rows.length), inline: true },
-      { name: '👑 Leader', value: `${leaderName}\n**${leaderPts} pts**`, inline: true },
+      {
+        name: normalizedType === 'ucl' ? '✅ Qualified' : '👑 Leader',
+        value: normalizedType === 'ucl'
+          ? `${qualifiedTeams.size} Teams`
+          : `${leaderName}\n**${leaderPts} pts**`,
+        inline: true
+      },
       { name: '🔻 Bottom Zone', value: bottomZone, inline: true }
     )
     .setColor(0x5865F2)
-    .setFooter({ text: `Live Standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 2 • ${boardLabel}` })
+    .setFooter({
+      text: normalizedType === 'ucl'
+        ? `Live Standings • ✅ Qualified • 👑 Group Winner • 🥈 Runner-up • ${boardLabel}`
+        : `Live Standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 2 • ${boardLabel}`
+    })
     .setTimestamp();
 }
 
