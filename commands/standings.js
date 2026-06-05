@@ -127,6 +127,7 @@ module.exports = {
           .setTitle(`${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} Coop League Table`)
           .setDescription(buildStandingsDescription(summary))
           .addFields(
+            { name: `${safeEmoji(E.stats || E.rank, '📊')} Table`, value: `\`\`\`diff\n${header}\n${table || 'No teams'}\n\`\`\``, inline: false },
             { name: '🔻 Bottom Zone', value: bottomZone, inline: false }
           )
           .setColor(getTeamColor(teams, leader, 0x5865F2))
