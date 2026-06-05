@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
+const E = require('./emojis');
 const { getData } = require('./sheets');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -10,10 +11,10 @@ function normalizeType(type) {
   const value = String(type || '').trim().toLowerCase();
 
   if (value === 'ucl') return 'ucl';
-  if (value === 'league') return 'coop_league';
-  if (value === 'coop_league') return 'coop_league';
+  if (value === 'league') return 'league';
+  if (value === 'coop_league') return 'league';
 
-  return 'coop_league';
+  return 'league';
 }
 
 function normalizeTeamKey(value) {
@@ -38,7 +39,7 @@ function rankIcon(index, total) {
   if (index === 0) return '👑';
   if (index === 1) return '🥈';
   if (index === 2) return '🥉';
-  if (index >= total - 2) return '🔻';
+  if (index >= total - 2) return '▫️';
   return '▫️';
 }
 
@@ -69,7 +70,7 @@ function writeStore(data) {
   fs.writeFileSync(STORE_PATH, JSON.stringify(data || {}, null, 2));
 }
 
-function saveLiveStandingsConfig(guildId, config, type = 'coop_league') {
+function saveLiveStandingsConfig(guildId, config, type = 'league') {
   const normalizedType = normalizeType(type);
   const key = String(guildId || '').trim();
   if (!key) return false;
@@ -101,7 +102,7 @@ function saveLiveStandingsConfig(guildId, config, type = 'coop_league') {
   return true;
 }
 
-function getLiveStandingsConfig(guildId, type = 'coop_league') {
+function getLiveStandingsConfig(guildId, type = 'league') {
   const normalizedType = normalizeType(type);
   const key = String(guildId || '').trim();
   if (!key) return null;
@@ -121,19 +122,19 @@ function getLiveStandingsConfig(guildId, type = 'coop_league') {
   }
 
   const legacyConfig = { ...entry };
-  if (!legacyConfig.type || legacyConfig.type === 'league') {
-    legacyConfig.type = 'coop_league';
+  if (!legacyConfig.type || legacyConfig.type === 'coop_league') {
+    legacyConfig.type = 'league';
   }
 
   if (normalizedType && legacyConfig.type !== normalizedType) return null;
   return legacyConfig;
 }
 
-function readLiveStandingsConfig(guildId, type = 'coop_league') {
+function readLiveStandingsConfig(guildId, type = 'league') {
   return getLiveStandingsConfig(guildId, type);
 }
 
-async function buildLiveStandingsEmbed(type = 'coop_league') {
+async function buildLiveStandingsEmbed(type = 'league') {
   const normalizedType = normalizeType(type);
   const standingsSheet = normalizedType === 'ucl'
     ? 'UCL_Coop_Group_Standings!A:K'
@@ -146,7 +147,7 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
     return new EmbedBuilder()
       .setTitle(
         normalizedType === 'ucl'
-          ? '🏆 UCL Live Standings'
+          ? `${E.UCL || '🏆'} UCL Group Standings`
           : '🏆 COOP Live Standings'
       )
       .setDescription('```ini\nNo standings data found.\n```')
@@ -202,7 +203,7 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
     return new EmbedBuilder()
       .setTitle(
         normalizedType === 'ucl'
-          ? '🏆 UCL Live Standings'
+          ? `${E.UCL || '🏆'} UCL Group Standings`
           : '🏆 COOP Live Standings'
       )
       .setDescription('```ini\nNo valid standings rows found.\n```')
@@ -339,35 +340,41 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
   return new EmbedBuilder()
     .setTitle(
       normalizedType === 'ucl'
-        ? '🏆 UCL Live Standings'
+        ? `${E.UCL || '🏆'} UCL Group Standings`
         : '🏆 COOP Live Standings'
     )
     .setDescription(
       normalizedType === 'ucl'
-        ? table
+        ? `${E.goal || '⚽'} UCL Group Stage Standings\n\n${E.up || '🟢'} Top 2 teams qualify automatically\n${E.up || '🟢'} Best 2 third-place teams qualify\n\n${table}`
         : `\`\`\`diff\n${header}\n${table}\n\`\`\``
     )
     .addFields(
-      { name: '👥 Teams', value: String(rows.length), inline: true },
-      {
-        name: normalizedType === 'ucl' ? '✅ Qualified' : '👑 Leader',
-        value: normalizedType === 'ucl'
-          ? `${qualifiedTeams.size} Teams`
-          : `${leaderName}\n**${leaderPts} pts**`,
-        inline: true
-      },
-      { name: '🔻 Bottom Zone', value: bottomZone, inline: true }
+      normalizedType === 'ucl'
+        ? {
+            name: `${E.correct || '✅'} Qualification`,
+            value: `Qualified Teams: **${qualifiedTeams.size}**\nTop 2 from each group + Best 2 third-place teams`,
+            inline: false
+          }
+        : [
+            { name: '👥 Teams', value: String(rows.length), inline: true },
+            {
+              name: '👑 Leader',
+              value: `${leaderName}\n**${leaderPts} pts**`,
+              inline: true
+            },
+            { name: '🔻 Bottom Zone', value: bottomZone, inline: true }
+          ]
     )
     .setColor(0x5865F2)
     .setFooter({
       text: normalizedType === 'ucl'
-        ? `Live Standings • ✅ Qualified • 👑 Group Winner • 🥈 Runner-up • ${boardLabel}`
+        ? `UCL Group Standings • ${E.correct || '✅'} Qualified • 👑 Group Winner • 🥈 Runner-up`
         : `Live Standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 2 • ${boardLabel}`
     })
     .setTimestamp();
 }
 
-async function refreshLiveStandings(client, guildId, type = 'coop_league') {
+async function refreshLiveStandings(client, guildId, type = 'league') {
   const normalizedType = normalizeType(type);
   const config = getLiveStandingsConfig(guildId, normalizedType);
   if (config && normalizeType(config.type) !== normalizedType) {
@@ -404,7 +411,7 @@ async function refreshLiveStandings(client, guildId, type = 'coop_league') {
   }
 }
 
-function startLiveStandingsUpdater(client, guildId, type = 'coop_league') {
+function startLiveStandingsUpdater(client, guildId, type = 'league') {
   const normalizedType = normalizeType(type);
   const config = getLiveStandingsConfig(guildId, normalizedType);
 
