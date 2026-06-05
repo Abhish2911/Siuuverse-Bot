@@ -39,7 +39,7 @@ function normalizeMatchNo(value) {
 function getCompetitionConfig(matchNo) {
   const code = normalizeMatchNo(matchNo);
 
-  if (code.startsWith('FA ')) {
+  if (code.startsWith('FA ') || code.startsWith('FA-')) {
     return {
       key: 'fa',
       label: 'FA Cup',
@@ -51,7 +51,7 @@ function getCompetitionConfig(matchNo) {
     };
   }
 
-  if (code.startsWith('CB ')) {
+  if (code.startsWith('CB ') || code.startsWith('CB-') || code.startsWith('CAR-')) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
@@ -63,8 +63,8 @@ function getCompetitionConfig(matchNo) {
     };
   }
 
-  if (code.startsWith('UCL ')) {
-    const isGroupStage = code.includes('GS-');
+  if (code.startsWith('UCL ') || code.startsWith('UCL-')) {
+    const isGroupStage = code.includes('-GS-') || code.includes('GS-');
     return {
       key: 'ucl',
       label: 'UCL',
