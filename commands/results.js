@@ -28,9 +28,29 @@ function matchTag(homeGoals, awayGoals) {
   return `${safeEmoji(E.played, '🎮')} Played`;
 }
 
+
 function shortName(value, len = 8) {
   const str = String(value || '-').trim();
   return str.length > len ? `${str.slice(0, len - 1)}…` : str;
+}
+
+function displayMatchday(matchNo) {
+  const value = String(matchNo || '').trim();
+
+  if (!value) return '-';
+
+  if (/^UCL-GS-/i.test(value)) {
+    const parts = value.split('-');
+    return parts.length >= 5 ? parts[4] : value;
+  }
+
+  const parts = value.split('-');
+
+  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
+    return parts[0];
+  }
+
+  return value;
 }
 
 function buildResultsSummary(matches) {
@@ -75,6 +95,7 @@ function buildResultsDescription(summary, limit) {
 
 function buildResultLine(row, index) {
   const matchNo = String(row[0] || '-');
+  const matchday = displayMatchday(matchNo);
   const date = String(row[1] || '-');
   const home = shortName(row[7] || row[2], 8);
   const away = shortName(row[8] || row[3], 8);
@@ -83,7 +104,7 @@ function buildResultLine(row, index) {
   const rawResult = row[6] || (toNumber(hg) > toNumber(ag) ? 'H' : toNumber(hg) < toNumber(ag) ? 'A' : 'D');
   const tag = matchTag(hg, ag);
 
-  return `${index + 1}. **MD ${matchNo}** • ${date}\n` +
+  return `${index + 1}. **MD ${matchday}** • ${date}\n` +
     `> **${home}** ${safeEmoji(E.vs, '⚔️')} **${away}** — **${hg}-${ag}**\n` +
     `> ${resultLabel(rawResult)} • ${tag}`;
 }
