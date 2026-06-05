@@ -1,8 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
+const E = require('../utils/emojis');
 
 function clean(value) {
   return String(value || '').trim();
+}
+
+function safeEmoji(value, fallback = '') {
+  return value || fallback;
 }
 
 function sortTeams(a, b) {
@@ -94,54 +99,50 @@ module.exports = {
     //  1 🟢 TeamName          6  4  1  1 12  5  7 13
 
     const lines = [];
-    const header = 'Pos Mark Group Team           P  W  D  L  GF GA GD PTS';
-    lines.push(header);
+    const header = ' # TEAM    P  W  D  L   GD  PTS';
 
     for (const g of Object.keys(groupsToShow).sort()) {
       const groupTeams = groupsToShow[g];
       if (!groupTeams || groupTeams.length === 0) continue;
 
-      lines.push(`\nGroup ${g}:`);
       for (let i = 0; i < groupTeams.length; i++) {
         const row = groupTeams[i];
         const pos = i + 1;
 
-        let mark = ' ';
-        if (pos === 1 || pos === 2) {
-          mark = '🟢';
-        } else if (pos === 3) {
-          // Check if this third place team is in best two third place teams
-          const isBestThird = bestTwoThird.some(t =>
-            t.group === g && t.team === row
-          );
-          mark = isBestThird ? '🟢' : '?';
-        }
-
         const shortName = clean(row[1]) || clean(row[2]) || '';
-        const teamName = shortName.padEnd(14, ' ');
-
         const p = row[3] || '0';
         const w = row[4] || '0';
         const d = row[5] || '0';
         const l = row[6] || '0';
-        const gf = row[7] || '0';
-        const ga = row[8] || '0';
         const gd = row[9] || '0';
         const pts = row[10] || '0';
 
-        // Align numbers to 2 chars
+        const team = shortName.padEnd(6, ' ');
         const pStr = String(p).padStart(2, ' ');
         const wStr = String(w).padStart(2, ' ');
         const dStr = String(d).padStart(2, ' ');
         const lStr = String(l).padStart(2, ' ');
-        const gfStr = String(gf).padStart(2, ' ');
-        const gaStr = String(ga).padStart(2, ' ');
-        const gdStr = String(gd).padStart(3, ' ');
+        const gdStr = String(gd).padStart(4, ' ');
         const ptsStr = String(pts).padStart(3, ' ');
 
-        lines.push(
-          `${pos.toString().padStart(3, ' ')} ${mark}  ${g}   ${teamName}${pStr} ${wStr} ${dStr} ${lStr} ${gfStr} ${gaStr} ${gdStr} ${ptsStr}`
-        );
+        const icon = pos === 1
+          ? '👑'
+          : pos === 2
+            ? '🥈'
+            : pos === 3
+              ? '🥉'
+              : '▫️';
+
+        const line = `${icon} ${String(pos).padStart(2, ' ')} ${team} ${pStr} ${wStr} ${dStr} ${lStr} ${gdStr} ${ptsStr}`;
+
+        if (pos <= 2) {
+          lines.push(`+ ${line}`);
+        } else if (pos === 3) {
+          const isBestThird = bestTwoThird.some(t => t.group === g && t.team === row);
+          lines.push(`${isBestThird ? '+' : '?'} ${line}`);
+        } else {
+          lines.push(`  ${line}`);
+        }
       }
     }
 
@@ -151,20 +152,50 @@ module.exports = {
       `🟢 Best 2 third-place teams qualify`;
 
     const embed = new EmbedBuilder()
-      .setTitle('⚽ UCL Group Standings')
+      .setTitle(`${safeEmoji(E.UCL, '🏆')} UCL Group Standings`)
       .setDescription(description)
       .addFields(
         {
-          name: '📊 Table',
-          value: '```diff\n' + lines.join('\n') + '\n```',
+          name: `${safeEmoji(E.UCL, '🏆')} Groups`,
+          value: Object.keys(groupsToShow)
+            .sort()
+            .map(groupKey => {
+              const groupLines = [header];
+              const groupTeams = groupsToShow[groupKey];
+
+              for (let i = 0; i < groupTeams.length; i++) {
+                const row = groupTeams[i];
+                const pos = i + 1;
+                const shortName = clean(row[1]) || clean(row[2]) || '';
+                const p = row[3] || '0';
+                const w = row[4] || '0';
+                const d = row[5] || '0';
+                const l = row[6] || '0';
+                const gd = row[9] || '0';
+                const pts = row[10] || '0';
+
+                const icon = pos === 1 ? '👑' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '▫️';
+                const line = `${icon} ${String(pos).padStart(2, ' ')} ${shortName.padEnd(6, ' ')} ${String(p).padStart(2, ' ')} ${String(w).padStart(2, ' ')} ${String(d).padStart(2, ' ')} ${String(l).padStart(2, ' ')} ${String(gd).padStart(4, ' ')} ${String(pts).padStart(3, ' ')}`;
+
+                if (pos <= 2) groupLines.push(`+ ${line}`);
+                else if (pos === 3) {
+                  const isBestThird = bestTwoThird.some(t => t.group === groupKey && t.team === row);
+                  groupLines.push(`${isBestThird ? '+' : '?'} ${line}`);
+                } else groupLines.push(`  ${line}`);
+              }
+
+              return `**Group ${groupKey}**\n\`\`\`diff\n` + groupLines.join('\n') + '\n```';
+            })
+            .join('\n'),
           inline: false
         },
         {
-          name: '🟢 Qualification',
+          name: `${safeEmoji(E.correct, '🟢')} Qualification`,
           value: 'Top 2 qualify automatically\nBest 2 third-place teams qualify',
           inline: false
         }
       )
+      .setColor(0x0A1E5E)
       .setFooter({ text: 'UCL Group Standings • 🟢 Qualified • ? Third Place Contender' })
       .setTimestamp();
 
