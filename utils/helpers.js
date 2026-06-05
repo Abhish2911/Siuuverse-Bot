@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { getData, clearCache, clearCacheByPrefixes, registerCacheInvalidator } = require('./sheets');
 
 const sheetCache = new Map();
@@ -218,6 +218,78 @@ function getAllowedMatchday(fixtures) {
   return null;
 }
 
+function createPaginationButtons({
+  prefix,
+  page,
+  totalPages,
+  targetType,
+  targetValue,
+  ownerId
+}) {
+  const encodedType = encodeURIComponent(targetType || 'self');
+  const encodedValue = encodeURIComponent(targetValue || '');
+
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${prefix}_prev_${page}_${encodedType}_${encodedValue}_${ownerId}`)
+      .setLabel('Previous')
+      .setEmoji('⬅️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0),
+
+    new ButtonBuilder()
+      .setCustomId(`${prefix}_refresh_${page}_${encodedType}_${encodedValue}_${ownerId}`)
+      .setLabel('Refresh')
+      .setEmoji('🔄')
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId(`${prefix}_next_${page}_${encodedType}_${encodedValue}_${ownerId}`)
+      .setLabel('Next')
+      .setEmoji('➡️')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(page >= totalPages - 1)
+  );
+}
+
+function createCompetitionDropdown({
+  prefix,
+  selectedCompetition,
+  targetType,
+  targetValue,
+  ownerId
+}) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(
+        `${prefix}_comp_${targetType}_${targetValue}_${ownerId}`
+      )
+      .setPlaceholder('Select Competition')
+      .addOptions([
+        {
+          label: 'League',
+          value: 'league',
+          default: selectedCompetition === 'league'
+        },
+        {
+          label: 'FA Cup',
+          value: 'fa',
+          default: selectedCompetition === 'fa'
+        },
+        {
+          label: 'Carabao Cup',
+          value: 'carabao',
+          default: selectedCompetition === 'carabao'
+        },
+        {
+          label: 'UCL',
+          value: 'ucl',
+          default: selectedCompetition === 'ucl'
+        }
+      ])
+  );
+}
+
 module.exports = {
   normalize,
   cleanId,
@@ -233,5 +305,7 @@ module.exports = {
   invalidateSheetCache,
   getAuditLogChannelId,
   sendAuditLog,
-  getAllowedMatchday
+  getAllowedMatchday,
+  createPaginationButtons,
+  createCompetitionDropdown,
 };
