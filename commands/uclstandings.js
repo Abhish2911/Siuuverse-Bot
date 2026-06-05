@@ -196,7 +196,7 @@ module.exports = {
         }
       )
       .setColor(0x0A1E5E)
-      .setFooter({ text: `UCL Group Standings • ${safeEmoji(E.correct, '✅')} Qualified`})
+      .setFooter({ text: `UCL Group Standings • ${safeEmoji(E.correct, '✅')} Qualified • ${safeEmoji(E.correct, '✅')} Advances` })
       .setTimestamp();
 
     return {
