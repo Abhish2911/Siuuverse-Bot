@@ -123,12 +123,20 @@ function readLiveStandingsConfig(guildId, type = 'coop_league') {
 
 async function buildLiveStandingsEmbed(type = 'coop_league') {
   const normalizedType = normalizeType(type);
-  const standings = await getData('Standings!A:J');
+  const standingsSheet = normalizedType === 'ucl'
+    ? 'UCL_Coop_Group_Standings!A:K'
+    : 'Standings!A:J';
+
+  const standings = await getData(standingsSheet);
   const teams = await getData('Teams!A:H');
 
   if (!Array.isArray(standings) || standings.length <= 1) {
     return new EmbedBuilder()
-      .setTitle('🏆 COOP Live Standings')
+      .setTitle(
+        normalizedType === 'ucl'
+          ? '🏆 UCL Live Standings'
+          : '🏆 COOP Live Standings'
+      )
       .setDescription('```ini\nNo standings data found.\n```')
       .setColor(0x5865F2)
       .setFooter({ text: 'Live Standings • No standings data available' });
@@ -145,24 +153,46 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
     });
   }
 
-  const rows = standings
-    .slice(1)
-    .filter(r => {
-      const team = String(r?.[1] || '').trim();
-      if (!team) return false;
-      if (/removed|delete|blank|tbd/i.test(team)) return false;
-      return true;
-    })
-    .sort((a, b) =>
-      toNumber(b?.[9]) - toNumber(a?.[9]) ||
-      toNumber(b?.[8]) - toNumber(a?.[8]) ||
-      toNumber(b?.[6]) - toNumber(a?.[6]) ||
-      String(a?.[1] || '').localeCompare(String(b?.[1] || ''))
-    );
+  let rows;
+
+  if (normalizedType === 'ucl') {
+    rows = standings
+      .slice(1)
+      .filter(r => {
+        const team = String(r?.[2] || '').trim();
+        if (!team) return false;
+        if (/removed|delete|blank|tbd/i.test(team)) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        toNumber(b?.[10]) - toNumber(a?.[10]) ||
+        toNumber(b?.[9]) - toNumber(a?.[9]) ||
+        toNumber(b?.[7]) - toNumber(a?.[7])
+      );
+  } else {
+    rows = standings
+      .slice(1)
+      .filter(r => {
+        const team = String(r?.[1] || '').trim();
+        if (!team) return false;
+        if (/removed|delete|blank|tbd/i.test(team)) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        toNumber(b?.[9]) - toNumber(a?.[9]) ||
+        toNumber(b?.[8]) - toNumber(a?.[8]) ||
+        toNumber(b?.[6]) - toNumber(a?.[6]) ||
+        String(a?.[1] || '').localeCompare(String(b?.[1] || ''))
+      );
+  }
 
   if (!rows.length) {
     return new EmbedBuilder()
-      .setTitle('🏆 COOP Live Standings')
+      .setTitle(
+        normalizedType === 'ucl'
+          ? '🏆 UCL Live Standings'
+          : '🏆 COOP Live Standings'
+      )
       .setDescription('```ini\nNo valid standings rows found.\n```')
       .setColor(0x5865F2)
       .setFooter({ text: 'Live Standings • No valid teams found' });
@@ -173,32 +203,127 @@ async function buildLiveStandingsEmbed(type = 'coop_league') {
     return dir === 'start' ? str.padStart(len, ' ') : str.padEnd(len, ' ');
   };
 
-  const table = rows.map((r, i) => {
-    const pos = pad(i + 1, 2, 'start');
-    const fullTeam = normalizeTeamKey(r?.[1]);
-    const tm = pad(shortMap[fullTeam] || String(r?.[1] || '').slice(0, 6).toUpperCase() || 'N/A', 6);
-    const p = pad(toNumber(r?.[2]), 2, 'start');
-    const w = pad(toNumber(r?.[3]), 2, 'start');
-    const d = pad(toNumber(r?.[4]), 2, 'start');
-    const l = pad(toNumber(r?.[5]), 2, 'start');
-    const gd = pad(formatGD(r?.[8]), 4, 'start');
-    const pts = pad(toNumber(r?.[9]), 3, 'start');
-    const line = `${rankIcon(i, rows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
+  let qualifiedTeams = new Set();
 
-    if (i < 3) return `+ ${line}`;
-    if (i >= rows.length - 2) return `- ${line}`;
-    return `  ${line}`;
-  }).join('\n');
+  if (normalizedType === 'ucl') {
+    const groups = {};
 
-  const header = '      # TEAM    P  W  D  L   GD  PTS';
-  const leaderName = clean(rows[0]?.[1]) || 'N/A';
-  const leaderPts = toNumber(rows[0]?.[9]);
-  const bottomZone = rows.slice(-2).map(row => clean(row?.[1])).filter(Boolean).join('\n') || 'N/A';
+    rows.forEach(row => {
+      const group = clean(row?.[0]).toUpperCase();
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(row);
+    });
+
+    const thirdPlaced = [];
+
+    Object.values(groups).forEach(groupRows => {
+      const sorted = [...groupRows].sort((a, b) =>
+        toNumber(b?.[10]) - toNumber(a?.[10]) ||
+        toNumber(b?.[9]) - toNumber(a?.[9]) ||
+        toNumber(b?.[7]) - toNumber(a?.[7])
+      );
+
+      if (sorted[0]) qualifiedTeams.add(clean(sorted[0][1]));
+      if (sorted[1]) qualifiedTeams.add(clean(sorted[1][1]));
+
+      if (sorted[2]) {
+        thirdPlaced.push({
+          shortName: clean(sorted[2][1]),
+          pts: toNumber(sorted[2][10]),
+          gd: toNumber(sorted[2][9]),
+          gf: toNumber(sorted[2][7])
+        });
+      }
+    });
+
+    thirdPlaced
+      .sort((a, b) =>
+        b.pts - a.pts ||
+        b.gd - a.gd ||
+        b.gf - a.gf
+      )
+      .slice(0, 2)
+      .forEach(team => qualifiedTeams.add(team.shortName));
+  }
+
+  let table;
+
+  if (normalizedType === 'ucl') {
+    const groups = {};
+
+    rows.forEach(row => {
+      const group = clean(row?.[0]).toUpperCase();
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(row);
+    });
+
+    table = Object.keys(groups)
+      .sort()
+      .map(group => {
+        const groupRows = groups[group].sort((a, b) =>
+          toNumber(b?.[10]) - toNumber(a?.[10]) ||
+          toNumber(b?.[9]) - toNumber(a?.[9]) ||
+          toNumber(b?.[7]) - toNumber(a?.[7])
+        );
+
+        const lines = groupRows.map((r, i) => {
+          const pos = pad(i + 1, 2, 'start');
+          const fullTeam = normalizeTeamKey(r?.[2]);
+          const tm = pad(shortMap[fullTeam] || String(r?.[1] || '').slice(0, 6).toUpperCase(), 6);
+          const p = pad(toNumber(r?.[3]), 2, 'start');
+          const w = pad(toNumber(r?.[4]), 2, 'start');
+          const d = pad(toNumber(r?.[5]), 2, 'start');
+          const l = pad(toNumber(r?.[6]), 2, 'start');
+          const gd = pad(formatGD(r?.[9]), 4, 'start');
+          const pts = pad(toNumber(r?.[10]), 3, 'start');
+          const line = `${rankIcon(i, groupRows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
+
+          return qualifiedTeams.has(clean(r?.[1]))
+            ? `+ ${line}`
+            : `  ${line}`;
+        }).join('\n');
+
+        return `**Group ${group}**\n\`\`\`diff\n      # TEAM    P  W  D  L   GD  PTS\n${lines}\n\`\`\``;
+      })
+      .join('\n\n');
+  } else {
+    table = rows.map((r, i) => {
+      const pos = pad(i + 1, 2, 'start');
+      const fullTeam = normalizeTeamKey(r?.[1]);
+      const tm = pad(shortMap[fullTeam] || String(r?.[1] || '').slice(0, 6).toUpperCase() || 'N/A', 6);
+      const p = pad(toNumber(r?.[2]), 2, 'start');
+      const w = pad(toNumber(r?.[3]), 2, 'start');
+      const d = pad(toNumber(r?.[4]), 2, 'start');
+      const l = pad(toNumber(r?.[5]), 2, 'start');
+      const gd = pad(formatGD(r?.[8]), 4, 'start');
+      const pts = pad(toNumber(r?.[9]), 3, 'start');
+      const line = `${rankIcon(i, rows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
+
+      if (i < 3) return `+ ${line}`;
+      if (i >= rows.length - 2) return `- ${line}`;
+      return `  ${line}`;
+    }).join('\n');
+  }
+
+  const header = normalizedType === 'ucl'
+    ? '      # TEAM    P  W  D  L   GD  PTS'
+    : '      # TEAM    P  W  D  L   GD  PTS';
+  const leaderName = clean(normalizedType === 'ucl' ? rows[0]?.[2] : rows[0]?.[1]) || 'N/A';
+  const leaderPts = toNumber(normalizedType === 'ucl' ? rows[0]?.[10] : rows[0]?.[9]);
+  const bottomZone = rows.slice(-2).map(row => clean(normalizedType === 'ucl' ? row?.[2] : row?.[1])).filter(Boolean).join('\n') || 'N/A';
   const boardLabel = normalizedType === 'coop_league' ? 'COOP auto-updated board' : `${normalizedType} auto-updated board`;
 
   return new EmbedBuilder()
-    .setTitle('🏆 COOP Live Standings')
-    .setDescription(`\`\`\`diff\n${header}\n${table}\n\`\`\``)
+    .setTitle(
+      normalizedType === 'ucl'
+        ? '🏆 UCL Live Standings'
+        : '🏆 COOP Live Standings'
+    )
+    .setDescription(
+      normalizedType === 'ucl'
+        ? table
+        : `\`\`\`diff\n${header}\n${table}\n\`\`\``
+    )
     .addFields(
       { name: '👥 Teams', value: String(rows.length), inline: true },
       { name: '👑 Leader', value: `${leaderName}\n**${leaderPts} pts**`, inline: true },
