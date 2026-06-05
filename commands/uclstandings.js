@@ -89,8 +89,65 @@ module.exports = {
       };
     }
 
+    // Build table lines
+    // Format: position + marker (🟢 or ?), short name or team, P, W, D, L, GF, GA, GD, PTS
+    // Mark positions 1 and 2 with 🟢
+    // Mark 3rd place with 🟢 if best two third-place teams, else ?
+
+    // We'll build a diff-style table: 
+    // Pos Marker Team          P  W  D  L  GF GA GD PTS
+    //  1 🟢 TeamName          6  4  1  1 12  5  7 13
+
+    const lines = [];
+    const header = ' # TEAM    P  W  D  L   GD  PTS';
+
+    for (const g of Object.keys(groupsToShow).sort()) {
+      const groupTeams = groupsToShow[g];
+      if (!groupTeams || groupTeams.length === 0) continue;
+
+      for (let i = 0; i < groupTeams.length; i++) {
+        const row = groupTeams[i];
+        const pos = i + 1;
+
+        const shortName = clean(row[1]) || clean(row[2]) || '';
+        const p = row[3] || '0';
+        const w = row[4] || '0';
+        const d = row[5] || '0';
+        const l = row[6] || '0';
+        const gd = row[9] || '0';
+        const pts = row[10] || '0';
+
+        const team = shortName.padEnd(6, ' ');
+        const pStr = String(p).padStart(2, ' ');
+        const wStr = String(w).padStart(2, ' ');
+        const dStr = String(d).padStart(2, ' ');
+        const lStr = String(l).padStart(2, ' ');
+        const gdStr = String(gd).padStart(4, ' ');
+        const ptsStr = String(pts).padStart(3, ' ');
+
+        const icon = pos === 1
+          ? '👑'
+          : pos === 2
+            ? '🥈'
+            : pos === 3
+              ? '🥉'
+              : '▫️';
+
+        const line = `${icon} ${String(pos).padStart(2, ' ')} ${team} ${pStr} ${wStr} ${dStr} ${lStr} ${gdStr} ${ptsStr}`;
+
+        if (pos <= 2) {
+          lines.push(`+ ${line}`);
+        } else if (pos === 3) {
+          const isBestThird = bestTwoThird.some(t => t.group === g && t.team === row);
+          lines.push(`${isBestThird ? '+' : '?'} ${line}`);
+        } else {
+          lines.push(`  ${line}`);
+        }
+      }
+    }
+
     const description =
-      `⚽ ${requestedGroup ? `Group ${requestedGroup}` : 'UCL Group Stage'} Standings\n\n` +
+      `${safeEmoji(E.goal, '⚽')} ${requestedGroup ? `Group ${requestedGroup}` : 'UCL Group Stage'} Standings\n\n` +
       `${safeEmoji(E.up, '🟢')} Top 2 teams qualify automatically\n` +
       `${safeEmoji(E.up, '🟢')} Best 2 third-place teams qualify`;
 
@@ -100,72 +157,46 @@ module.exports = {
       .addFields(
         {
           name: `${safeEmoji(E.UCL, '🏆')} Groups`,
-          value: 'See group tables below',
-          inline: false
-        },
-        ...Object.keys(groupsToShow)
-          .sort()
-          .map(groupKey => {
-            const groupTeams = groupsToShow[groupKey];
+          value: Object.keys(groupsToShow)
+            .sort()
+            .map(groupKey => {
+              const groupLines = [header];
+              const groupTeams = groupsToShow[groupKey];
 
-            const pad = (value, len, dir = 'end') => {
-              const str = String(value ?? '');
-              return dir === 'start'
-                ? str.padStart(len, ' ')
-                : str.padEnd(len, ' ');
-            };
+              for (let i = 0; i < groupTeams.length; i++) {
+                const row = groupTeams[i];
+                const pos = i + 1;
+                const shortName = clean(row[1]) || clean(row[2]) || '';
+                const p = row[3] || '0';
+                const w = row[4] || '0';
+                const d = row[5] || '0';
+                const l = row[6] || '0';
+                const gd = row[9] || '0';
+                const pts = row[10] || '0';
 
-            const groupTable = groupTeams.map((row, index) => {
-              const pos = pad(index + 1, 2, 'start');
-              const team = pad(clean(row[1]) || clean(row[2]), 6);
-              const p = pad(row[3] || 0, 2, 'start');
-              const w = pad(row[4] || 0, 2, 'start');
-              const d = pad(row[5] || 0, 2, 'start');
-              const l = pad(row[6] || 0, 2, 'start');
-              const gd = pad(row[9] || 0, 4, 'start');
-              const pts = pad(row[10] || 0, 3, 'start');
+                const icon = pos === 1 ? '👑' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '▫️';
+                const line = `${icon} ${String(pos).padStart(2, ' ')} ${shortName.padEnd(6, ' ')} ${String(p).padStart(2, ' ')} ${String(w).padStart(2, ' ')} ${String(d).padStart(2, ' ')} ${String(l).padStart(2, ' ')} ${String(gd).padStart(4, ' ')} ${String(pts).padStart(3, ' ')}`;
 
-              const icon =
-                index === 0 ? '👑' :
-                index === 1 ? '🥈' :
-                index === 2 ? '🥉' :
-                '▫️';
-
-              const line = `${icon} ${pos} ${team} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
-
-              if (index < 2) return `+ ${line}`;
-
-              if (index === 2) {
-                const isBestThird = bestTwoThird.some(
-                  t => t.group === groupKey && t.team === row
-                );
-
-                return `${isBestThird ? '+' : ' '} ${line}`;
+                if (pos <= 2) groupLines.push(`+ ${line}`);
+                else if (pos === 3) {
+                  const isBestThird = bestTwoThird.some(t => t.group === groupKey && t.team === row);
+                  groupLines.push(`${isBestThird ? '+' : '?'} ${line}`);
+                } else groupLines.push(`  ${line}`);
               }
 
-              return `  ${line}`;
-            }).join('\n');
-
-            return {
-              name: `🏆 Group ${groupKey}`,
-              value:
-                '```diff\n' +
-                '      # TEAM    P  W  D  L   GD  PTS\n' +
-                groupTable +
-                '\n```',
-              inline: false
-            };
-          }),
+              return `**Group ${groupKey}**\n\`\`\`diff\n` + groupLines.join('\n') + '\n```';
+            })
+            .join('\n'),
+          inline: false
+        },
         {
-          name: `${safeEmoji(E.correct, '🟢')} Qualification`,
-          value:
-            `${safeEmoji(E.up, '🟢')} Top 2 qualify automatically\n` +
-            `${safeEmoji(E.up, '🟢')} Best 2 third-place teams qualify`,
+          name: `${safeEmoji(E.correct, '✅')} Qualification`,
+          value: 'Top 2 qualify automatically\nBest 2 third-place teams qualify',
           inline: false
         }
       )
       .setColor(0x0A1E5E)
-      .setFooter({ text: 'UCL Group Standings • + Qualified Teams' })
+      .setFooter({ text: 'UCL Group Standings • 🟢 Qualified • ? Third Place Contender' })
       .setTimestamp();
 
     return {
