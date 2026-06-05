@@ -18,7 +18,6 @@ try {
   console.warn('Suspension service unavailable:', error.message);
 }
 
-const { buildWeeklySummaryPayload } = require('./weeklysummary');
 const E = require('../utils/emojis');
 
 const pendingResults = new Map();
@@ -52,7 +51,25 @@ function clean(v) {
 }
 
 function normalizeMatchNo(v) {
-  return String(v ?? '').trim();
+  return String(v ?? '')
+    .trim()
+    .toUpperCase();
+}
+
+function getMatchdayKey(matchNo) {
+  const value = normalizeMatchNo(matchNo);
+
+  if (value.startsWith('UCL-GS-')) {
+    const parts = value.split('-');
+    return parts.length >= 5
+      ? `${parts[0]}-${parts[1]}-${parts[2]}-${parts[3]}`
+      : value;
+  }
+
+  const parts = value.split('-');
+  return parts.length > 1
+    ? parts.slice(0, -1).join('-')
+    : value;
 }
 
 function getTodayKey(date = new Date()) {
@@ -334,6 +351,45 @@ module.exports = {
 
     const fixtures = await getData(competition.fixturesRange);
 
+    if (competition.key === 'ucl') {
+      const rowsForLock = Array.isArray(fixtures) ? fixtures.slice(1) : [];
+
+      const grouped = new Map();
+
+      for (const row of rowsForLock) {
+        const match = normalizeMatchNo(row[0]);
+        const md = getMatchdayKey(match);
+
+        if (!grouped.has(md)) grouped.set(md, []);
+        grouped.get(md).push(row);
+      }
+
+      const ordered = [...grouped.keys()].sort();
+
+      let active = null;
+
+      for (const md of ordered) {
+        const matches = grouped.get(md) || [];
+
+        const completed = matches.filter(
+          r => r[4] !== '' && r[4] !== undefined && r[5] !== '' && r[5] !== undefined
+        );
+
+        if (completed.length < matches.length) {
+          active = md;
+          break;
+        }
+      }
+
+      if (active) {
+        fixtures.__allowedMatchday = active;
+      }
+    }
+
+    if (fixtures.__allowedMatchday) {
+      fixtures.allowedMatchday = fixtures.__allowedMatchday;
+    }
+
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
       return {
         content: `${safeEmoji(E.wrong, '❌')} Fixtures unavailable.`
@@ -353,6 +409,23 @@ module.exports = {
     }
 
     const fixture = rows[index];
+
+    const allowedMatchday = getAllowedMatchday(fixtures);
+
+    if (allowedMatchday) {
+      const requestedMatchday = getMatchdayKey(matchNo);
+
+      if (
+        normalizeMatchNo(requestedMatchday) !==
+        normalizeMatchNo(allowedMatchday)
+      ) {
+        return {
+          content:
+            `${safeEmoji(E.lock, '🔒')} Results are currently locked. ` +
+            `Only fixtures from **${allowedMatchday}** can be submitted right now.`
+        };
+      }
+    }
 
     const homeTeam = clean(fixture[2]);
     const awayTeam = clean(fixture[3]);
