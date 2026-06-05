@@ -127,14 +127,19 @@ function getHeaderLabel(row, config) {
   */
   if (config.key === 'league') {
     const parts = matchNo.split('-');
+
+    if (parts.length >= 2 && /^L$/i.test(parts[0])) {
+      return parts[1];
+    }
+
     return parts[0] || matchNo;
   }
 
   /* ---------------- UCL ----------------
-     UCL-GS-A-1 -> GS-1
-     UCL-GS-B-1 -> GS-1
-     UCL-GS-C-1 -> GS-1
-     UCL-GS-A-2 -> GS-2
+     UCL-GS-A-1-1 -> GS-1
+     UCL-GS-A-1-2 -> GS-1
+     UCL-GS-A-1-3 -> GS-1
+     UCL-GS-A-2-1 -> GS-2
      UCL-QF-1-1 -> QF
      UCL-SF-1-1 -> SF
      UCL-FINAL -> FINAL
@@ -142,7 +147,7 @@ function getHeaderLabel(row, config) {
   if (config.key === 'ucl') {
     const parts = matchNo.split('-');
 
-    if (parts.length >= 4 && parts[1] === 'GS') {
+    if (parts.length >= 5 && parts[1] === 'GS') {
       return `GS-${parts[3]}`;
     }
 
