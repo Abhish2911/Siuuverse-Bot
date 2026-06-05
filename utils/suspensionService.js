@@ -100,14 +100,23 @@ function getMatchOrderValue(matchNo) {
   const text = clean(matchNo).toUpperCase();
   if (!text) return Number.MAX_SAFE_INTEGER;
 
-  const mdMatch = text.match(/MD\s*(\d+)(?:\.(\d+))?/i);
+  const mdMatch = text.match(/MD\s*(\d+)(?:[-.](\d+))?/i);
   if (mdMatch) {
     const md = Number(mdMatch[1]) || 0;
     const sub = Number(mdMatch[2]) || 0;
     return md * 100 + sub;
   }
 
-  const stageMatch = text.match(/(QFQ|QF|SF|F|R16|RO16|R1|GS)[^\d]*(\d+)?(?:\.(\d+))?/i);
+  const uclGsMatch = text.match(/UCL-GS-[A-Z]-(\d+)-(\d+)/i);
+
+  if (uclGsMatch) {
+    const md = Number(uclGsMatch[1]) || 0;
+    const fixture = Number(uclGsMatch[2]) || 0;
+
+    return 1000 + (md * 100) + fixture;
+  }
+
+  const stageMatch = text.match(/(QFQ|QF|SF|F|R16|RO16|R1|GS)[^\d]*(\d+)?(?:[-.](\d+))?/i);
   if (stageMatch) {
     const stageMap = { GS: 10, R1: 15, R16: 20, RO16: 20, QFQ: 25, QF: 30, SF: 40, F: 50 };
     const stage = stageMap[String(stageMatch[1] || '').toUpperCase()] || 0;
