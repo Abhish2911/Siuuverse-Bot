@@ -61,7 +61,17 @@ function buildLiveStandingsSetupDescription(summary, isCreated = false) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setlivestandings')
-    .setDescription('Owner only: create or replace the COOP live standings message'),
+    .setDescription('Owner only: create or replace a live standings message')
+    .addStringOption(option =>
+      option
+        .setName('type')
+        .setDescription('Standings type')
+        .setRequired(true)
+        .addChoices(
+          { name: 'League', value: 'coop_league' },
+          { name: 'UCL', value: 'ucl' }
+        )
+    ),
 
   async execute(interaction) {
     if (!interaction.guild) {
@@ -84,25 +94,27 @@ module.exports = {
 
     try {
       const setupPreview = buildLiveStandingsSetupSummary(interaction);
-      const embed = await buildLiveStandingsEmbed('coop_league');
+      const standingsType = interaction.options.getString('type') || 'coop_league';
+      const embed = await buildLiveStandingsEmbed(standingsType);
       const sent = await interaction.channel.send({ embeds: [embed] });
       const setupSummary = buildLiveStandingsSetupSummary(interaction, sent);
+      setupSummary.type = standingsType === 'ucl' ? 'UCL Group Stage' : 'COOP League';
 
       saveLiveStandingsConfig(interaction.guild.id, {
         channelId: interaction.channel.id,
         messageId: sent.id,
-        type: 'coop_league'
-      }, 'coop_league');
+        type: standingsType
+      }, standingsType);
 
       try {
-        startLiveStandingsUpdater(interaction.client, interaction.guild.id, 'coop_league');
+        startLiveStandingsUpdater(interaction.client, interaction.guild.id, standingsType);
       } catch (error) {
         console.error('❌ Live standings updater start error:', error);
       }
 
       sendAuditLog(interaction, {
-        title: '🏆 COOP Live Standings Set',
-        description: `COOP league live standings message was created in <#${interaction.channel.id}> and live updates were started.`,
+        title: `🏆 ${standingsType === 'ucl' ? 'UCL' : 'League'} Live Standings Set`,
+        description: `${standingsType === 'ucl' ? 'UCL' : 'League'} live standings message was created in <#${interaction.channel.id}> and live updates were started.`,
         color: 0x5865F2,
         fields: [
           { name: '📢 Channel', value: `<#${interaction.channel.id}>`, inline: true },
@@ -113,7 +125,7 @@ module.exports = {
       return finishInteraction(interaction, {
         embeds: [
           new (require('discord.js').EmbedBuilder)()
-            .setTitle('✅ COOP Live Standings Set')
+            .setTitle(`✅ ${standingsType === 'ucl' ? 'UCL' : 'League'} Live Standings Set`)
             .setDescription(buildLiveStandingsSetupDescription(setupSummary, true))
             .addFields(
               { name: '📢 Channel', value: setupSummary.channel, inline: true },
@@ -145,6 +157,8 @@ module.exports = {
       for (const guildId of guilds) {
         const leagueOk = startLiveStandingsUpdater(client, guildId, 'coop_league');
         if (leagueOk) restored = true;
+        const uclOk = startLiveStandingsUpdater(client, guildId, 'ucl');
+        if (uclOk) restored = true;
       }
 
       return restored;
