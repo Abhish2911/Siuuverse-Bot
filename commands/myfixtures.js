@@ -1,15 +1,21 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
+  EmbedBuilder
 } = require('discord.js');
-const { cachedGetData, cleanId, getTeamColor, normalize, splitList } = require('../utils/helpers');
+const {
+  cachedGetData,
+  cleanId,
+  getTeamColor,
+  normalize,
+  splitList,
+  createPaginationButtons,
+  createCompetitionDropdown
+} = require('../utils/helpers');
 const { clean: sharedClean } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
-const PAGE_SIZE = 4;
+const LEAGUE_PAGE_SIZE = 4;
+const CUP_PAGE_SIZE = 2;
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 let derbyMapCache = null;
 
@@ -309,36 +315,15 @@ function buildFixtureDescription(team, summary, record, currentBlock, reserveBlo
     `${safeEmoji(E.Badge || E.info, '📌')} **Current Pairing:** ${summary.currentPairing}\n\n` +
     `${currentBlock}` +
     `${reserveBlock}` +
-    `${safeEmoji(E.calendar, '📅')} **Showing ${page * PAGE_SIZE + 1}-${page * PAGE_SIZE + pageRows.length} of ${orderedRows.length} fixtures**`
-  );
-}
-
-function createButtons(page, totalPages, targetType, targetValue, ownerId) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`myfixtures_prev_${page}_${targetType}_${targetValue}_${ownerId}`)
-      .setLabel('Previous')
-      .setEmoji('⬅️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(page <= 0),
-
-    new ButtonBuilder()
-      .setCustomId(`myfixtures_refresh_${page}_${targetType}_${targetValue}_${ownerId}`)
-      .setLabel('Refresh')
-      .setEmoji('🔄')
-      .setStyle(ButtonStyle.Success),
-
-    new ButtonBuilder()
-      .setCustomId(`myfixtures_next_${page}_${targetType}_${targetValue}_${ownerId}`)
-      .setLabel('Next')
-      .setEmoji('➡️')
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(page >= totalPages - 1)
+    `${safeEmoji(E.calendar, '📅')} **Showing ${pageRows.length ? page * pageRows.length + 1 : 0}-${page * pageRows.length + pageRows.length} of ${orderedRows.length} fixtures**`
   );
 }
 
 async function buildMyFixtures(interaction, page = 0, targetType = 'self', targetValue = '', competitionKey = 'league') {
   const config = getCompetitionConfig(competitionKey);
+  const pageSize = config.key === 'league'
+    ? LEAGUE_PAGE_SIZE
+    : CUP_PAGE_SIZE;
   const [teams, fixtures, standings, reserveRows, derbyRows] = await Promise.all([
     cachedGetData('Teams!A:Z'),
     cachedGetData(config.fixturesRange),
@@ -399,10 +384,10 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
     return aNo.localeCompare(bNo, undefined, { numeric: true, sensitivity: 'base' });
   });
 
-  const totalPages = Math.max(1, Math.ceil(orderedRows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(orderedRows.length / pageSize));
   page = Math.max(0, Math.min(page, totalPages - 1));
 
-  const pageRows = orderedRows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const pageRows = orderedRows.slice(page * pageSize, page * pageSize + pageSize);
   const record = config.key === 'league' ? getRecord(standings, team.teamName, team.shortName) : { wins: 0, draws: 0, losses: 0, gd: 0, pts: 0 };
   const reserveMatches = getReserveMatches(reserveRows, team, config.reserveLabel);
   const summary = buildFixtureSummary(team, rows, upcoming, played, reserveMatches, current, config);
@@ -441,20 +426,28 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
       }
     )
     .setColor(getTeamColor(teams, team.teamName, 0x5865F2))
-    .setFooter({ text: `${config.label} • Page ${page + 1}/${totalPages} • Showing ${PAGE_SIZE} matches per page` });
+    .setFooter({ text: `${config.label} • Page ${page + 1}/${totalPages} • Showing ${pageSize} matches per page` });
 
   if (team.logo && /^https?:\/\//i.test(team.logo)) embed.setThumbnail(team.logo);
 
   return {
     embeds: [embed],
     components: [
-      createButtons(
+      createCompetitionDropdown({
+        prefix: 'myfixtures',
+        selectedCompetition: competitionKey,
+        targetType,
+        targetValue: encodeURIComponent(targetValue || interaction.user.id),
+        ownerId: interaction.user.id
+      }),
+      createPaginationButtons({
+        prefix: 'myfixtures',
         page,
         totalPages,
-        `${targetType}_${competitionKey}`,
-        encodeURIComponent(targetValue || interaction.user.id),
-        interaction.user.id
-      )
+        targetType: `${targetType}|${competitionKey}`,
+        targetValue: encodeURIComponent(targetValue || interaction.user.id),
+        ownerId: interaction.user.id
+      })
     ]
   };
 }
@@ -503,10 +496,28 @@ module.exports = {
       : action === 'prev'
         ? currentPage - 1
         : currentPage;
-    const rawType = targetType || 'self_league';
-    const [resolvedTargetType, competitionKey = 'league'] = rawType.split('_');
+    const rawType = String(targetType || 'self|league');
+    const [resolvedTargetType = 'self', competitionKey = 'league'] = rawType.split('|');
+    const value = decodeURIComponent(targetValue || interaction.user.id);
+    return buildMyFixtures(
+      interaction,
+      nextPage,
+      resolvedTargetType || 'self',
+      value,
+      competitionKey || 'league'
+    );
+  },
+
+  async selectMenuHandler(interaction, targetType, targetValue) {
+    const competitionKey = interaction.values[0] || 'league';
     const value = decodeURIComponent(targetValue || interaction.user.id);
 
-    return buildMyFixtures(interaction, nextPage, resolvedTargetType || 'self', value, competitionKey);
-  }
+    return buildMyFixtures(
+      interaction,
+      0,
+      targetType || 'self',
+      value,
+      competitionKey
+    );
+  },
 };
