@@ -161,13 +161,11 @@ for (const file of commandFiles) {
 
 client.once('clientReady', async () => {
   console.log(`🚀 Bot ready: ${client.user.tag}`);
-  console.log(`📢 Weekly summary channel: ${process.env.WEEKLY_SUMMARY_CHANNEL_ID || 'NOT SET'}`);
   console.log(`📝 Audit log config: ${process.env.AUDIT_LOG_CHANNELS || process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || process.env.AUDIT_LOG_CHANNEL_ID || 'NOT SET'}`);
 
   const restoreCommands = [
     'setlivestats',
-    'setlivestandings',
-    'setweeklysummary'
+    'setlivestandings'
   ];
 
   for (const commandName of restoreCommands) {
@@ -267,6 +265,30 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // myfixtures special button handler
+      if (cmd === 'myfixtures') {
+        const command = client.commands.get('myfixtures');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const [page, targetType, targetValue, ownerId] = parts;
+
+        const result = await command.buttonHandler(
+          interaction,
+          action,
+          page,
+          decodeURIComponent(targetType || ''),
+          decodeURIComponent(targetValue || '')
+        );
+
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
@@ -300,17 +322,6 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
-      // weeklysummary dropdown handler
-      if (interaction.customId === 'weeklysummary_select') {
-        const command = client.commands.get('weeklysummary');
-        if (!command || !command.selectHandler) return;
-
-        const result = await command.selectHandler(interaction);
-        if (result) {
-          await interaction.message.edit(result);
-        }
-        return;
-      }
 
       // fixtures dropdown handler
       if (interaction.customId.startsWith('md_select_fixtures')) {
@@ -372,6 +383,26 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // myfixtures special select menu handler
+      if (interaction.customId.startsWith('myfixtures_comp_')) {
+        const command = client.commands.get('myfixtures');
+        if (!command || !command.selectMenuHandler) return;
+
+        const parts = interaction.customId.split('_');
+        const targetType = decodeURIComponent(parts[2] || 'self');
+        const targetValue = decodeURIComponent(parts[3] || interaction.user.id);
+
+        const result = await command.selectMenuHandler(
+          interaction,
+          targetType,
+          targetValue
+        );
+
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
       return;
     }
   } catch (error) {
