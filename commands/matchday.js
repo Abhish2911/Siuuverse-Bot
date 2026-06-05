@@ -1,5 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { cachedGetData, getAllowedMatchday, getTeamColor } = require('../utils/helpers');
+const {
+  cachedGetData,
+  getAllowedMatchday,
+  getTeamColor,
+  getFixtureMatchday
+} = require('../utils/helpers');
 const E = require('../utils/emojis');
 
 function safeEmoji(value, fallback = '') {
@@ -14,22 +19,6 @@ function toNumber(value) {
 const hasScore = (row) => {
   return row[4] !== '' && row[4] !== undefined &&
     row[5] !== '' && row[5] !== undefined;
-};
-
-const getMatchday = row => {
-  const matchNo = String(row[0] || '').trim();
-
-  // League format: 1-1, 1-2, 2-1...
-  if (/^\d+-\d+$/i.test(matchNo)) {
-    return matchNo.split('-')[0].trim();
-  }
-
-  // Legacy format: 1.1, 1.2...
-  if (matchNo.includes('.')) {
-    return matchNo.split('.')[0].trim();
-  }
-
-  return matchNo;
 };
 
 const shortTeam = (row, home = true) => {
@@ -67,28 +56,29 @@ const lineLimit = (lines, max = 8) => {
 };
 
 const findNextMatchdayRows = (fixtures, activeMD) => {
-  const activeNumber = Number(activeMD);
+  const allMatchdays = [...new Set(
+    fixtures
+      .slice(1)
+      .filter(row => row?.[0])
+      .map(row => getFixtureMatchday(row[0]))
+      .filter(Boolean)
+  )];
 
-  const rows = fixtures
-    .slice(1)
-    .filter(row => row?.[0])
-    .filter(row => {
-      const md = Number(getMatchday(row));
-      return Number.isFinite(md) && md > activeNumber;
-    })
-    .filter(row => !hasScore(row));
+  const currentIndex = allMatchdays.indexOf(activeMD);
+  const nextMD = currentIndex >= 0
+    ? allMatchdays[currentIndex + 1]
+    : null;
 
-  if (!rows.length) return { matchday: null, rows: [] };
-
-  const nextMDNumber = Math.min(
-    ...rows.map(row => Number(getMatchday(row)))
-  );
-
-  const nextMD = String(nextMDNumber);
+  if (!nextMD) {
+    return { matchday: null, rows: [] };
+  }
 
   return {
     matchday: nextMD,
-    rows: rows.filter(row => getMatchday(row) === nextMD)
+    rows: fixtures
+      .slice(1)
+      .filter(row => !hasScore(row))
+      .filter(row => getFixtureMatchday(row[0]) === nextMD)
   };
 };
 
@@ -164,10 +154,32 @@ const buildMatchdayDescription = summary => {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('matchday')
-    .setDescription('Show the current active matchday automatically'),
+    .setDescription('Show the current active matchday automatically')
+    .addStringOption(option =>
+      option
+        .setName('competition')
+        .setDescription('Competition')
+        .setRequired(false)
+        .addChoices(
+          { name: 'League', value: 'league' },
+          { name: 'FA Cup', value: 'fa' },
+          { name: 'Carabao Cup', value: 'carabao' },
+          { name: 'UCL', value: 'ucl' }
+        )
+    ),
 
   async execute(interaction) {
-    const fixtures = await cachedGetData('Fixtures!A:I');
+    const competition =
+      interaction.options?.getString('competition') || 'league';
+
+    const sheetMap = {
+      league: 'Fixtures!A:I',
+      fa: 'FA_Cup_Fixtures!A:I',
+      carabao: 'Carabao_Cup_Fixtures!A:I',
+      ucl: 'UCL_Coop_Fixtures!A:I'
+    };
+
+    const fixtures = await cachedGetData(sheetMap[competition] || sheetMap.league);
     const teams = await cachedGetData('Teams!A:H');
 
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
@@ -187,10 +199,11 @@ module.exports = {
       };
     }
 
-    const activeMD = String(getMatchday([allowedMD]));
+    const activeMD = String(allowedMD);
+
     const rows = fixtures
       .slice(1)
-      .filter(r => getMatchday(r) === activeMD);
+      .filter(r => getFixtureMatchday(r?.[0]) === activeMD);
 
     if (!rows.length) {
       return { content: `${safeEmoji(E.wrong, '❌')} Could not find active matchday fixtures.` };
@@ -212,7 +225,7 @@ module.exports = {
       : 0x2ECC71;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.calendar, '📅')} Active Matchday ${activeMD}`)
+      .setTitle(`${safeEmoji(E.calendar, '📅')} ${competition.toUpperCase()} • ${activeMD}`)
       .setDescription(buildMatchdayDescription(summary))
       .addFields(
         {
@@ -221,7 +234,7 @@ module.exports = {
             `${safeEmoji(E.played, '🎮')} **Bar:** ${progress}\n` +
             `${safeEmoji(E.correct, '✅')} **Completed:** ${completed.length}/${rows.length}\n` +
             `${safeEmoji(E.missing, '➖')} **Remaining:** ${remaining.length}\n` +
-            `📌 **Type:** Coop / League`,
+            `📌 **Competition:** ${competition.toUpperCase()}`,
           inline: false
         },
         {
