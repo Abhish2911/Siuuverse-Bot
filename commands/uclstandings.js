@@ -139,7 +139,7 @@ module.exports = {
           lines.push(`+ ${line}`);
         } else if (pos === 3) {
           const isBestThird = bestTwoThird.some(t => t.group === g && t.team === row);
-          lines.push(`${isBestThird ? '+' : '?'} ${line}`);
+          lines.push(`${isBestThird ? '+' : '▫️'} ${line}`);
         } else {
           lines.push(`  ${line}`);
         }
