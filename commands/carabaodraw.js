@@ -6,7 +6,7 @@ const {
   toNumber,
   getTeamsHeaderMap,
   getActiveTeamsByCompetition,
-  sortTeamsByColumn
+  sortTeamsByColumn,
 } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
@@ -20,36 +20,17 @@ function isOwner(interaction) {
     .map(id => id.trim())
     .filter(Boolean);
 
-  return (
-    ownerIds.includes(interaction.user.id) ||
-    interaction.guild?.ownerId === interaction.user.id
-  );
-}
-
-function shuffleTeams(teams) {
-  const copy = [...teams];
-
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-
-  return copy;
+  return ownerIds.includes(interaction.user.id) || interaction.guild?.ownerId === interaction.user.id;
 }
 
 function splitSeedsForCupFormat(seedRows) {
   return {
-    top4: seedRows.filter(
-      team => toNumber(team.seed) >= 1 && toNumber(team.seed) <= 4
-    ),
-
-    round1: seedRows.filter(
-      team => toNumber(team.seed) >= 5
-    )
+    top4: seedRows.filter(team => toNumber(team.seed) >= 1 && toNumber(team.seed) <= 4),
+    round1: seedRows.filter(team => toNumber(team.seed) >= 5)
   };
 }
 
-function buildFixture(round, md, home, away, leg = '') {
+function buildCupFixture(round, md, home, away, leg = '') {
   const roundLabel = leg ? `${round} ${leg}` : round;
 
   return {
@@ -68,13 +49,18 @@ function buildFixture(round, md, home, away, leg = '') {
   };
 }
 
-function pairSequentialTeams(
-  teams,
-  round,
-  prefix,
-  startNumber = 1,
-  twoLegged = false
-) {
+function shuffleTeams(teams) {
+  const copy = [...teams];
+
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+
+  return copy;
+}
+
+function pairSequentialTeams(teams, round, prefix, startNumber = 1, twoLegged = false) {
   const fixtures = [];
   let matchNumber = startNumber;
 
@@ -88,7 +74,7 @@ function pairSequentialTeams(
 
     if (twoLegged) {
       fixtures.push(
-        buildFixture(
+        buildCupFixture(
           round,
           `${prefix}-${matchNumber}A`,
           home,
@@ -98,7 +84,7 @@ function pairSequentialTeams(
       );
 
       fixtures.push(
-        buildFixture(
+        buildCupFixture(
           round,
           `${prefix}-${matchNumber}B`,
           away,
@@ -108,7 +94,7 @@ function pairSequentialTeams(
       );
     } else {
       fixtures.push(
-        buildFixture(
+        buildCupFixture(
           round,
           `${prefix}-${matchNumber}`,
           home,
@@ -123,13 +109,13 @@ function pairSequentialTeams(
   return fixtures;
 }
 
-function buildCarabaoDraw(seedRows) {
+function buildFaCupAdvantageDraw(seedRows) {
   const grouped = splitSeedsForCupFormat(seedRows);
 
   const round1Fixtures = pairSequentialTeams(
     grouped.round1,
     'Round 1',
-    'CB-R1'
+    'FA-R1'
   );
 
   return {
@@ -163,12 +149,7 @@ function formatDrawLines(fixtures) {
   return chunkArray(lines, 8).map(chunk => chunk.join('\n'));
 }
 
-function buildDrawSummary(
-  teamRows,
-  fixtures,
-  roundLabel,
-  grouped = null
-) {
+function buildDrawSummary(teamRows, fixtures, roundLabel, grouped = null) {
   const topSeed = teamRows[0]
     ? `\`${clean(teamRows[0].shortName)}\` ${clean(teamRows[0].teamName)}`
     : 'N/A';
@@ -185,8 +166,8 @@ function buildDrawSummary(
 
 function buildDrawDescription(roundLabel, isGenerated = false) {
   const base = isGenerated
-    ? `${safeEmoji(E.correct, '✅')} Carabao Cup QFQ-format draw was generated and saved into the fixtures.\n`
-    : `${safeEmoji(E.info || E.Badge, '📌')} Current Carabao Cup fixtures loaded from the data.\n`;
+    ? `${safeEmoji(E.correct, '✅')} FA Cup QFQ-format draw was generated and saved into the fixtures.\n`
+    : `${safeEmoji(E.info || E.Badge, '📌')} Current FA Cup fixtures loaded from the data.\n`;
 
   return (
     base +
@@ -198,46 +179,31 @@ function buildDrawDescription(roundLabel, isGenerated = false) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('carabaodraw')
-    .setDescription('Generate or view the Carabao Cup knockout draw')
-
+    .setName('facupdraw')
+    .setDescription('Generate or view the FA Cup knockout draw')
     .addSubcommand(subcommand =>
       subcommand
         .setName('generate')
-        .setDescription(
-          'Generate the Carabao Cup first knockout round using Carabao seeds'
-        )
+        .setDescription('Generate the FA Cup first knockout round using FA Cup seeds')
     )
-
     .addSubcommand(subcommand =>
       subcommand
         .setName('view')
-        .setDescription(
-          'View the current Carabao Cup fixtures draw'
-        )
+        .setDescription('View the current FA Cup fixtures draw')
     ),
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'view') {
-      const fixturesSheet = await cachedGetData(
-        'Carabao_Coop_Fixtures!A:L'
-      ).catch(() => []);
+      const fixturesSheet = await cachedGetData('FA_Cup_Coop_Fixtures!A:L').catch(() => []);
 
-      if (
-        !Array.isArray(fixturesSheet) ||
-        fixturesSheet.length <= 1
-      ) {
+      if (!Array.isArray(fixturesSheet) || fixturesSheet.length <= 1) {
         return {
           embeds: [
             new EmbedBuilder()
-              .setTitle(
-                `${safeEmoji(E.Carabao || E.calendar, '🏆')} Carabao Cup Draw`
-              )
-              .setDescription(
-                'No Carabao Cup draw has been generated yet.'
-              )
+              .setTitle(`${safeEmoji(E.FA || E.calendar, '🏆')} FA Cup Draw`)
+              .setDescription('No FA Cup draw has been generated yet.')
               .setColor(0x5865F2)
           ]
         };
@@ -245,12 +211,7 @@ module.exports = {
 
       const rows = fixturesSheet
         .slice(1)
-        .filter(
-          row =>
-            clean(row[0]) ||
-            clean(row[2]) ||
-            clean(row[3])
-        );
+        .filter(row => clean(row[0]) || clean(row[2]) || clean(row[3]));
 
       const fixtures = rows.map(row => ({
         md: clean(row[0]),
@@ -263,62 +224,43 @@ module.exports = {
       }));
 
       const roundLabel = fixtures[0]?.round || 'Draw';
-
-      const summary = buildDrawSummary(
-        [],
-        fixtures,
-        roundLabel
-      );
+      const summary = buildDrawSummary([], fixtures, roundLabel);
 
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle(
-              `${safeEmoji(E.Carabao || E.calendar, '🏆')} Carabao Cup ${roundLabel}`
-            )
-
-            .setDescription(
-              buildDrawDescription(roundLabel, false)
-            )
-
+            .setTitle(`${safeEmoji(E.FA || E.calendar, '🏆')} FA Cup ${roundLabel}`)
+            .setDescription(buildDrawDescription(roundLabel, false))
             .addFields(
               {
                 name: 'Fixtures',
                 value: String(summary.fixtures),
                 inline: true
               },
-
               {
                 name: 'Round',
                 value: summary.round,
                 inline: true
               },
-
               {
                 name: 'Loaded From',
-                value: 'Carabao_Coop_Fixtures',
+                value: 'FA_Cup_Coop_Fixtures',
                 inline: true
               },
-
               {
                 name: 'Format',
                 value: 'Top 4 QF • QFQ • QF/SF 2 Legs',
                 inline: true
               },
-
-              ...formatDrawLines(fixtures).map(
-                (value, index) => ({
-                  name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
-                  value,
-                  inline: false
-                })
-              )
+              ...formatDrawLines(fixtures).map((value, index) => ({
+                name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+                value,
+                inline: false
+              }))
             )
-
             .setColor(0x5865F2)
-
             .setFooter({
-              text: 'Carabao Cup Draw • Loaded from fixtures data'
+              text: 'FA Cup Draw • Loaded from fixtures data'
             })
         ]
       };
@@ -326,87 +268,76 @@ module.exports = {
 
     if (!isOwner(interaction)) {
       return {
-        content:
-          `${safeEmoji(E.lock || E.error, '🚫')} ` +
-          `Owner only command.`
+        content: `${safeEmoji(E.lock || E.error, '🚫')} Owner only command.`
       };
     }
 
     const teamsSheet = await cachedGetData('Teams!A:Z');
 
-    if (
-      !Array.isArray(teamsSheet) ||
-      teamsSheet.length <= 1
-    ) {
+    if (!Array.isArray(teamsSheet) || teamsSheet.length <= 1) {
       return {
-        content:
-          `${safeEmoji(E.wrong || E.error, '❌')} ` +
-          `Teams is empty.`
+        content: `${safeEmoji(E.wrong || E.error, '❌')} Teams is empty.`
       };
     }
 
     const header = teamsSheet[0];
-
     const headerMap = getTeamsHeaderMap(header);
 
     const teamRows = teamsSheet
       .slice(1)
-      .filter(
-        row => clean(row[headerMap.teamName])
-      );
+      .filter(row => clean(row[headerMap.teamName]));
 
     if (
       headerMap.teamName === -1 ||
       headerMap.shortName === -1 ||
-      headerMap.carabaoStatus === -1 ||
-      headerMap.carabaoSeed === -1
+      headerMap.faStatus === -1 ||
+      headerMap.faSeed === -1
     ) {
       return {
         content:
           `${safeEmoji(E.wrong || E.error, '❌')} ` +
           `Teams is missing one of these columns: ` +
-          `Team Name, Short Name, Carabao Status, Carabao Seed.`
+          `Team Name, Short Name, FA Status, FA Cup Seed.`
       };
     }
 
-    const activeCarabaoTeams =
-      getActiveTeamsByCompetition(
-        teamRows,
-        headerMap,
-        'carabao'
-      );
+    const activeFaTeams = getActiveTeamsByCompetition(
+      teamRows,
+      headerMap,
+      'fa'
+    );
 
-    if (activeCarabaoTeams.length < 2) {
+    if (activeFaTeams.length < 2) {
       return {
         content:
           `${safeEmoji(E.wrong || E.error, '❌')} ` +
-          `At least 2 active Carabao Cup teams are required for a draw.`
+          `At least 2 active FA Cup teams are required for a draw.`
       };
     }
 
-    const missingSeeds = activeCarabaoTeams.some(
-      row => !clean(row[headerMap.carabaoSeed])
+    const missingSeeds = activeFaTeams.some(
+      row => !clean(row[headerMap.faSeed])
     );
 
     if (missingSeeds) {
       return {
         content:
           `${safeEmoji(E.wrong || E.error, '❌')} ` +
-          `Some active Carabao Cup teams do not have a seed yet. ` +
-          `Run /carabaoseed generate first.`
+          `Some active FA Cup teams do not have a seed yet. ` +
+          `Run /facupseed generate first.`
       };
     }
 
     const sortedBySeed = sortTeamsByColumn(
-      activeCarabaoTeams,
-      headerMap.carabaoSeed,
+      activeFaTeams,
+      headerMap.faSeed,
       headerMap.teamName
     );
 
     const fixtureInput = sortedBySeed.map(row => ({
       teamName: clean(row[headerMap.teamName]),
       shortName: clean(row[headerMap.shortName]),
-      seed: toNumber(row[headerMap.carabaoSeed])
+      seed: toNumber(row[headerMap.faSeed])
     }));
 
     const summaryTeams = fixtureInput.map(row => ({
@@ -414,81 +345,68 @@ module.exports = {
       shortName: row.shortName
     }));
 
-    const draw = buildCarabaoDraw(fixtureInput);
+    const draw = buildFaCupAdvantageDraw(fixtureInput);
 
     const generatedFixtures = draw.fixtures;
-
-    const roundLabel = 'Carabao Cup Full Draw';
+    const roundLabel = 'FA Cup Full Draw';
 
     if (!generatedFixtures.length) {
       return {
         content:
           `${safeEmoji(E.wrong || E.error, '❌')} ` +
-          `Could not generate Carabao Cup draw. ` +
-          `Check Carabao seeds and active teams.`
+          `Could not generate FA Cup draw. ` +
+          `Check FA Cup seeds and active teams.`
       };
     }
 
-    const rowsToSave = generatedFixtures.map(
-      fixture => [
-        clean(fixture.md),         // A
-        clean(fixture.date),       // B
-        clean(fixture.homeTeam),   // C
-        clean(fixture.awayTeam),   // D
-        clean(fixture.hg),         // E
-        clean(fixture.ag),         // F
-        clean(fixture.result),     // G
-        clean(fixture.decision),   // H
-        clean(fixture.homeShort),  // I
-        clean(fixture.awayShort),  // J
-        clean(fixture.status),     // K
-        clean(fixture.round)       // L
-      ]
-    );
+    const rowsToSave = generatedFixtures.map(fixture => [
+      clean(fixture.md),          // A = MD
+      clean(fixture.date),        // B = Date
+      clean(fixture.homeTeam),    // C = Home Team
+      clean(fixture.awayTeam),    // D = Away Team
+      clean(fixture.hg),          // E = HG
+      clean(fixture.ag),          // F = AG
+      clean(fixture.result),      // G = Result
+      clean(fixture.decision),    // H = Decision
+      clean(fixture.homeShort),   // I = Home-Short
+      clean(fixture.awayShort),   // J = Away-Short
+      clean(fixture.status),      // K = Status
+      clean(fixture.round)        // L = Round
+    ]);
 
-    await updateData(
-      'Carabao_Coop_Fixtures!A2:L',
-      rowsToSave
-    );
+    await updateData('FA_Cup_Coop_Fixtures!A2:L', rowsToSave);
 
     invalidateSheetCache([
-      'Carabao_Coop_Fixtures!'
+      'FA_Cup_Coop_Fixtures!'
     ]);
 
     sendAuditLog(interaction, {
-      title: '🏆 Carabao Cup Draw Generated',
-
+      title: '🏆 FA Cup Draw Generated',
       description:
-        `Carabao Cup ${roundLabel} draw was generated ` +
-        `from Carabao Cup seeds and saved into the fixtures.`,
-
+        `FA Cup ${roundLabel} draw was generated ` +
+        `from FA Cup seeds and saved into the fixtures.`,
       color: 0x5865F2,
-
       fields: [
         {
           name: 'Active Teams',
-          value: String(activeCarabaoTeams.length),
+          value: String(activeFaTeams.length),
           inline: true
         },
-
         {
           name: 'Fixtures',
           value: String(generatedFixtures.length),
           inline: true
         },
-
         {
           name: 'Format',
           value: 'Round 1 only',
           inline: true
         },
-
         {
           name: 'Direct QF Teams',
           value: String(draw.grouped.top4.length),
           inline: true
         },
-
         {
           name: 'Round 1 Teams',
           value: String(draw.grouped.round1.length),
@@ -507,66 +425,50 @@ module.exports = {
     return {
       embeds: [
         new EmbedBuilder()
-
           .setTitle(
-            `${safeEmoji(E.correct || E.Carabao, '✅')} Carabao Cup Draw Generated`
+            `${safeEmoji(E.correct || E.FA, '✅')} FA Cup Draw Generated`
           )
-
-          .setDescription(
-            buildDrawDescription(roundLabel, true)
-          )
-
+          .setDescription(buildDrawDescription(roundLabel, true))
           .addFields(
             {
               name: 'Active Teams',
               value: String(summary.activeTeams),
               inline: true
             },
-
             {
               name: 'Fixtures',
               value: String(summary.fixtures),
               inline: true
             },
-
             {
               name: 'Top Seed',
               value: summary.topSeed,
               inline: true
             },
-
             {
               name: 'Direct QF',
               value: String(summary.directQfTeams),
               inline: true
             },
-
             {
               name: 'QFQ Path',
               value: String(summary.qfqPathTeams),
               inline: true
             },
-
             {
               name: 'Format',
               value: 'R1 → QFQ → QF → SF → Final',
               inline: true
             },
-
-            ...formatDrawLines(generatedFixtures).map(
-              (value, index) => ({
-                name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
-                value,
-                inline: false
-              })
-            )
+            ...formatDrawLines(generatedFixtures).map((value, index) => ({
+              name: `${safeEmoji(E.calendar, '📅')} Pairings ${index + 1}`,
+              value,
+              inline: false
+            }))
           )
-
           .setColor(0x2ECC71)
-
           .setFooter({
-            text:
-              'Carabao Cup Draw • Top 4 direct QF + QFQ format'
+            text: 'FA Cup Draw • Top 4 direct QF + QFQ format'
           })
       ]
     };
