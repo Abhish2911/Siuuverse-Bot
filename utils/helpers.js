@@ -189,19 +189,34 @@ async function sendAuditLog(interaction, payload = {}) {
 function getFixtureMatchday(matchNo) {
   const id = String(matchNo || '').trim().toUpperCase();
 
-  const leagueMatch = id.match(/^(\d+)(?:[.-]\d+)?$/);
-  if (leagueMatch) {
-    return leagueMatch[1];
+  // League: L-1-1 -> L-1
+  const league = id.match(/^L-(\d+)-\d+$/);
+  if (league) {
+    return `L-${league[1]}`;
   }
 
-  const uclNew = id.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
-  if (uclNew) {
-    return `UCL-GS-${uclNew[1]}`;
+  // FA Cup: FA-R1-1 -> FA-R1
+  const fa = id.match(/^FA-(.+?)-\d+$/);
+  if (fa) {
+    return `FA-${fa[1]}`;
   }
 
-  const uclOld = id.match(/^UCL-GS-[A-H]-(\d+)$/);
-  if (uclOld) {
-    return `UCL-GS-${Math.ceil(Number(uclOld[1]) / 3)}`;
+  // Carabao Cup: CB-R1-1 -> CB-R1
+  const carabao = id.match(/^CB-(.+?)-\d+$/);
+  if (carabao) {
+    return `CB-${carabao[1]}`;
+  }
+
+  // UCL Group Stage: UCL-GS-A-1-1 -> UCL-GS-1
+  const uclGroup = id.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
+  if (uclGroup) {
+    return `UCL-GS-${uclGroup[1]}`;
+  }
+
+  // UCL Knockout: UCL-R16-1 -> UCL-R16
+  const uclKnockout = id.match(/^UCL-(R16|QF|SF|F)-\d+$/);
+  if (uclKnockout) {
+    return `UCL-${uclKnockout[1]}`;
   }
 
   return id;
