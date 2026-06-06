@@ -289,6 +289,22 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // matchday special button handler
+      if (cmd === 'matchday') {
+        const command = client.commands.get('matchday');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(interaction, action, value, extra);
+
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
@@ -397,6 +413,19 @@ client.on('interactionCreate', async interaction => {
           targetType,
           targetValue
         );
+
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
+
+      // matchday competition dropdown handler
+      if (interaction.customId.startsWith('matchday_comp_')) {
+        const command = client.commands.get('matchday');
+        if (!command || !command.selectMenuHandler) return;
+
+        const result = await command.selectMenuHandler(interaction);
 
         if (result) {
           await interaction.message.edit(result);
