@@ -473,7 +473,7 @@ async function buildSuspensions(interaction, page, competitionKey = 'league') {
     const player = r[0] || '-';
     const yellow = r[1] || 0;
     const redMatch = formatMatchDisplay(r[2] || '-');
-    // const yellowBan = formatMatchDisplay(r[3] || '-');
+    // const yellowBan = formatMatchDisplay(r[3] || '-'); // Removed as requested
     const bannedMatch = formatMatchDisplay(r[4] || '-');
 
     return {
@@ -481,7 +481,7 @@ async function buildSuspensions(interaction, page, competitionKey = 'league') {
       value:
         `${safeEmoji(E.yellowCard, '🟨')} **Yellow Cards:** ${yellow}\n` +
         `${safeEmoji(E.redCard, '🟥')} **Red Card Match:** ${redMatch}\n` +
-        // `${safeEmoji(E.ban || E.lock, '🚫')} **Yellow Trigger Match:** ${yellowBan}\n` +
+        // Removed Yellow Trigger Match display line
         `${safeEmoji(E.ban || E.lock, '⛔')} **Next Banned Match:** ${bannedMatch}\n` +
         `${safeEmoji(E.info || E.Badge, '📌')} **Status:** ${r[5] || '-'}`,
       inline: true
