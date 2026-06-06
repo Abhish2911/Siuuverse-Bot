@@ -308,7 +308,8 @@ function buildCareerBadges(totals, awards) {
 
 function getDisplayName(rows, fallback) {
   const best = rows.find(row => row[0]);
-  return best?.[0] || fallback || 'Unknown Player';
+  const rawName = best?.[0] || fallback || 'Unknown Player';
+  return stripTeamPrefix(rawName);
 }
 
 function createCareerButtons(activeView, targetType, targetValue) {
@@ -737,8 +738,8 @@ async function buildCareerResponse(interaction, view = 'profile', targetType = '
     userId = decodedTarget;
     query = decodedTarget;
   } else {
-    userId = interaction.user.id;
-    query = interaction.user.username;
+    userId = decodedTarget || interaction.user.id;
+    query = decodedTarget || interaction.user.username;
   }
 
   const [allTimePlayers, awards, teamIdRows] = await Promise.all([
@@ -826,20 +827,33 @@ module.exports = {
       return buildCareerResponse(interaction, 'profile', 'user', userInput.id);
     }
 
-    return buildCareerResponse(interaction, 'profile', 'self', interaction.user.id);
+    return buildCareerResponse(interaction, 'profile', 'user', interaction.user.id);
   },
 
   async buttonHandler(interaction, action, page, targetType = 'self', targetValue = '') {
-    const view = ['profile', 'history', 'trophies', 'awards'].includes(action) ? action : 'profile';
+    const view = ['profile', 'history', 'trophies', 'awards'].includes(action)
+      ? action
+      : 'profile';
 
-    let realTargetType = targetType;
-    let realTargetValue = targetValue;
+    // Custom ID format:
+    // mycareer_<view>_<targetType>_<targetValue>
+    // Example:
+    // mycareer_history_user_123456789
+    // action = history
+    // page = user
+    // targetType = 123456789
 
-    if (['self', 'user', 'player'].includes(page)) {
-      realTargetType = page;
-      realTargetValue = targetType;
-    }
+    const realTargetType = ['user', 'player', 'self'].includes(page)
+      ? page
+      : 'self';
 
-    return buildCareerResponse(interaction, view, realTargetType || 'self', realTargetValue || '');
+    const realTargetValue = String(targetType || '');
+
+    return buildCareerResponse(
+      interaction,
+      view,
+      realTargetType,
+      realTargetValue
+    );
   }
 };
