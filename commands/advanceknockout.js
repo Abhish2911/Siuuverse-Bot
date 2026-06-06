@@ -363,7 +363,7 @@ function buildQfqFixtures(winners, competitionCode) {
 
     fixtures.push({
       round: 'Quarter Final Qualifier',
-      md: `${competitionCode} QFQ-${tie}`,
+      md: `${competitionCode}-QFQ-${tie}`,
       date: '',
       homeTeam: home.teamName,
       awayTeam: away.teamName,
@@ -382,7 +382,7 @@ function buildQfqFixtures(winners, competitionCode) {
   if (byeTeam) {
     fixtures.push({
       round: 'Quarter Final Qualifier',
-      md: `${competitionCode} QFQ-BYE`,
+      md: `${competitionCode}-QFQ-BYE`,
       date: '',
       homeTeam: byeTeam.teamName,
       awayTeam: 'BYE',
@@ -411,7 +411,7 @@ function buildTwoLegFixtures(winners, nextRoundCode, competitionCode) {
 
     fixtures.push({
       round: `${nextRoundLabel} Leg 1`,
-      md: `${competitionCode} ${nextRoundCode}-${tie}A`,
+      md: `${competitionCode}-${nextRoundCode}-${tie}A`,
       date: '',
       homeTeam: home.teamName,
       awayTeam: away.teamName,
@@ -426,7 +426,7 @@ function buildTwoLegFixtures(winners, nextRoundCode, competitionCode) {
 
     fixtures.push({
       round: `${nextRoundLabel} Leg 2`,
-      md: `${competitionCode} ${nextRoundCode}-${tie}B`,
+      md: `${competitionCode}-${nextRoundCode}-${tie}B`,
       date: '',
       homeTeam: away.teamName,
       awayTeam: home.teamName,
@@ -457,7 +457,9 @@ function buildSingleLegFixtures(winners, nextRoundCode, competitionCode) {
 
     fixtures.push({
       round: nextRoundLabel,
-      md: `${competitionCode} ${nextRoundCode === 'F' ? 'Final' : `${nextRoundCode}-${tie}`}`,
+      md: nextRoundCode === 'F'
+        ? `${competitionCode}-FINAL`
+        : `${competitionCode}-${nextRoundCode}-${tie}`,
       date: '',
       homeTeam: home.teamName,
       awayTeam: away.teamName,
@@ -580,7 +582,7 @@ function buildUclQuarterFinalFixtures(qualifiedTeams) {
 
     fixtures.push({
       round: 'Quarter Final Leg 1',
-      md: `UCL QF-${tie}A`,
+      md: `UCL-QF-${tie}A`,
       date: '',
       homeTeam: home.teamName,
       awayTeam: away.teamName,
@@ -594,7 +596,7 @@ function buildUclQuarterFinalFixtures(qualifiedTeams) {
 
     fixtures.push({
       round: 'Quarter Final Leg 2',
-      md: `UCL QF-${tie}B`,
+      md: `UCL-QF-${tie}B`,
       date: '',
       homeTeam: away.teamName,
       awayTeam: home.teamName,
