@@ -1,26 +1,22 @@
 /****
  * competitionHelpers.js
  *
- * Shared helper functions for competition systems such as:
- * - power ranking
- * - seed generation
- * - UCL pot assignment
- * - group draws
- * - fixture generation
+ * Refactored shared competition utilities:
+ * - string/number normalization
+ * - team metadata helpers
+ * - seeding & ranking utilities
+ * - draw & group assignment logic
+ * - knockout & fixture generation
  */
 
-/**
- * Clean any incoming value into a trimmed string.
- * Belongs to: general shared competition helpers.
- */
+/* -----------------------------
+ * BASIC UTILITIES
+ * ----------------------------- */
+
 function clean(value) {
-  return String(value || '').trim();
+  return String(value ?? '').trim();
 }
 
-/**
- * Convert any value into a safe number.
- * Belongs to: ranking, seeding, standings, and fixture sorting helpers.
- */
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
@@ -30,13 +26,8 @@ function cleanLower(value) {
   return clean(value).toLowerCase();
 }
 
-/**
- * Shuffle an array using Fisher-Yates.
- * Belongs to: draw helpers (cup draws, UCL draws, knockout draws).
- */
 function shuffleArray(arr) {
   if (!Array.isArray(arr)) return [];
-
   const copy = [...arr];
 
   for (let i = copy.length - 1; i > 0; i--) {
@@ -47,17 +38,19 @@ function shuffleArray(arr) {
   return copy;
 }
 
-/**
- * Build a column map from the Teams sheet header row.
- * Belongs to: team / competition metadata helpers.
- */
+/* -----------------------------
+ * HEADER MAPPING
+ * ----------------------------- */
+
 function getTeamsHeaderMap(header = []) {
-  const lowered = Array.isArray(header) ? header.map(col => cleanLower(col)) : [];
+  const lowered = Array.isArray(header)
+    ? header.map(col => cleanLower(col))
+    : [];
 
   const indexOf = (...names) => {
     for (const name of names) {
-      const index = lowered.indexOf(String(name).toLowerCase());
-      if (index !== -1) return index;
+      const idx = lowered.indexOf(String(name).toLowerCase());
+      if (idx !== -1) return idx;
     }
     return -1;
   };
@@ -71,122 +64,112 @@ function getTeamsHeaderMap(header = []) {
     usersId: indexOf('UsersID', 'Users ID'),
     stadium: indexOf('Stadium'),
     color: indexOf('Color'),
+
     faStatus: indexOf('FA Status', 'FA Cup Status'),
     carabaoStatus: indexOf('Carabao Status', 'Carabao Cup Status'),
     uclStatus: indexOf('UCL Status'),
+
     uclGroup: indexOf('UCL Group', 'Group'),
     uclPot: indexOf('UCL Pot', 'Pot'),
+
     powerRank: indexOf('Power Rank'),
     powerScore: indexOf('Power Score'),
+
     faSeed: indexOf('FA Cup Seed', 'FA Seed'),
     carabaoSeed: indexOf('Carabao Seed', 'Carabao Cup Seed')
   };
 }
 
-/**
- * Return only active teams for a requested competition.
- * Belongs to: competition team filtering helpers.
- */
+/* -----------------------------
+ * TEAM FILTERING / SORTING
+ * ----------------------------- */
+
 function getActiveTeamsByCompetition(teamRows = [], headerMap = {}, competition = 'league') {
-  const normalizedCompetition = cleanLower(competition);
+  const comp = cleanLower(competition);
   const rows = Array.isArray(teamRows) ? teamRows : [];
 
   return rows.filter(row => {
-    const teamName = clean(row?.[headerMap.teamName]);
-    if (!teamName) return false;
+    const name = clean(row?.[headerMap.teamName]);
+    if (!name) return false;
 
-    if (normalizedCompetition === 'league') return true;
-    if (normalizedCompetition === 'fa') return cleanLower(row?.[headerMap.faStatus]) === 'active';
-    if (normalizedCompetition === 'carabao') return cleanLower(row?.[headerMap.carabaoStatus]) === 'active';
-    if (normalizedCompetition === 'ucl') return cleanLower(row?.[headerMap.uclStatus]) === 'active';
+    if (comp === 'league') return true;
+    if (comp === 'fa') return cleanLower(row?.[headerMap.faStatus]) === 'active';
+    if (comp === 'carabao') return cleanLower(row?.[headerMap.carabaoStatus]) === 'active';
+    if (comp === 'ucl') return cleanLower(row?.[headerMap.uclStatus]) === 'active';
 
     return false;
   });
 }
 
-/**
- * Sort teams by a numeric column ascending.
- * Belongs to: seed and rank ordering helpers.
- */
-function sortTeamsByColumn(teamRows = [], columnIndex = -1, fallbackNameIndex = 0) {
+function sortTeamsByColumn(teamRows = [], columnIndex = -1, fallbackIndex = 0) {
   const rows = Array.isArray(teamRows) ? [...teamRows] : [];
 
   return rows.sort((a, b) => {
     if (columnIndex >= 0) {
-      const aValue = toNumber(a?.[columnIndex]);
-      const bValue = toNumber(b?.[columnIndex]);
-      if (aValue !== bValue) return aValue - bValue;
+      const diff = toNumber(a?.[columnIndex]) - toNumber(b?.[columnIndex]);
+      if (diff !== 0) return diff;
     }
 
-    return clean(a?.[fallbackNameIndex]).localeCompare(clean(b?.[fallbackNameIndex]));
+    return clean(a?.[fallbackIndex]).localeCompare(clean(b?.[fallbackIndex]));
   });
 }
 
-/**
- * Write sequential values (1..N) into a target column based on the given sorted rows.
- * Belongs to: seed generation and rank assignment helpers.
- */
+/* -----------------------------
+ * SEEDING / ASSIGNMENT
+ * ----------------------------- */
+
 function assignSequentialValues(teamRows = [], headerMap = {}, sortedRows = [], targetColumn = -1) {
   if (targetColumn < 0 || headerMap.teamName < 0) {
-    return Array.isArray(teamRows) ? teamRows.map(row => [...row]) : [];
+    return Array.isArray(teamRows) ? teamRows.map(r => [...r]) : [];
   }
 
-  const valueMap = new Map();
+  const map = new Map();
 
-  sortedRows.forEach((row, index) => {
-    const teamName = cleanLower(row?.[headerMap.teamName]);
-    if (!teamName) return;
-    valueMap.set(teamName, index + 1);
+  sortedRows.forEach((row, i) => {
+    const name = cleanLower(row?.[headerMap.teamName]);
+    if (name) map.set(name, i + 1);
   });
 
   return teamRows.map(row => {
     const next = [...row];
-    const teamName = cleanLower(row?.[headerMap.teamName]);
-    next[targetColumn] = valueMap.get(teamName) || '';
+    const name = cleanLower(row?.[headerMap.teamName]);
+    next[targetColumn] = map.get(name) || '';
     return next;
   });
 }
 
-/**
- * Assign UCL pots based on already sorted team rows.
- * Belongs to: UCL pot generation helpers.
- */
 function assignUclPots(sortedTeams = [], headerMap = {}, potColumn = -1) {
-  if (potColumn < 0) {
-    return Array.isArray(sortedTeams) ? sortedTeams.map(row => [...row]) : [];
-  }
+  if (potColumn < 0) return Array.isArray(sortedTeams) ? sortedTeams.map(r => [...r]) : [];
 
-  const totalTeams = sortedTeams.length;
+  const total = sortedTeams.length;
   let potSize = 4;
 
-  if (totalTeams === 8) potSize = 4;
-  else if (totalTeams === 12) potSize = 4;
-  else if (totalTeams === 16) potSize = 4;
-  else if (totalTeams > 0) potSize = Math.ceil(totalTeams / Math.ceil(totalTeams / 4));
+  if (total === 8 || total === 12 || total === 16) potSize = 4;
+  else if (total > 0) potSize = Math.ceil(total / Math.ceil(total / 4));
 
-  return sortedTeams.map((row, index) => {
+  return sortedTeams.map((row, i) => {
     const next = [...row];
-    next[potColumn] = Math.floor(index / potSize) + 1;
+    next[potColumn] = Math.floor(i / potSize) + 1;
     return next;
   });
 }
 
-/**
- * Draw groups from teams already assigned into pots.
- * Belongs to: UCL group draw helpers.
- */
-function drawGroupsFromPots(teamRows = [], headerMap = {}, groupNames = []) {
-  if (headerMap.teamName < 0 || headerMap.uclPot < 0 || headerMap.uclGroup < 0) {
-    return Array.isArray(teamRows) ? teamRows.map(row => [...row]) : [];
-  }
+/* -----------------------------
+ * UCL GROUP DRAW
+ * ----------------------------- */
 
-  const normalizedGroupNames = Array.isArray(groupNames)
-    ? groupNames.map(name => clean(name)).filter(Boolean)
+function drawGroupsFromPots(teamRows = [], headerMap = {}, groupNames = []) {
+  if (
+    headerMap.teamName < 0 ||
+    headerMap.uclPot < 0 ||
+    headerMap.uclGroup < 0
+  ) return Array.isArray(teamRows) ? teamRows.map(r => [...r]) : [];
+
+  const groups = Array.isArray(groupNames)
+    ? groupNames.map(clean).filter(Boolean)
     : [];
 
-  if (!normalizedGroupNames.length) {
-    return Array.isArray(teamRows) ? teamRows.map(row => [...row]) : [];
-  }
+  if (!groups.length) return Array.isArray(teamRows) ? teamRows.map(r => [...r]) : [];
 
   const potMap = new Map();
 
@@ -197,33 +180,31 @@ function drawGroupsFromPots(teamRows = [], headerMap = {}, groupNames = []) {
     potMap.get(pot).push(row);
   });
 
-  const drawnRows = teamRows.map(row => [...row]);
-  const teamAssignments = new Map();
+  const assignments = new Map();
 
   [...potMap.keys()]
     .sort((a, b) => toNumber(a) - toNumber(b))
-    .forEach(potKey => {
-      const shuffledPot = shuffleArray(potMap.get(potKey) || []);
-      shuffledPot.forEach((row, index) => {
-        const groupName = normalizedGroupNames[index % normalizedGroupNames.length] || '';
-        const teamName = cleanLower(row?.[headerMap.teamName]);
-        if (!teamName) return;
-        teamAssignments.set(teamName, groupName);
+    .forEach(pot => {
+      const shuffled = shuffleArray(potMap.get(pot));
+      shuffled.forEach((row, i) => {
+        const team = cleanLower(row?.[headerMap.teamName]);
+        if (!team) return;
+        assignments.set(team, groups[i % groups.length]);
       });
     });
 
-  return drawnRows.map(row => {
+  return teamRows.map(row => {
     const next = [...row];
-    const teamName = cleanLower(row?.[headerMap.teamName]);
-    next[headerMap.uclGroup] = teamAssignments.get(teamName) || '';
+    const team = cleanLower(row?.[headerMap.teamName]);
+    next[headerMap.uclGroup] = assignments.get(team) || '';
     return next;
   });
 }
 
-/**
- * Pair teams for knockout fixtures using seeded bracket order.
- * Belongs to: domestic cup and knockout bracket generation helpers.
- */
+/* -----------------------------
+ * KNOCKOUT HELPERS
+ * ----------------------------- */
+
 function generateSeededKnockoutPairings(teams = [], options = {}) {
   const {
     teamNameKey = 'teamName',
@@ -232,21 +213,21 @@ function generateSeededKnockoutPairings(teams = [], options = {}) {
     competitionCode = 'FA'
   } = options;
 
-  const filteredTeams = (Array.isArray(teams) ? teams : [])
-    .map(team => ({ ...team }))
-    .filter(team => clean(team?.[teamNameKey]));
+  const list = (Array.isArray(teams) ? teams : [])
+    .map(t => ({ ...t }))
+    .filter(t => clean(t?.[teamNameKey]));
 
-  const pairings = [];
-  let left = 0;
-  let right = filteredTeams.length - 1;
-  let matchIndex = 1;
+  const out = [];
+  let l = 0;
+  let r = list.length - 1;
+  let i = 1;
 
-  while (left < right) {
-    const home = filteredTeams[left];
-    const away = filteredTeams[right];
+  while (l < r) {
+    const home = list[l];
+    const away = list[r];
 
-    pairings.push({
-      md: `${competitionCode} ${roundCode}${matchIndex}`,
+    out.push({
+      md: `${competitionCode}-${roundCode}-${i}`,
       round: roundCode,
       date: '',
       homeTeam: clean(home?.[teamNameKey]),
@@ -259,77 +240,58 @@ function generateSeededKnockoutPairings(teams = [], options = {}) {
       status: 'Upcoming'
     });
 
-    left += 1;
-    right -= 1;
-    matchIndex += 1;
+    l++;
+    r--;
+    i++;
   }
 
-  return pairings;
+  return out;
 }
 
-/**
- * Build the next knockout round from the winners of a finished fixture list.
- * Belongs to: advance-knockout helpers.
- */
 function advanceKnockoutRound(fixtures = [], options = {}) {
-  const {
-    nextRoundCode = 'SF',
-    competitionCode = 'FA'
-  } = options;
+  const { nextRoundCode = 'SF', competitionCode = 'FA' } = options;
 
   const winners = (Array.isArray(fixtures) ? fixtures : [])
-    .filter(match => clean(match?.status).toLowerCase() === 'done')
-    .map(match => {
-      const homeGoals = toNumber(match?.hg);
-      const awayGoals = toNumber(match?.ag);
+    .filter(m => clean(m?.status).toLowerCase() === 'done')
+    .map(m => {
+      const hg = toNumber(m?.hg);
+      const ag = toNumber(m?.ag);
 
-      if (homeGoals > awayGoals) {
-        return {
-          teamName: clean(match?.homeTeam),
-          shortName: clean(match?.homeShort)
-        };
-      }
-
-      if (awayGoals > homeGoals) {
-        return {
-          teamName: clean(match?.awayTeam),
-          shortName: clean(match?.awayShort)
-        };
-      }
-
+      if (hg > ag) return { teamName: clean(m?.homeTeam), shortName: clean(m?.homeShort) };
+      if (ag > hg) return { teamName: clean(m?.awayTeam), shortName: clean(m?.awayShort) };
       return null;
     })
     .filter(Boolean);
 
-  const nextFixtures = [];
+  const next = [];
 
   for (let i = 0; i < winners.length; i += 2) {
-    const home = winners[i];
-    const away = winners[i + 1];
-    if (!home || !away) continue;
+    const a = winners[i];
+    const b = winners[i + 1];
+    if (!a || !b) continue;
 
-    nextFixtures.push({
-      md: `${competitionCode} ${nextRoundCode}${Math.floor(i / 2) + 1}`,
+    next.push({
+      md: `${competitionCode}-${nextRoundCode}-${Math.floor(i / 2) + 1}`,
       round: nextRoundCode,
       date: '',
-      homeTeam: clean(home.teamName),
-      awayTeam: clean(away.teamName),
+      homeTeam: clean(a.teamName),
+      awayTeam: clean(b.teamName),
       hg: '',
       ag: '',
       result: '',
-      homeShort: clean(home.shortName),
-      awayShort: clean(away.shortName),
+      homeShort: clean(a.shortName),
+      awayShort: clean(b.shortName),
       status: 'Upcoming'
     });
   }
 
-  return nextFixtures;
+  return next;
 }
 
-/**
- * Generate round-robin fixtures.
- * Belongs to: league and UCL fixture generation helpers.
- */
+/* -----------------------------
+ * ROUND ROBIN FIXTURES
+ * ----------------------------- */
+
 function generateRoundRobinFixtures(teams = [], options = {}) {
   const {
     competitionCode = 'L',
@@ -342,118 +304,100 @@ function generateRoundRobinFixtures(teams = [], options = {}) {
     shuffleRounds = false
   } = options;
 
-  const inputTeams = shuffleArray((Array.isArray(teams) ? teams : []).map(team => ({ ...team })));
-  if (inputTeams.length < 2) return [];
+  const shuffled = shuffleArray(
+    (Array.isArray(teams) ? teams : []).map(t => ({ ...t }))
+  );
 
-  const teamList = [...inputTeams];
-  const isOdd = teamList.length % 2 !== 0;
-  if (isOdd) {
-    teamList.push({ [teamNameKey]: 'BYE', [shortNameKey]: 'BYE' });
+  if (shuffled.length < 2) return [];
+
+  const list = [...shuffled];
+
+  if (list.length % 2 !== 0) {
+    list.push({ [teamNameKey]: 'BYE', [shortNameKey]: 'BYE' });
   }
 
   const rounds = [];
-  const rotation = [...teamList];
+  const rotation = [...list];
   const totalRounds = rotation.length - 1;
   const half = rotation.length / 2;
 
-  const realTeams = teamList
-    .map(team => clean(team?.[teamNameKey]))
-    .filter(name => name && name.toUpperCase() !== 'BYE');
+  const realTeams = list
+    .map(t => clean(t?.[teamNameKey]))
+    .filter(n => n && n.toUpperCase() !== 'BYE');
 
-  const targetHomeMax = Math.ceil((realTeams.length - 1) / 2);
+  const homeMax = Math.ceil((realTeams.length - 1) / 2);
 
-  const homeCounts = new Map();
-  const streaks = new Map();
+  const homeCount = new Map();
+  const streak = new Map(realTeams.map(t => [t, { last: '', count: 0 }]));
 
-  realTeams.forEach(teamName => {
-    homeCounts.set(teamName, 0);
-    streaks.set(teamName, { last: '', streak: 0 });
-  });
-
-  function getStreakPenalty(teamName, side) {
-    const state = streaks.get(teamName) || { last: '', streak: 0 };
-    if (state.last !== side) return 0;
-    if (state.streak >= 2) return 100;
-    if (state.streak === 1) return 10;
+  const penaltyStreak = (team, side) => {
+    const s = streak.get(team) || { last: '', count: 0 };
+    if (s.last !== side) return 0;
+    if (s.count >= 2) return 100;
+    if (s.count === 1) return 10;
     return 0;
-  }
+  };
 
-  function getHomeQuotaPenalty(teamName) {
-    const count = homeCounts.get(teamName) || 0;
-    if (count >= targetHomeMax) return 1000;
-    return count * 5;
-  }
+  const penaltyHome = team => {
+    const c = homeCount.get(team) || 0;
+    if (c >= homeMax) return 1000;
+    return c * 5;
+  };
 
-  function chooseSides(teamAName, teamAShort, teamBName, teamBShort, round, pairIndex) {
+  const updateStreak = (team, side) => {
+    const s = streak.get(team) || { last: '', count: 0 };
+    if (s.last === side) streak.set(team, { last: side, count: s.count + 1 });
+    else streak.set(team, { last: side, count: 1 });
+  };
+
+  const chooseSides = (a, as, b, bs, r, i) => {
     if (!randomizeHomeAway) {
-      return {
-        homeTeam: teamAName,
-        awayTeam: teamBName,
-        homeShort: teamAShort,
-        awayShort: teamBShort
-      };
+      return { homeTeam: a, awayTeam: b, homeShort: as, awayShort: bs };
     }
 
-    const optionA = {
-      homeTeam: teamAName,
-      awayTeam: teamBName,
-      homeShort: teamAShort,
-      awayShort: teamBShort,
-      penalty:
-        getHomeQuotaPenalty(teamAName) +
-        getStreakPenalty(teamAName, 'H') +
-        getStreakPenalty(teamBName, 'A')
+    const optA = {
+      homeTeam: a,
+      awayTeam: b,
+      homeShort: as,
+      awayShort: bs,
+      penalty: penaltyHome(a) + penaltyStreak(a, 'H') + penaltyStreak(b, 'A')
     };
 
-    const optionB = {
-      homeTeam: teamBName,
-      awayTeam: teamAName,
-      homeShort: teamBShort,
-      awayShort: teamAShort,
-      penalty:
-        getHomeQuotaPenalty(teamBName) +
-        getStreakPenalty(teamBName, 'H') +
-        getStreakPenalty(teamAName, 'A')
+    const optB = {
+      homeTeam: b,
+      awayTeam: a,
+      homeShort: bs,
+      awayShort: as,
+      penalty: penaltyHome(b) + penaltyStreak(b, 'H') + penaltyStreak(a, 'A')
     };
 
-    if (optionA.penalty < optionB.penalty) return optionA;
-    if (optionB.penalty < optionA.penalty) return optionB;
+    if (optA.penalty !== optB.penalty) return optA.penalty < optB.penalty ? optA : optB;
 
-    const shouldSwap = pairIndex === 0
-      ? round % 2 === 0
-      : (round + pairIndex) % 2 === 1;
+    return (i === 0 ? r % 2 === 0 : (r + i) % 2 === 1) ? optB : optA;
+  };
 
-    return shouldSwap ? optionB : optionA;
-  }
-
-  function updateStreak(teamName, side) {
-    const state = streaks.get(teamName) || { last: '', streak: 0 };
-    if (state.last === side) {
-      streaks.set(teamName, { last: side, streak: state.streak + 1 });
-    } else {
-      streaks.set(teamName, { last: side, streak: 1 });
-    }
-  }
-
-  for (let round = 0; round < totalRounds; round++) {
+  for (let r = 0; r < totalRounds; r++) {
     const pairings = [];
 
     for (let i = 0; i < half; i++) {
-      const teamA = rotation[i];
-      const teamB = rotation[rotation.length - 1 - i];
+      const A = rotation[i];
+      const B = rotation[rotation.length - 1 - i];
 
-      const teamAName = clean(teamA?.[teamNameKey]);
-      const teamBName = clean(teamB?.[teamNameKey]);
-      const teamAShort = clean(teamA?.[shortNameKey]);
-      const teamBShort = clean(teamB?.[shortNameKey]);
+      const aName = clean(A?.[teamNameKey]);
+      const bName = clean(B?.[teamNameKey]);
 
-      if (teamAName.toUpperCase() === 'BYE' || teamBName.toUpperCase() === 'BYE') {
-        continue;
-      }
+      if (aName.toUpperCase() === 'BYE' || bName.toUpperCase() === 'BYE') continue;
 
-      const chosen = chooseSides(teamAName, teamAShort, teamBName, teamBShort, round, i);
+      const chosen = chooseSides(
+        aName,
+        clean(A?.[shortNameKey]),
+        bName,
+        clean(B?.[shortNameKey]),
+        r,
+        i
+      );
 
-      homeCounts.set(chosen.homeTeam, (homeCounts.get(chosen.homeTeam) || 0) + 1);
+      homeCount.set(chosen.homeTeam, (homeCount.get(chosen.homeTeam) || 0) + 1);
       updateStreak(chosen.homeTeam, 'H');
       updateStreak(chosen.awayTeam, 'A');
 
@@ -462,7 +406,7 @@ function generateRoundRobinFixtures(teams = [], options = {}) {
         awayTeam: chosen.awayTeam,
         homeShort: chosen.homeShort,
         awayShort: chosen.awayShort,
-        round: round + 1
+        round: r + 1
       });
     }
 
@@ -474,39 +418,39 @@ function generateRoundRobinFixtures(teams = [], options = {}) {
     rotation[0] = fixed;
   }
 
-  const firstLegRounds = shuffleRounds ? shuffleArray(rounds) : rounds;
+  const first = shuffleRounds ? shuffleArray(rounds) : rounds;
 
-  const secondLegRounds = doubleRoundRobin
-    ? firstLegRounds.map(pairings => pairings.map(match => ({
-        ...match,
-        homeTeam: match.awayTeam,
-        awayTeam: match.homeTeam,
-        homeShort: match.awayShort,
-        awayShort: match.homeShort
+  const second = doubleRoundRobin
+    ? first.map(r => r.map(m => ({
+        ...m,
+        homeTeam: m.awayTeam,
+        awayTeam: m.homeTeam,
+        homeShort: m.awayShort,
+        awayShort: m.homeShort
       })))
     : [];
 
-  const allRounds = [...firstLegRounds, ...secondLegRounds];
+  const all = [...first, ...second];
+
   const fixtures = [];
 
-  allRounds.forEach((pairings, roundIndex) => {
-    pairings.forEach((match, matchIndex) => {
-      const mdNumber = roundIndex + 1;
-      const matchNumber = matchIndex + 1;
-      const matchId = includeGroupInId && groupName
-        ? `${competitionCode} GS-${groupName}-MD${mdNumber}.${matchNumber}`
-        : `${competitionCode} MD${mdNumber}.${matchNumber}`;
+  all.forEach((round, ri) => {
+    round.forEach((m, mi) => {
+      const md = ri + 1;
+      const id = includeGroupInId && groupName
+        ? `${competitionCode}-GS-${groupName}-${md}-${mi + 1}`
+        : `${competitionCode}-${md}-${mi + 1}`;
 
       fixtures.push({
-        md: matchId,
+        md: id,
         date: '',
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
         hg: '',
         ag: '',
         result: '',
-        homeShort: match.homeShort,
-        awayShort: match.awayShort,
+        homeShort: m.homeShort,
+        awayShort: m.awayShort,
         status: 'Upcoming'
       });
     });
@@ -518,6 +462,7 @@ function generateRoundRobinFixtures(teams = [], options = {}) {
 module.exports = {
   clean,
   toNumber,
+  cleanLower,
   shuffleArray,
   getTeamsHeaderMap,
   getActiveTeamsByCompetition,
