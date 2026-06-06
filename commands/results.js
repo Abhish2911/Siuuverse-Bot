@@ -35,20 +35,24 @@ function shortName(value, len = 8) {
 }
 
 function displayMatchday(matchNo) {
-  const value = String(matchNo || '').trim();
+  const value = String(matchNo || '').trim().toUpperCase();
 
   if (!value) return '-';
 
-  if (/^UCL-GS-/i.test(value)) {
-    const parts = value.split('-');
-    return parts.length >= 5 ? parts[4] : value;
-  }
+  const league = value.match(/^L-(\d+)-\d+$/);
+  if (league) return `L-${league[1]}`;
 
-  const parts = value.split('-');
+  const fa = value.match(/^FA-(.+?)-\d+$/);
+  if (fa) return `FA-${fa[1]}`;
 
-  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
-    return parts[0];
-  }
+  const carabao = value.match(/^CB-(.+?)-\d+$/);
+  if (carabao) return `CB-${carabao[1]}`;
+
+  const uclGroup = value.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
+  if (uclGroup) return `UCL-GS-${uclGroup[1]}`;
+
+  const uclKnockout = value.match(/^UCL-(R16|QF|SF|F)-\d+$/);
+  if (uclKnockout) return `UCL-${uclKnockout[1]}`;
 
   return value;
 }
@@ -104,7 +108,7 @@ function buildResultLine(row, index) {
   const rawResult = row[6] || (toNumber(hg) > toNumber(ag) ? 'H' : toNumber(hg) < toNumber(ag) ? 'A' : 'D');
   const tag = matchTag(hg, ag);
 
-  return `${index + 1}. **MD ${matchday}** • ${date}\n` +
+  return `${index + 1}. **${matchday}** • ${date}\n` +
     `> **${home}** ${safeEmoji(E.vs, '⚔️')} **${away}** — **${hg}-${ag}**\n` +
     `> ${resultLabel(rawResult)} • ${tag}`;
 }
