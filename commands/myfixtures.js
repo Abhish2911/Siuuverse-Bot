@@ -14,7 +14,7 @@ const {
 const { clean: sharedClean } = require('../utils/competitionHelpers');
 const E = require('../utils/emojis');
 
-const LEAGUE_PAGE_SIZE = 4;
+const LEAGUE_PAGE_SIZE = 3;
 const CUP_PAGE_SIZE = 2;
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 let derbyMapCache = null;
