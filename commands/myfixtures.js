@@ -137,19 +137,40 @@ function hasScore(row, config) {
 }
 
 function matchdayOf(row, config) {
-  const matchNo = String(row?.[config.matchNoIndex] || '').trim();
+  const matchNo = String(row?.[config.matchNoIndex] || '')
+    .trim()
+    .toUpperCase();
 
   if (!matchNo) return '-';
 
-  if (/^UCL-GS-/i.test(matchNo)) {
-    const parts = matchNo.split('-');
-    return parts.length >= 5 ? parts[4] : matchNo;
+  // League: L-1-1 -> L-1
+  const league = matchNo.match(/^L-(\d+)-\d+$/);
+  if (league) {
+    return `L-${league[1]}`;
   }
 
-  const parts = matchNo.split('-');
+  // FA Cup: FA-R1-1 -> FA-R1
+  const fa = matchNo.match(/^FA-(.+?)-\d+$/);
+  if (fa) {
+    return `FA-${fa[1]}`;
+  }
 
-  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
-    return parts[0];
+  // Carabao Cup: CB-R1-1 -> CB-R1
+  const carabao = matchNo.match(/^CB-(.+?)-\d+$/);
+  if (carabao) {
+    return `CB-${carabao[1]}`;
+  }
+
+  // UCL Group Stage: UCL-GS-A-1-1 -> UCL-GS-1
+  const uclGroup = matchNo.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
+  if (uclGroup) {
+    return `UCL-GS-${uclGroup[1]}`;
+  }
+
+  // UCL Knockout: UCL-R16-1 -> UCL-R16
+  const uclKnockout = matchNo.match(/^UCL-(R16|QF|SF|F)-\d+$/);
+  if (uclKnockout) {
+    return `UCL-${uclKnockout[1]}`;
   }
 
   return matchNo;
