@@ -176,6 +176,41 @@ function matchdayOf(row, config) {
   return matchNo;
 }
 
+function getFixtureType(row, teamName, config) {
+  const matchNo = String(row?.[config.matchNoIndex] || '').toUpperCase();
+  const home = String(row?.[config.homeIndex] || '').trim();
+  const away = String(row?.[config.awayIndex] || '').trim();
+  const teamKey = normalize(teamName);
+
+  if (isDerbyFixture(home, away)) {
+    return `${safeEmoji(E.fire, '🔥')} **DERBY MATCH**`;
+  }
+
+  if (config.key === 'ucl') {
+    if (/UCL-F-/.test(matchNo)) return '👑 **FINAL**';
+    if (/UCL-SF-/.test(matchNo)) return '🎖️ **SEMI FINAL**';
+    if (/UCL-QF-/.test(matchNo)) return '🛡️ **QUARTER FINAL**';
+    return '🌍 **UCL NIGHT**';
+  }
+
+  if (config.key === 'fa' || config.key === 'carabao') {
+    if (/-F-/.test(matchNo)) return '👑 **FINAL**';
+    if (/SF/.test(matchNo)) return '🎖️ **SEMI FINAL**';
+    if (/QF/.test(matchNo)) return '🛡️ **QUARTER FINAL**';
+    return '🏆 **CUP TIE**';
+  }
+
+  const isHome = normalize(home) === teamKey;
+
+  if (/L-1-|L-2-|L-3-/.test(matchNo)) {
+    return '⭐ **FEATURED FIXTURE**';
+  }
+
+  return isHome
+    ? '🏠 **HOME FIXTURE**'
+    : '✈️ **AWAY FIXTURE**';
+}
+
 function getTeamFromUserId(teams, userId) {
   const id = cleanId(userId);
   if (!id || !Array.isArray(teams)) return null;
@@ -347,7 +382,8 @@ function buildFixtureDescription(team, summary, record, currentBlock, reserveBlo
       : ''}` +
     `${safeEmoji(E.played, '🎮')} **Total:** ${summary.total} • ${safeEmoji(E.missing, '➖')} **Upcoming:** ${summary.upcoming} • ${safeEmoji(E.correct, '✅')} **Played:** ${summary.played} • ${safeEmoji(E.lock, '🔒')} **Reserved:** ${summary.reserved}\n` +
     `${safeEmoji(E.calendar, '📅')} **Current Match:** ${summary.currentMatchNo}\n` +
-    `${safeEmoji(E.Badge || E.info, '📌')} **Current Pairing:** ${summary.currentPairing}\n\n` +
+    // Removed Current Pairing line
+    `\n` +
     `${currentBlock}` +
     `${reserveBlock}` +
     `${safeEmoji(E.calendar, '📅')} **Showing ${pageRows.length ? page * pageRows.length + 1 : 0}-${page * pageRows.length + pageRows.length} of ${orderedRows.length} fixtures**`
@@ -444,8 +480,7 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
       `> \`${current[config.homeIndex]}\` ${safeEmoji(E.vs, '⚔️')} \`${current[config.awayIndex]}\`\n` +
       `> ${safeEmoji(E.calendar, '📅')} Stage / Matchday **${matchdayOf(current, config)}**\n` +
       `> ${safeEmoji(E.captain, '👑')} Opp. Captain: ${getOpponentCaptainMention(teams, currentOpponent)}\n` +
-      `> ${isDerbyFixture(current[config.homeIndex], current[config.awayIndex]) ? `${safeEmoji(E.fire, '🔥')} **DERBY MATCH**` : `${safeEmoji(E.info, 'ℹ️')} Regular Fixture`}\n` +
-      `> ${safeEmoji(E.missing, '➖')} Status: **Pending**\n\n`
+      `> ${getFixtureType(current, team.teamName, config)}\n\n`
     : `${safeEmoji(E.correct, '✅')} **All fixtures completed.**\n\n`;
 
   const lines = pageRows.map(row => buildFixtureLine(row, team, current?.[config.matchNoIndex], config));
