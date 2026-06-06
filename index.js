@@ -245,7 +245,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -260,7 +263,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -284,7 +290,10 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -300,7 +309,10 @@ client.on('interactionCreate', async interaction => {
         const result = await command.buttonHandler(interaction, action, value, extra);
 
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -326,7 +338,10 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -340,7 +355,10 @@ client.on('interactionCreate', async interaction => {
       const result = await command.buttonHandler(interaction, action, value, extra);
 
       if (result) {
-        await interaction.message.edit(result);
+        await interaction.message.edit({
+          content: null,
+          ...result
+        });
       }
       return;
     }
@@ -359,7 +377,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -372,7 +393,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -384,7 +408,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -396,7 +423,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -408,7 +438,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -420,7 +453,10 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectMenuHandler(interaction);
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -441,7 +477,10 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
@@ -454,7 +493,10 @@ client.on('interactionCreate', async interaction => {
         const result = await command.selectMenuHandler(interaction);
 
         if (result) {
-          await interaction.message.edit(result);
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
         }
         return;
       }
