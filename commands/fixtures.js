@@ -121,103 +121,34 @@ function getHeaderLabel(row, config) {
 
   if (!matchNo) return '';
 
-  /* ---------------- LEAGUE ----------------
-     1-1 -> 1
-     2-3 -> 2
-  */
-  if (config.key === 'league') {
-    const parts = matchNo.split('-');
-
-    if (parts.length >= 2 && /^L$/i.test(parts[0])) {
-      return parts[1];
-    }
-
-    return parts[0] || matchNo;
+  // League: L-1-1 -> L-1
+  const league = matchNo.match(/^L-(\d+)-\d+$/);
+  if (league) {
+    return `L-${league[1]}`;
   }
 
-  /* ---------------- UCL ----------------
-     UCL-GS-A-1-1 -> GS-1
-     UCL-GS-A-1-2 -> GS-1
-     UCL-GS-A-1-3 -> GS-1
-     UCL-GS-A-2-1 -> GS-2
-     UCL-QF-1-1 -> QF
-     UCL-SF-1-1 -> SF
-     UCL-FINAL -> FINAL
-  */
-  if (config.key === 'ucl') {
-    const parts = matchNo.split('-');
-
-    if (parts.length >= 5 && parts[1] === 'GS') {
-      return `GS-${parts[3]}`;
-    }
-
-    if (matchNo.includes('QF')) return 'QF';
-    if (matchNo.includes('SF')) return 'SF';
-    if (matchNo.includes('FINAL')) return 'FINAL';
-
-    return matchNo;
+  // FA Cup: FA-R1-1 -> FA-R1
+  const fa = matchNo.match(/^FA-(.+?)-\d+$/);
+  if (fa) {
+    return `FA-${fa[1]}`;
   }
 
-
-  /* ---------------- FA CUP ----------------
-     FA-R1-1 -> Round 1
-     FA-QF-1 -> Quarter Final
-     FA-SF-1-1 -> Semi Final
-     FA-Final -> Final
-  */
-  if (config.key === 'fa') {
-    if (matchNo.includes('R1')) {
-      return 'Round 1';
-    }
-
-    if (matchNo.includes('QFQ')) {
-      return 'Quarter Final Qualifier';
-    }
-
-    if (matchNo.includes('QF')) {
-      return 'Quarter Final';
-    }
-
-    if (matchNo.includes('SF')) {
-      return 'Semi Final';
-    }
-
-    if (matchNo.includes('FINAL')) {
-      return 'Final';
-    }
-
-    return matchNo;
+  // Carabao Cup: CB-R1-1 -> CB-R1
+  const carabao = matchNo.match(/^CB-(.+?)-\d+$/);
+  if (carabao) {
+    return `CB-${carabao[1]}`;
   }
 
-  /* ---------------- CARABAO CUP ----------------
-     CB-R1-1 -> Round 1
-     CB-QFQ-1 -> Quarter Final Qualifier
-     CB-QF-1-1 -> Quarter Final
-     CB-SF-1-1 -> Semi Final
-     CB-Final -> Final
-  */
-  if (config.key === 'carabao') {
-    if (matchNo.includes('R1')) {
-      return 'Round 1';
-    }
+  // UCL Group Stage: UCL-GS-A-1-1 -> UCL-GS-1
+  const uclGroup = matchNo.match(/^UCL-GS-[A-H]-(\d+)-\d+$/);
+  if (uclGroup) {
+    return `UCL-GS-${uclGroup[1]}`;
+  }
 
-    if (matchNo.includes('QFQ')) {
-      return 'Quarter Final Qualifier';
-    }
-
-    if (matchNo.includes('QF')) {
-      return 'Quarter Final';
-    }
-
-    if (matchNo.includes('SF')) {
-      return 'Semi Final';
-    }
-
-    if (matchNo.includes('FINAL')) {
-      return 'Final';
-    }
-
-    return matchNo;
+  // UCL Knockout: UCL-R16-1 -> UCL-R16
+  const uclKnockout = matchNo.match(/^UCL-(R16|QF|SF|F)-\d+$/);
+  if (uclKnockout) {
+    return `UCL-${uclKnockout[1]}`;
   }
 
   return matchNo;
