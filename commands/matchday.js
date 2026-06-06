@@ -1,9 +1,15 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder
+} = require('discord.js');
 const {
   cachedGetData,
   getAllowedMatchday,
   getTeamColor,
-  getFixtureMatchday
+  getFixtureMatchday,
+  createCompetitionDropdown
 } = require('../utils/helpers');
 const E = require('../utils/emojis');
 
@@ -60,7 +66,7 @@ const findNextMatchdayRows = (fixtures, activeMD) => {
     fixtures
       .slice(1)
       .filter(row => row?.[0])
-      .map(row => getFixtureMatchday(row[0]))
+      .map(row => String(getFixtureMatchday(row[0])).trim())
       .filter(Boolean)
   )];
 
@@ -77,7 +83,7 @@ const findNextMatchdayRows = (fixtures, activeMD) => {
     matchday: nextMD,
     rows: fixtures
       .slice(1)
-      .filter(row => getFixtureMatchday(row[0]) === nextMD)
+      .filter(row => String(getFixtureMatchday(row[0])).trim() === String(nextMD).trim())
   };
 };
 
@@ -131,13 +137,13 @@ const buildMatchdaySummary = (activeMD, rows, completed, remaining, percent, nex
     percent,
     latestResult: formatFixture(firstCompleted),
     nextFixture: formatFixture(firstRemaining),
-    nextMatchday: nextMatchday.matchday ? `MD ${nextMatchday.matchday}` : 'N/A'
+    nextMatchday: nextMatchday.matchday || 'N/A'
   };
 };
 
 const buildMatchdayDescription = summary => {
   return (
-    `${safeEmoji(E.calendar, '📅')} **Current Active Matchday**\n` +
+    `${safeEmoji(E.calendar, '📅')} **Stage:** ${summary.activeMD}\n` +
     `Automatic league matchday tracker based on played and remaining fixtures from the Fixtures.\n\n` +
     `${safeEmoji(E.calendar, '📅')} **Matchday:** ${summary.activeMD}\n` +
     `${safeEmoji(E.played, '🎮')} **Total Fixtures:** ${summary.total}\n` +
@@ -173,12 +179,23 @@ module.exports = {
 
     const sheetMap = {
       league: 'Fixtures!A:I',
-      fa: 'FA_Cup_Fixtures!A:I',
-      carabao: 'Carabao_Cup_Fixtures!A:I',
-      ucl: 'UCL_Coop_Fixtures!A:I'
+      fa: 'FA_Cup_Coop_Fixtures!A:I',
+      carabao: 'Carabao_Coop_Fixtures!A:I'
     };
 
-    const fixtures = await cachedGetData(sheetMap[competition] || sheetMap.league);
+    let fixtures;
+
+    if (competition === 'ucl') {
+      const groupFixtures = await cachedGetData('UCL_Coop_Group_Fixtures!A:I');
+      const knockoutFixtures = await cachedGetData('UCL_Coop_Knockout_Fixtures!A:I');
+
+      fixtures = [
+        ...(groupFixtures || []),
+        ...((knockoutFixtures || []).slice(1))
+      ];
+    } else {
+      fixtures = await cachedGetData(sheetMap[competition] || sheetMap.league);
+    }
     const teams = await cachedGetData('Teams!A:H');
 
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
@@ -199,10 +216,11 @@ module.exports = {
     }
 
     const activeMD = String(allowedMD).trim();
+    console.log('[MATCHDAY]', competition, 'ACTIVE_MD =', activeMD);
 
     const rows = fixtures
       .slice(1)
-      .filter(r => getFixtureMatchday(r?.[0]) === activeMD);
+      .filter(r => String(getFixtureMatchday(r?.[0])) === String(activeMD));
 
     if (!rows.length) {
       return { content: `${safeEmoji(E.wrong, '❌')} Could not find active matchday fixtures.` };
@@ -215,10 +233,13 @@ module.exports = {
 
     const completedLines = completed.map(row => makeCompletedLine(row));
     const remainingLines = remaining.map(row => makeRemainingLine(row));
+
     const nextMatchday = findNextMatchdayRows(fixtures, activeMD);
     const nextLines = nextMatchday.rows
-      .slice(0, 10)
+      .filter(row => !hasScore(row))
+      .slice(0, 5)
       .map((row, index) => makeNextLine(row, index));
+
     const summary = buildMatchdaySummary(activeMD, rows, completed, remaining, percent, nextMatchday);
 
     const embedColor = remaining.length
@@ -226,7 +247,7 @@ module.exports = {
       : 0x2ECC71;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.calendar, '📅')} ${competition.toUpperCase()} • Active Matchday ${activeMD}`)
+      .setTitle(`${safeEmoji(E.calendar, '📅')} ${competition === 'ucl' ? 'UCL' : competition.toUpperCase()} • ${activeMD}`)
       .setDescription(buildMatchdayDescription(summary))
       .addFields(
         {
@@ -245,14 +266,16 @@ module.exports = {
         },
         {
           name: `${safeEmoji(E.missing, '➖')} Remaining Matches`,
-          value: remainingLines.length ? lineLimit(remainingLines, 8) : 'None',
+          value: remainingLines.length
+            ? remainingLines.join('\n').slice(0, 1024)
+            : 'None',
           inline: false
         },
         {
-          name: `${safeEmoji(E.fire, '🔥')} Next Matchday Fixtures${nextMatchday.matchday ? ` — MD ${nextMatchday.matchday}` : ''}`,
+          name: `${safeEmoji(E.fire, '🔥')} Upcoming Fixtures${nextMatchday.matchday ? ` — ${nextMatchday.matchday}` : ''}`,
           value: nextLines.length
             ? nextLines.join('\n')
-            : `${safeEmoji(E.correct, '✅')} No upcoming matchday fixtures found after MD ${activeMD}.`,
+            : `${safeEmoji(E.correct, '✅')} No upcoming fixtures found.`,
           inline: false
         }
       )
@@ -261,7 +284,26 @@ module.exports = {
 
     return {
       content: `${safeEmoji(E.calendar, '📅')} **Current matchday overview**`,
-      embeds: [embed]
+      embeds: [embed],
+      components: [
+        createCompetitionDropdown({
+          prefix: 'matchday',
+          selectedCompetition: competition,
+          targetType: 'competition',
+          targetValue: competition,
+          ownerId: interaction.user.id
+        })
+      ]
     };
+  },
+
+  async selectMenuHandler(interaction) {
+    const competition = interaction.values[0];
+
+    interaction.options = {
+      getString: () => competition
+    };
+
+    return this.execute(interaction);
   }
 };
