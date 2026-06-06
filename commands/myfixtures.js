@@ -466,6 +466,7 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
   if (team.logo && /^https?:\/\//i.test(team.logo)) embed.setThumbnail(team.logo);
 
   return {
+    content: null,
     embeds: [embed],
     components: [
       createCompetitionDropdown({
