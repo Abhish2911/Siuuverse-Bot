@@ -305,6 +305,32 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // mycareer special button handler
+      if (cmd === 'mycareer') {
+        const command = client.commands.get('mycareer');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        // customId format:
+        // mycareer_<view>_<targetType>_<targetValue>
+        const [targetType, ...targetParts] = parts;
+        const targetValue = targetParts.join('_');
+
+        const result = await command.buttonHandler(
+          interaction,
+          action,
+          targetType,
+          decodeURIComponent(targetValue || '')
+        );
+
+        if (result) {
+          await interaction.message.edit(result);
+        }
+        return;
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
