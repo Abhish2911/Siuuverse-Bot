@@ -90,7 +90,7 @@ function pairSequentialTeams(
       fixtures.push(
         buildFixture(
           round,
-          `${prefix}-${matchNumber}-1`,
+          `${prefix}-${matchNumber}A`,
           home,
           away,
           'Leg 1'
@@ -100,7 +100,7 @@ function pairSequentialTeams(
       fixtures.push(
         buildFixture(
           round,
-          `${prefix}-${matchNumber}-2`,
+          `${prefix}-${matchNumber}B`,
           away,
           home,
           'Leg 2'
