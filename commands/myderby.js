@@ -72,12 +72,26 @@ module.exports = {
       };
     }
 
-    const [derbiesSheet, league, fa, carabao, ucl] = await Promise.all([
+    const [
+      derbiesSheet,
+      league,
+      fa,
+      carabao,
+      ucl,
+      leagueFixtures,
+      faFixtures,
+      carabaoFixtures,
+      uclFixtures
+    ] = await Promise.all([
       cachedGetData('Derbies!A:D'),
       cachedGetData('Matches_Entry!A:S').catch(() => []),
       cachedGetData('FA_Cup_Coop_Results!A:S').catch(() => []),
       cachedGetData('Carabao_Coop_Results!A:S').catch(() => []),
-      cachedGetData('UCL_Coop_Results!A:S').catch(() => [])
+      cachedGetData('UCL_Coop_Results!A:S').catch(() => []),
+      cachedGetData('Fixtures!A:Z').catch(() => []),
+      cachedGetData('FA_Cup_Fixtures!A:Z').catch(() => []),
+      cachedGetData('Carabao_Fixtures!A:Z').catch(() => []),
+      cachedGetData('UCL_Fixtures!A:Z').catch(() => [])
     ]);
 
     const derbyRow = derbiesSheet
@@ -107,6 +121,12 @@ module.exports = {
     const team2 = clean(derbyRow[2]);
 
     const sources = [league, fa, carabao, ucl];
+    const fixtureSources = [
+      leagueFixtures,
+      faFixtures,
+      carabaoFixtures,
+      uclFixtures
+    ];
 
     let played = 0;
     let team1Wins = 0;
@@ -161,6 +181,37 @@ module.exports = {
       }
     }
 
+    let nextDerby = null;
+
+    for (const sheet of fixtureSources) {
+      for (const row of (sheet || []).slice(1)) {
+        const home = clean(row[2]);
+        const away = clean(row[3]);
+
+        const isDerbyFixture =
+          (normalize(home) === normalize(team1) && normalize(away) === normalize(team2)) ||
+          (normalize(home) === normalize(team2) && normalize(away) === normalize(team1));
+
+        if (!isDerbyFixture) continue;
+
+        const hg = clean(row[4]);
+        const ag = clean(row[5]);
+
+        if (hg || ag) continue;
+
+        nextDerby = {
+          matchNo: clean(row[0]),
+          date: clean(row[1]),
+          home,
+          away
+        };
+
+        break;
+      }
+
+      if (nextDerby) break;
+    }
+
     const topGoals = [...goals.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -196,6 +247,12 @@ module.exports = {
           value:
             `${team1}: ${safeEmoji(E.goal, '⚽')} **${team1Goals}**\n` +
             `${team2}: ${safeEmoji(E.goal, '⚽')} **${team2Goals}**`
+        },
+        {
+          name: `${safeEmoji(E.calendar, '📅')} Next Derby`,
+          value: nextDerby
+            ? `**${nextDerby.matchNo}**\n${nextDerby.date || 'TBD'}\n${nextDerby.home} vs ${nextDerby.away}`
+            : 'No upcoming derby fixture found.'
         },
         {
           name: `${safeEmoji(E.goldenBoot, '🥇')} Top Scorers`,
