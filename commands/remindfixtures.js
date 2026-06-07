@@ -103,6 +103,59 @@ function buildReminderDescription(summary) {
   );
 }
 
+function getCompetitionConfigs() {
+  return [
+    {
+      key: 'League',
+      fixturesRange: 'Fixtures!A:I',
+      activeMatchday: true,
+      matchdayColumn: 0,
+      homeCol: 2,
+      awayCol: 3,
+      homeShortCol: 7,
+      awayShortCol: 8,
+      scoreHomeCol: 4,
+      scoreAwayCol: 5
+    },
+    {
+      key: 'UCL',
+      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      activeMatchday: false,
+      matchdayColumn: 0,
+      homeCol: 2,
+      awayCol: 3,
+      homeShortCol: 7,
+      awayShortCol: 8,
+      scoreHomeCol: 4,
+      scoreAwayCol: 5
+    },
+    {
+      key: 'FA Cup',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      activeMatchday: false,
+      matchdayColumn: 1,
+      homeCol: 3,
+      awayCol: 4,
+      homeShortCol: 8,
+      awayShortCol: 9,
+      scoreHomeCol: 5,
+      scoreAwayCol: 6
+    },
+    {
+      key: 'Carabao Cup',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      activeMatchday: false,
+      matchdayColumn: 1,
+      homeCol: 3,
+      awayCol: 4,
+      homeShortCol: 8,
+      awayShortCol: 9,
+      scoreHomeCol: 5,
+      scoreAwayCol: 6
+    }
+  ];
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('remindfixtures')
@@ -121,79 +174,92 @@ module.exports = {
 
     const silent = interaction.options.getBoolean('silent') || false;
 
-    const [fixtures, teams] = await Promise.all([
-      cachedGetData('Fixtures!A:I'),
-      cachedGetData('Teams!A:Z')
+    const configs = getCompetitionConfigs();
+
+    const data = await Promise.all([
+      cachedGetData('Teams!A:Z'),
+      ...configs.map(c => cachedGetData(c.fixturesRange).catch(() => []))
     ]);
 
-    if (!Array.isArray(fixtures) || fixtures.length <= 1) {
-      return { content: `${safeEmoji(E.wrong, '❌')} Fixtures is empty.` };
-    }
+    const teams = data[0];
+    const teamRows = Array.isArray(teams) ? teams.slice(1) : [];
 
-    const active = getAllowedMatchday(fixtures);
-    if (!active) {
-      return {
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(`${safeEmoji(E.correct, '✅')} No Pending Fixtures`)
-            .setDescription('All fixtures appear to be completed.')
-            .setColor(0x2ECC71)
-        ]
-      };
-    }
+    const remaining = [];
 
-    const activeMD = String(active || '').split('.')[0].trim();
-    const rows = fixtures.slice(1).filter(r => getMatchday(r) === activeMD);
-    const remaining = rows.filter(r => !hasScore(r));
+    for (let i = 0; i < configs.length; i++) {
+      const config = configs[i];
+      const fixtures = data[i + 1];
+
+      if (!Array.isArray(fixtures) || fixtures.length <= 1) continue;
+
+      let rows = fixtures.slice(1);
+
+      if (config.activeMatchday) {
+        const active = getAllowedMatchday(fixtures);
+        if (!active) continue;
+
+        const activeMD = String(active).split('.')[0].trim();
+        rows = rows.filter(r => String(r[0] || '').split('.')[0].trim() === activeMD);
+      }
+
+      for (const row of rows) {
+        const hg = row[config.scoreHomeCol];
+        const ag = row[config.scoreAwayCol];
+
+        if (hg !== '' && hg !== undefined && ag !== '' && ag !== undefined) {
+          continue;
+        }
+
+        remaining.push({ row, config });
+      }
+    }
 
     if (!remaining.length) {
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle(`${safeEmoji(E.calendar, '📅')} Matchday ${activeMD}`)
-            .setDescription('There are no remaining fixtures in the current active matchday.')
+            .setTitle(`${safeEmoji(E.correct, '✅')} No Pending Fixtures`)
+            .setDescription('League, UCL, FA Cup and Carabao Cup fixtures are all completed.')
             .setColor(0x2ECC71)
         ]
       };
     }
 
-    const teamRows = Array.isArray(teams) ? teams.slice(1) : [];
-
     const fixtureLines = [];
     const mentions = new Set();
 
-    for (const row of remaining) {
-      const matchNo = String(row[0] || '-').trim();
-      const homeShort = shortTeam(row, true);
-      const awayShort = shortTeam(row, false);
+    for (const item of remaining) {
+      const row = item.row;
+      const config = item.config;
 
-      const homeMention = getCaptainMention(findCoopTeamRow(teamRows, homeShort, row[2]));
-      const awayMention = getCaptainMention(findCoopTeamRow(teamRows, awayShort, row[3]));
+      const matchNo = String(row[config.matchdayColumn] || '-').trim();
+      const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
+      const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
+
+      const homeMention = getCaptainMention(findCoopTeamRow(teamRows, homeShort, row[config.homeCol]));
+      const awayMention = getCaptainMention(findCoopTeamRow(teamRows, awayShort, row[config.awayCol]));
 
       if (!silent) {
         if (homeMention) mentions.add(homeMention);
         if (awayMention) mentions.add(awayMention);
       }
 
-      const homeName = homeShort || String(row[2] || 'HOME').trim();
-      const awayName = awayShort || String(row[3] || 'AWAY').trim();
-
       fixtureLines.push(
-        `**${matchNo}** • \`${homeName}\` ${safeEmoji(E.vs, '⚔️')} \`${awayName}\`` +
+        `**${config.key} • ${matchNo}** • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\`` +
         (!silent && (homeMention || awayMention)
           ? `\n> ${safeEmoji(E.captain, '👑')} ${[homeMention, awayMention].filter(Boolean).join(' ')}`
           : '')
       );
     }
 
-    const summary = buildReminderSummary(activeMD, remaining, silent, mentions);
+    const summary = buildReminderSummary('All Competitions', remaining.map(x => x.row), silent, mentions);
 
     const mentionText = silent || !mentions.size
       ? ''
       : `${[...mentions].join(' ')}\n\n`;
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.calendar, '📢')} Matchday ${activeMD} Reminder`)
+      .setTitle(`League • UCL • FA Cup • Carabao Cup Reminder`)
       .setDescription(buildReminderDescription(summary))
       .addFields(
         {
@@ -206,13 +272,13 @@ module.exports = {
       .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Captains tagged automatically' });
 
     await interaction.channel.send({
-      content: `${mentionText}⚽ **Matchday ${activeMD} fixtures reminder**`,
+      content: `${mentionText}⚽ **Pending fixtures reminder across all competitions**`,
       embeds: [embed]
     });
 
     sendAuditLog(interaction, {
       title: '📢 Fixtures Reminder Sent',
-      description: `Remaining fixtures reminder posted for **Matchday ${activeMD}**.`,
+      description: `Remaining fixture reminder posted for League, UCL, FA Cup and Carabao Cup.`,
       color: 0xF1C40F,
       fields: [
         { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
@@ -225,7 +291,7 @@ module.exports = {
         new EmbedBuilder()
           .setTitle(`${safeEmoji(E.correct, '✅')} Reminder Posted`)
           .setDescription(
-            `${safeEmoji(E.calendar, '📢')} Reminder posted in this channel for **Matchday ${activeMD}**.\n\n` +
+            `Reminder posted in this channel for all pending League, UCL, FA Cup and Carabao Cup fixtures.\n\n` +
             `${safeEmoji(E.missing, '⏳')} Remaining Matches: **${remaining.length}**\n` +
             `🔕 Silent: **${silent ? 'Yes' : 'No'}**`
           )
