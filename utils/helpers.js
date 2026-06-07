@@ -326,6 +326,10 @@ function createCompetitionDropdown({
   );
 }
 
+function safeEmoji(customEmoji, fallback = '') {
+  return customEmoji || fallback;
+}
+
 module.exports = {
   normalize,
   cleanId,
@@ -345,4 +349,5 @@ module.exports = {
   getAllowedMatchday,
   createPaginationButtons,
   createCompetitionDropdown,
+  safeEmoji,
 };
