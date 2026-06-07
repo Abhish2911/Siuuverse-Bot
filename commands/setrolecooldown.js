@@ -4,6 +4,8 @@ const {
 } = require('discord.js');
 
 const { RoleCooldown } = require('../models/rolehandler');
+const E = require('../utils/emojis');
+const { safeEmoji } = require('../utils/helpers');
 
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhd])$/i);
