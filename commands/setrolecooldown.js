@@ -48,7 +48,7 @@ module.exports = {
 
     if (!cooldownMs) {
       return interaction.reply({
-        content: '❌ Invalid duration. Use formats like 30m, 12h, or 1d.',
+        content: `${safeEmoji(E.wrong, '❌')} Invalid duration. Use formats like 30m, 12h, or 1d.`,
         ephemeral: true
       });
     }
@@ -69,12 +69,12 @@ module.exports = {
 
     if (interaction.deferred || interaction.replied) {
       return interaction.followUp({
-        content: `✅ Cooldown for ${role} set to ${duration}.`
+        content: `${safeEmoji(E.correct, '✅')} Cooldown for ${role} set to ${duration}.`
       });
     }
 
     return interaction.reply({
-      content: `✅ Cooldown for ${role} set to ${duration}.`
+      content: `${safeEmoji(E.correct, '✅')} Cooldown for ${role} set to ${duration}.`
     });
   }
 };
