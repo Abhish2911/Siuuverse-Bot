@@ -67,6 +67,12 @@ module.exports = {
       }
     );
 
+    if (interaction.deferred || interaction.replied) {
+      return interaction.followUp({
+        content: `✅ Cooldown for ${role} set to ${duration}.`
+      });
+    }
+
     return interaction.reply({
       content: `✅ Cooldown for ${role} set to ${duration}.`
     });
