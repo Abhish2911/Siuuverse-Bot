@@ -196,8 +196,11 @@ client.on('interactionCreate', async interaction => {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
 
-      const deferred = await safeDeferReply(interaction);
-      if (!deferred) return;
+      // Commands that handle their own replies should not be auto-deferred.
+      if (interaction.commandName !== 'setrolecooldown') {
+        const deferred = await safeDeferReply(interaction);
+        if (!deferred) return;
+      }
 
       const result = await command.execute(interaction);
 
