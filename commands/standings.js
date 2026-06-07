@@ -19,7 +19,7 @@ function rankIcon(index, total) {
   if (index === 0) return '👑';
   if (index === 1) return '🥈';
   if (index === 2) return '🥉';
-  if (index >= total - 2) return '🔻';
+  if (index >= total - 3) return '🔻';
   return '▫️';
 }
 
@@ -112,7 +112,7 @@ module.exports = {
       const line = `${rankIcon(index, rows.length)} ${pos} ${team} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
 
       if (index < 3) return `+ ${line}`;
-      if (index >= rows.length - 2) return `- ${line}`;
+      if (index >= rows.length - 3) return `- ${line}`;
       return `  ${line}`;
     }).join('\n');
 
