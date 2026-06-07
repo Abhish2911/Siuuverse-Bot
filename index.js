@@ -185,6 +185,56 @@ client.once('clientReady', async () => {
       console.error(`❌ Restore error in ${commandName}:`, error);
     }
   }
+
+  // Restore role mentionability after bot restarts
+  try {
+    const cooldowns = await RoleCooldown.find({});
+
+    for (const config of cooldowns) {
+      const pingData = await RolePing.findOne({
+        guildId: config.guildId,
+        roleId: config.roleId
+      });
+
+      if (!pingData?.lastPing) continue;
+
+      const expiresAt = pingData.lastPing + config.cooldownMs;
+      const remaining = expiresAt - Date.now();
+
+      const guild = client.guilds.cache.get(config.guildId);
+      if (!guild) continue;
+
+      const role = await guild.roles.fetch(config.roleId).catch(() => null);
+      if (!role) continue;
+
+      if (remaining <= 0) {
+        if (!role.mentionable) {
+          await role.setMentionable(true, 'Restored after cooldown expiry');
+        }
+        continue;
+      }
+
+      if (role.mentionable) {
+        await role.setMentionable(false, 'Restored cooldown state after restart');
+      }
+
+      setTimeout(async () => {
+        try {
+          const freshRole = await guild.roles.fetch(config.roleId).catch(() => null);
+
+          if (freshRole && !freshRole.mentionable) {
+            await freshRole.setMentionable(true, 'Role cooldown expired');
+          }
+        } catch (err) {
+          console.error('❌ Failed to restore role mentionability:', err);
+        }
+      }, remaining);
+    }
+
+    console.log('✅ Role cooldown states restored');
+  } catch (error) {
+    console.error('❌ Failed to restore role cooldowns:', error);
+  }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -588,6 +638,26 @@ client.on('messageCreate', async message => {
           new: true
         }
       );
+
+      try {
+        if (role.mentionable) {
+          await role.setMentionable(false, 'Role cooldown activated');
+
+          setTimeout(async () => {
+            try {
+              const freshRole = await message.guild.roles.fetch(role.id).catch(() => null);
+
+              if (freshRole && !freshRole.mentionable) {
+                await freshRole.setMentionable(true, 'Role cooldown expired');
+              }
+            } catch (err) {
+              console.error('❌ Failed to restore role mentionability:', err);
+            }
+          }, config.cooldownMs);
+        }
+      } catch (err) {
+        console.error('❌ Failed to toggle role mentionability:', err);
+      }
     }
   } catch (error) {
     console.error('❌ Role cooldown error:', error);
