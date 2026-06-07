@@ -43,6 +43,18 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(interaction) {
+    const ownerIds = [
+      process.env.OWNER_ID,
+      process.env.BOT_OWNER_ID
+    ].filter(Boolean);
+
+    if (!ownerIds.includes(interaction.user.id)) {
+      return interaction.reply({
+        content: `${safeEmoji(E.wrong, '❌')} Only the bot owner can use this command.`,
+        ephemeral: true
+      });
+    }
+
     const role = interaction.options.getRole('role');
     const duration = interaction.options.getString('duration');
 
