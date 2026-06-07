@@ -3,7 +3,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const RoleCooldown = require('../models/rolehandler');
+const { RoleCooldown } = require('../models/rolehandler');
 
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhd])$/i);
