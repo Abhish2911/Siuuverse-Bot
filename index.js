@@ -7,6 +7,7 @@ const path = require('path');
 
 const express = require('express');
 const { sendAuditLog } = require('./utils/helpers');
+const { RoleCooldown, RolePing } = require('./models/rolehandler');
 
 function startHealthServer() {
   const app = express();
@@ -67,7 +68,11 @@ function ensureGoogleCredentialsFile() {
 ensureGoogleCredentialsFile();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 async function connectMongo() {
@@ -521,6 +526,68 @@ client.on('interactionCreate', async interaction => {
     } catch (replyError) {
       console.error('❌ Error while sending error reply:', replyError);
     }
+  }
+});
+
+client.on('messageCreate', async message => {
+  try {
+    if (message.author.bot || !message.guild) return;
+    if (!message.mentions.roles.size) return;
+
+    for (const role of message.mentions.roles.values()) {
+      const config = await RoleCooldown.findOne({
+        guildId: message.guild.id,
+        roleId: role.id
+      });
+
+      if (!config || !config.cooldownMs) continue;
+
+      if (message.member?.permissions?.has('Administrator')) {
+        continue;
+      }
+
+      const pingData = await RolePing.findOne({
+        guildId: message.guild.id,
+        roleId: role.id
+      });
+
+      const now = Date.now();
+
+      if (
+        pingData &&
+        pingData.lastPing &&
+        now - pingData.lastPing < config.cooldownMs
+      ) {
+        const remaining = config.cooldownMs - (now - pingData.lastPing);
+
+        const hours = Math.floor(remaining / 3600000);
+        const minutes = Math.floor((remaining % 3600000) / 60000);
+
+        await message.delete().catch(() => null);
+
+        await message.channel.send({
+          content: `❌ ${role} is on cooldown. Remaining: ${hours}h ${minutes}m`
+        }).catch(() => null);
+
+        return;
+      }
+
+      await RolePing.findOneAndUpdate(
+        {
+          guildId: message.guild.id,
+          roleId: role.id
+        },
+        {
+          lastPing: now
+        },
+        {
+          upsert: true,
+          new: true
+        }
+      );
+    }
+  } catch (error) {
+    console.error('❌ Role cooldown error:', error);
   }
 });
 
