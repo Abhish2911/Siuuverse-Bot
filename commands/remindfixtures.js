@@ -264,7 +264,7 @@ module.exports = {
       .addFields(
         {
           name: `${safeEmoji(E.missing, '⏳')} Remaining Matches`,
-          value: fixtureLines.join('\n') || 'None',
+          value: (fixtureLines.join('\n\n') || 'None').slice(0, 1024),
           inline: false
         }
       )
@@ -272,7 +272,7 @@ module.exports = {
       .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Captains tagged automatically' });
 
     await interaction.channel.send({
-      content: `${mentionText}⚽ **Pending fixtures reminder across all competitions**`,
+      content: `${mentionText}⚽ **Pending fixtures reminder across all competitions**\n\n${fixtureLines.join('\n\n').slice(0, 1800)}`,
       embeds: [embed]
     });
 
