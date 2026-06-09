@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 
 const { cachedGetData } = require('../utils/helpers');
+const E = require('../utils/emojis');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -123,7 +124,7 @@ module.exports = {
             embeds: [
               new EmbedBuilder()
                 .setColor(0x3498DB)
-                .setTitle('📢 COOP Announcement')
+                .setTitle('📢 Announcement')
                 .setDescription(message)
                 .setFooter({
                   text: `Sent by ${interaction.user.username}`
@@ -142,7 +143,7 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
-          .setTitle('✅ DM Campaign Complete')
+          .setTitle(`${E.correct || '✅'} DM Campaign Done`)
           .addFields(
             { name: 'Delivered', value: String(delivered), inline: true },
             { name: 'Failed', value: String(failed), inline: true },
