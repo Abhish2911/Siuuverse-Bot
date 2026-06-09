@@ -263,8 +263,13 @@ client.on('interactionCreate', async interaction => {
         color: 0x5865F2
       }).catch(error => console.error('❌ Audit log failed:', error));
 
-      if (result) {
-        await safeReply(interaction, result);
+      // Some commands reply/followUp internally.
+      // Only send a response if the command returned data AND
+      // the interaction has not already been replied to.
+      if (result && !interaction.replied && !interaction.deferred) {
+        await interaction.reply(result);
+      } else if (result && interaction.deferred && !interaction.replied) {
+        await interaction.editReply(result);
       }
       return;
     }
@@ -565,9 +570,20 @@ client.on('interactionCreate', async interaction => {
 
     try {
       if (interaction.isChatInputCommand()) {
-        await safeReply(interaction, {
+        const errorPayload = {
           content: `❌ Error occurred while executing command\n\`${error.message || 'Unknown error'}\``
-        });
+        };
+
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply(errorPayload).catch(() => null);
+        } else if (interaction.deferred && !interaction.replied) {
+          await interaction.editReply(errorPayload).catch(() => null);
+        } else {
+          await interaction.followUp({
+            ...errorPayload,
+            ephemeral: true
+          }).catch(() => null);
+        }
       } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
         if (interaction.deferred || interaction.replied) {
           await interaction.followUp({
