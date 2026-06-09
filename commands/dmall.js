@@ -72,7 +72,10 @@ module.exports = {
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    return await interaction.reply({
+      content: '📨 DM campaign started...',
+      ephemeral: true
+    });
 
     const teams = await cachedGetData('Teams!A:Z');
 
@@ -137,7 +140,8 @@ module.exports = {
       }
     }
 
-    return interaction.editReply({
+    return interaction.followUp({
+      ephemeral: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
