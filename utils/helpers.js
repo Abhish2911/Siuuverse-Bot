@@ -34,6 +34,21 @@ function cleanId(value) {
   return String(value || '').replace(/[<@!>]/g, '').trim();
 }
 
+function getAllPlayerIds(teamRow) {
+  const ids = new Set();
+
+  const captain = cleanId(teamRow?.[4]);
+  if (captain) ids.add(captain);
+
+  String(teamRow?.[5] || '')
+    .split(',')
+    .map(id => cleanId(id))
+    .filter(Boolean)
+    .forEach(id => ids.add(id));
+
+  return [...ids];
+}
+
 function parseHexColor(value, fallback = 0x5865F2) {
   const color = String(value || '').trim();
   if (!/^#[0-9A-Fa-f]{6}$/.test(color)) return fallback;
@@ -333,6 +348,7 @@ function safeEmoji(customEmoji, fallback = '') {
 module.exports = {
   normalize,
   cleanId,
+  getAllPlayerIds,
   parseHexColor,
   getTeamColor,
   splitList,
