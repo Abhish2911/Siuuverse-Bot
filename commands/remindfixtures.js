@@ -160,6 +160,19 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('remindfixtures')
     .setDescription('Post remaining fixtures of the current active matchday and tag captains')
+    .addStringOption(opt =>
+      opt
+        .setName('competition')
+        .setDescription('Competition to remind')
+        .setRequired(true)
+        .addChoices(
+          { name: 'League', value: 'league' },
+          { name: 'UCL', value: 'ucl' },
+          { name: 'FA Cup', value: 'fa' },
+          { name: 'Carabao Cup', value: 'carabao' },
+          { name: 'All Competitions', value: 'all' }
+        )
+    )
     .addBooleanOption(opt =>
       opt
         .setName('silent')
@@ -172,9 +185,20 @@ module.exports = {
       return { content: `${safeEmoji(E.lock, '🚫')} Admin only command.` };
     }
 
+    const competition = interaction.options.getString('competition') || 'all';
     const silent = interaction.options.getBoolean('silent') || false;
 
-    const configs = getCompetitionConfigs();
+    let configs = getCompetitionConfigs();
+
+    if (competition !== 'all') {
+      configs = configs.filter(c => {
+        if (competition === 'league') return c.key === 'League';
+        if (competition === 'ucl') return c.key === 'UCL';
+        if (competition === 'fa') return c.key === 'FA Cup';
+        if (competition === 'carabao') return c.key === 'Carabao Cup';
+        return true;
+      });
+    }
 
     const data = await Promise.all([
       cachedGetData('Teams!A:Z'),
@@ -219,7 +243,11 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setTitle(`${safeEmoji(E.correct, '✅')} No Pending Fixtures`)
-            .setDescription('League, UCL, FA Cup and Carabao Cup fixtures are all completed.')
+            .setDescription(
+              competition === 'all'
+                ? 'League, UCL, FA Cup and Carabao Cup fixtures are all completed.'
+                : `All ${configs[0].key} fixtures are completed.`
+            )
             .setColor(0x2ECC71)
         ]
       };
@@ -259,7 +287,11 @@ module.exports = {
       : `${[...mentions].join(' ')}\n\n`;
 
     const embed = new EmbedBuilder()
-      .setTitle(`League • UCL • FA Cup • Carabao Cup Reminder`)
+      .setTitle(
+        competition === 'all'
+          ? 'League • UCL • FA Cup • Carabao Cup Reminder'
+          : `${configs[0].key} Reminder`
+      )
       .setDescription(buildReminderDescription(summary))
       .addFields(
         {
@@ -272,13 +304,17 @@ module.exports = {
       .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Captains tagged automatically' });
 
     await interaction.channel.send({
-      content: `${mentionText}⚽ **Pending fixtures reminder across all competitions**\n\n${fixtureLines.join('\n\n').slice(0, 1800)}`,
+      content: silent
+        ? `⚽ **${competition === 'all' ? 'All Competitions' : configs[0].key} Fixtures Reminder**`
+        : [...mentions].join(' '),
       embeds: [embed]
     });
 
     sendAuditLog(interaction, {
       title: '📢 Fixtures Reminder Sent',
-      description: `Remaining fixture reminder posted for League, UCL, FA Cup and Carabao Cup.`,
+      description: competition === 'all'
+        ? 'Remaining fixture reminder posted for League, UCL, FA Cup and Carabao Cup.'
+        : `Remaining fixture reminder posted for ${configs[0].key}.`,
       color: 0xF1C40F,
       fields: [
         { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
@@ -291,7 +327,9 @@ module.exports = {
         new EmbedBuilder()
           .setTitle(`${safeEmoji(E.correct, '✅')} Reminder Posted`)
           .setDescription(
-            `Reminder posted in this channel for all pending League, UCL, FA Cup and Carabao Cup fixtures.\n\n` +
+            (competition === 'all'
+              ? 'Reminder posted in this channel for all pending League, UCL, FA Cup and Carabao Cup fixtures.\n\n'
+              : `Reminder posted in this channel for pending ${configs[0].key} fixtures.\n\n`) +
             `${safeEmoji(E.missing, '⏳')} Remaining Matches: **${remaining.length}**\n` +
             `🔕 Silent: **${silent ? 'Yes' : 'No'}**`
           )
