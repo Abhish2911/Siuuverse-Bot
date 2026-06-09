@@ -66,15 +66,13 @@ module.exports = {
     );
 
     if (!isOwner && !hasAdminRole) {
-      return interaction.reply({
-        content: '❌ Admin only command.',
-        ephemeral: true
-      });
+      return {
+        content: '❌ Admin only command.'
+      };
     }
 
-    return await interaction.reply({
-      content: '📨 DM campaign started...',
-      ephemeral: true
+    await interaction.editReply({
+      content: '📨 DM campaign started...'
     });
 
     const teams = await cachedGetData('Teams!A:Z');
@@ -140,8 +138,7 @@ module.exports = {
       }
     }
 
-    return interaction.followUp({
-      ephemeral: true,
+    return {
       embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
@@ -157,6 +154,6 @@ module.exports = {
             }
           )
       ]
-    });
+    };
   }
 };
