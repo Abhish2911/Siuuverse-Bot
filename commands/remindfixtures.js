@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { cachedGetData, getAllowedMatchday, sendAuditLog } = require('../utils/helpers');
+const { cachedGetData, getAllowedMatchday, sendAuditLog, getAllPlayerIds } = require('../utils/helpers');
 const E = require('../utils/emojis');
 
 function isAdmin(interaction) {
@@ -118,7 +118,7 @@ function getCompetitionConfigs() {
       scoreAwayCol: 5
     },
     {
-      key: 'UCL',
+      key: 'UCL GS',
       fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
       activeMatchday: false,
       matchdayColumn: 0,
@@ -126,6 +126,18 @@ function getCompetitionConfigs() {
       awayCol: 3,
       homeShortCol: 7,
       awayShortCol: 8,
+      scoreHomeCol: 4,
+      scoreAwayCol: 5
+    },
+    {
+      key: 'UCL KO',
+      fixturesRange: 'UCL_Coop_Knockout_Fixtures!A:L',
+      activeMatchday: false,
+      matchdayColumn: 0,
+      homeCol: 2,
+      awayCol: 3,
+      homeShortCol: 8,
+      awayShortCol: 9,
       scoreHomeCol: 4,
       scoreAwayCol: 5
     },
@@ -193,7 +205,7 @@ module.exports = {
     if (competition !== 'all') {
       configs = configs.filter(c => {
         if (competition === 'league') return c.key === 'League';
-        if (competition === 'ucl') return c.key === 'UCL';
+        if (competition === 'ucl') return c.key === 'UCL GS' || c.key === 'UCL KO';
         if (competition === 'fa') return c.key === 'FA Cup';
         if (competition === 'carabao') return c.key === 'Carabao Cup';
         return true;
@@ -220,10 +232,18 @@ module.exports = {
 
       if (config.activeMatchday) {
         const active = getAllowedMatchday(fixtures);
-        if (!active) continue;
 
-        const activeMD = String(active).split('.')[0].trim();
-        rows = rows.filter(r => String(r[0] || '').split('.')[0].trim() === activeMD);
+        // Fallback if helper fails to detect an active matchday
+        if (!active) {
+          rows = rows.filter(r => {
+            const hg = r[config.scoreHomeCol];
+            const ag = r[config.scoreAwayCol];
+            return hg === '' || hg === undefined || ag === '' || ag === undefined;
+          });
+        } else {
+          const activeMD = String(active).split('.')[0].trim();
+          rows = rows.filter(r => String(r[0] || '').split('.')[0].trim() === activeMD);
+        }
       }
 
       for (const row of rows) {
@@ -254,7 +274,7 @@ module.exports = {
     }
 
     const fixtureLines = [];
-    const mentions = new Set();
+    const playerIds = new Set();
 
     for (const item of remaining) {
       const row = item.row;
@@ -264,12 +284,12 @@ module.exports = {
       const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
       const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
 
-      const homeMention = getCaptainMention(findCoopTeamRow(teamRows, homeShort, row[config.homeCol]));
-      const awayMention = getCaptainMention(findCoopTeamRow(teamRows, awayShort, row[config.awayCol]));
+      const homeTeam = findCoopTeamRow(teamRows, homeShort, row[config.homeCol]);
+      const awayTeam = findCoopTeamRow(teamRows, awayShort, row[config.awayCol]);
 
       if (!silent) {
-        if (homeMention) mentions.add(homeMention);
-        if (awayMention) mentions.add(awayMention);
+        getAllPlayerIds(homeTeam).forEach(id => playerIds.add(id));
+        getAllPlayerIds(awayTeam).forEach(id => playerIds.add(id));
       }
 
       fixtureLines.push(
@@ -277,11 +297,7 @@ module.exports = {
       );
     }
 
-    const summary = buildReminderSummary('All Competitions', remaining.map(x => x.row), silent, mentions);
-
-    const mentionText = silent || !mentions.size
-      ? ''
-      : `${[...mentions].join(' ')}\n\n`;
+    const summary = buildReminderSummary('All Competitions', remaining.map(x => x.row), silent, playerIds);
 
     const embed = new EmbedBuilder()
       .setTitle(
@@ -298,16 +314,37 @@ module.exports = {
         }
       )
       .setColor(0xF1C40F)
-      .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Captains tagged automatically' });
+      .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Players notified via DM' });
 
-    const mentionList = [...mentions];
-    const maxMentions = 40;
-    const mentionContent = mentionList.slice(0, maxMentions).join(' ');
+    if (!silent) {
+      for (const userId of playerIds) {
+        try {
+          const user = await interaction.client.users.fetch(userId);
+
+          await user.send({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle('⚽ Fixture Reminder')
+                .setDescription(
+                  `You have pending fixtures in ${
+                    competition === 'all'
+                      ? 'COOP competitions'
+                      : configs[0].key
+                  }.\n\nPlease arrange and play your matches as soon as possible.`
+                )
+                .setColor(0xF1C40F)
+            ]
+          });
+        } catch {}
+      }
+    }
 
     await interaction.channel.send({
-      content: silent
-        ? `⚽ **${competition === 'all' ? 'All Competitions' : configs[0].key} Fixtures Reminder**`
-        : `${mentionContent}\n\n⚽ **Pending Fixtures Reminder**`.slice(0, 1900),
+      content: `⚽ **${
+        competition === 'all'
+          ? 'All Competitions'
+          : configs[0].key
+      } Fixtures Reminder**`,
       embeds: [embed]
     });
 
@@ -337,7 +374,7 @@ module.exports = {
           .addFields(
             { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
             { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true },
-            { name: '👑 Tagged Captains', value: String(silent ? 0 : mentions.size), inline: true }
+            { name: '📩 Players Notified', value: String(silent ? 0 : playerIds.size), inline: true }
           )
           .setColor(0x2ECC71)
           .setFooter({ text: 'Remind Fixtures • Reminder posted successfully' })
