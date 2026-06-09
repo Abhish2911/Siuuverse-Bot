@@ -273,10 +273,7 @@ module.exports = {
       }
 
       fixtureLines.push(
-        `**${config.key} • ${matchNo}** • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\`` +
-        (!silent && (homeMention || awayMention)
-          ? `\n> ${safeEmoji(E.captain, '👑')} ${[homeMention, awayMention].filter(Boolean).join(' ')}`
-          : '')
+        `**${config.key} • ${matchNo}** • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\``
       );
     }
 
@@ -303,10 +300,14 @@ module.exports = {
       .setColor(0xF1C40F)
       .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Captains tagged automatically' });
 
+    const mentionList = [...mentions];
+    const maxMentions = 40;
+    const mentionContent = mentionList.slice(0, maxMentions).join(' ');
+
     await interaction.channel.send({
       content: silent
         ? `⚽ **${competition === 'all' ? 'All Competitions' : configs[0].key} Fixtures Reminder**`
-        : [...mentions].join(' '),
+        : `${mentionContent}\n\n⚽ **Pending Fixtures Reminder**`.slice(0, 1900),
       embeds: [embed]
     });
 
