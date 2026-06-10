@@ -76,6 +76,8 @@ module.exports = {
       content: '📨 DM campaign started...'
     });
 
+    let statusMessage = '📨 DM campaign started...';
+
     const teams = await cachedGetData('Teams!A:Z');
 
     let delivered = 0;
@@ -139,11 +141,13 @@ module.exports = {
       }
     }
 
-    return {
+    await interaction.editReply({
+      content: `${E.correct || '✅'} DM Campaign Done`,
       embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
           .setTitle(`${E.correct || '✅'} DM Campaign Done`)
+          .setDescription(`Your custom message has been delivered.`)
           .addFields(
             { name: 'Delivered', value: String(delivered), inline: true },
             { name: 'Failed', value: String(failed), inline: true },
@@ -152,9 +156,15 @@ module.exports = {
               name: 'Target',
               value: teamFilter || target,
               inline: true
+            },
+            {
+              name: 'Message Sent',
+              value: message.slice(0, 1024)
             }
           )
       ]
-    };
+    });
+
+    return null;
   }
 };
