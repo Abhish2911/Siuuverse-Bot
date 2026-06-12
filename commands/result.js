@@ -22,6 +22,9 @@ try {
 const E = require('../utils/emojis');
 
 const pendingResults = new Map();
+function getPendingKey(userId, matchNo = '') {
+  return `${userId}:${normalizeMatchNo(matchNo)}`;
+}
 const PENDING_TTL = 5 * 60 * 1000;
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const SUBMITTED_AT_INDEX = 18;
@@ -413,7 +416,7 @@ module.exports = {
     }
 
     const rows = fixtures.slice(1);
-    const matchNoIndex = pendingResults.get(interaction.user.id)?.competition?.matchNoIndex ?? competition.matchNoIndex ?? 0;
+    // const matchNoIndex = pendingResults.get(interaction.user.id)?.competition?.matchNoIndex ?? competition.matchNoIndex ?? 0;
 
     const index = rows.findIndex(
       r => normalizeMatchNo(r[competition.matchNoIndex ?? 0]) === matchNo
@@ -442,7 +445,7 @@ module.exports = {
       };
     }
 
-    pendingResults.set(interaction.user.id, {
+    pendingResults.set(getPendingKey(interaction.user.id, matchNo), {
       matchNo,
       competition,
       fixtureIndex: index,
@@ -550,9 +553,16 @@ module.exports = {
   async buttonHandler(interaction, action) {
     cleanPending(pendingResults);
 
-    if (action === 'cancel') {
-      pendingResults.delete(interaction.user.id);
+    const matchNo = interaction.customId.startsWith('result_confirm_')
+      ? normalizeMatchNo(interaction.customId.replace('result_confirm_', ''))
+      : '';
 
+    if (action === 'cancel') {
+      for (const key of pendingResults.keys()) {
+        if (key.startsWith(`${interaction.user.id}:`)) {
+          pendingResults.delete(key);
+        }
+      }
       return {
         content: `${safeEmoji(E.correct, '✅')} Result submission cancelled.`,
         components: [],
@@ -560,7 +570,9 @@ module.exports = {
       };
     }
 
-    const pending = pendingResults.get(interaction.user.id);
+    const pending = pendingResults.get(
+      getPendingKey(interaction.user.id, matchNo)
+    );
 
     if (!pending) {
       return {
@@ -744,7 +756,9 @@ module.exports = {
       ]
     });
 
-    pendingResults.delete(interaction.user.id);
+    pendingResults.delete(
+      getPendingKey(interaction.user.id, pending.matchNo)
+    );
 
     return {
       embeds: [
