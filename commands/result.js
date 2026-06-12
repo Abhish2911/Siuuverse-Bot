@@ -4,7 +4,8 @@ const {
   buildMixedPrefixList,
   invalidateSheetCache,
   sendAuditLog,
-  getAllowedMatchday
+  getAllowedMatchday,
+  getCompetitionConfig
 } = require('../utils/helpers');
 const { refreshLiveStandings } = require('../utils/liveStandings');
 
@@ -361,7 +362,7 @@ module.exports = {
     const mvp = clean(interaction.options.getString('mvp'));
     const decision = clean(interaction.options.getString('decision'));
 
-    const competition = require('./helpers').getCompetitionConfig(matchNo);
+    const competition = getCompetitionConfig(matchNo);
 
     if (!competition) {
       return {
