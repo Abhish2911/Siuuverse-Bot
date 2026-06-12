@@ -18,7 +18,7 @@ const pendingReserves = new Map();
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const TEAMS_SHEET_RANGE = 'Teams!A:Z';
 const FIXTURES_SHEET_RANGE = 'Fixtures!A:J';
-const MAX_ACTIVE_RESERVES_PER_CAPTAIN = 3;
+const MAX_ACTIVE_RESERVES_PER_CAPTAIN = 4;
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
