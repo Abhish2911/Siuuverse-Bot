@@ -115,6 +115,7 @@ const SuspensionSchema = new mongoose.Schema(
   }
 );
 
+
 SuspensionSchema.index(
   { guildId: 1, competition: 1, normalizedPlayerName: 1 },
   { unique: true }
@@ -165,7 +166,7 @@ SuspensionSchema.statics.resetForGuild = async function resetForGuild(guildId, o
 };
 
 
-SuspensionSchema.pre('validate', function normalizeSuspensionState(next) {
+SuspensionSchema.pre('validate', function normalizeSuspensionState() {
   this.guildId = String(this.guildId || '').trim();
   this.competition = String(this.competition || '').trim().toLowerCase();
   this.playerName = String(this.playerName || '').trim();
@@ -191,8 +192,6 @@ SuspensionSchema.pre('validate', function normalizeSuspensionState(next) {
     this.redCard = false;
     this.bannedMatchNo = null;
   }
-
-  next();
 });
 
 module.exports = mongoose.models.Suspension || mongoose.model('Suspension', SuspensionSchema);
