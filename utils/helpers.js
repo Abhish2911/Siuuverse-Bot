@@ -237,35 +237,7 @@ function getFixtureMatchday(matchNo) {
   return id;
 }
 
-function getAllowedMatchday(fixtures) {
-  if (!Array.isArray(fixtures) || fixtures.length <= 1) {
-    return null;
-  }
-
-  const rows = fixtures.slice(1).filter(r => r && r[0]);
-  const grouped = new Map();
-
-  rows.forEach(row => {
-    const md = getFixtureMatchday(row[0]);
-    if (!md) return;
-    if (!grouped.has(md)) grouped.set(md, []);
-    grouped.get(md).push(row);
-  });
-
-  for (const [md, matches] of grouped.entries()) {
-    const played = matches.filter(r => r[4] !== '' && r[4] !== undefined && r[5] !== '' && r[5] !== undefined);
-    const unplayed = matches.filter(r => r[4] === '' || r[4] === undefined || r[5] === '' || r[5] === undefined);
-
-    if (played.length > 0 && unplayed.length > 0) {
-      return md;
-    }
-  }
-
-  for (const [md, matches] of grouped.entries()) {
-    const unplayed = matches.filter(r => r[4] === '' || r[4] === undefined || r[5] === '' || r[5] === undefined);
-    if (unplayed.length > 0) return md;
-  }
-
+function getAllowedMatchday() {
   return null;
 }
 
