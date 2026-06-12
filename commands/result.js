@@ -172,7 +172,7 @@ function compactCountList(v, empty = 'None') {
   }
 
   return [...map.entries()]
-    .map(([n, c]) => `• ${n} (${c})`)
+    .map(([n, c]) => c > 1 ? `• ${n} (${c})` : `• ${n}`)
     .join('\n') || empty;
 }
 
@@ -487,56 +487,54 @@ module.exports = {
           .setTitle(`${safeEmoji(E.correct, '✅')} Match Result Preview`)
           .setDescription(
             [
-              `# ${pending ? '' : ''}${homeTeam} ${hg} - ${ag} ${awayTeam}`,
+              `# ${safeEmoji(E.trophy, '🏆')} MATCH CENTRE`,
               '',
-              `🏆 **Competition:** ${competition.label || competition.key}`,
-              `📋 **Match No:** ${matchNo}`
+              `### ${safeEmoji(E.team, '🏠')} ${homeTeam}`,
+              `# ${hg} - ${ag}`,
+              `### ${safeEmoji(E.vs, '✈️')} ${awayTeam}`,
+              '',
+              `${safeEmoji(E.trophy, '🏆')} **${competition.label || competition.key}** • ${safeEmoji(E.calendar, '📋')} **${matchNo}**`
             ].join('\n')
           )
           .addFields(
             {
-              name: '⚽ Goalscorers',
+              name: `${safeEmoji(E.team, '🏠')} Home Team Stats`,
+              value: [
+                `${safeEmoji(E.tackle, '🛡️')} Tackles: ${homeTackles || '0'}`,
+                `${safeEmoji(E.interception, '🚧')} Interceptions: ${homeInterceptions || '0'}`,
+                `${safeEmoji(E.save, '🧤')} Saves: ${homeSaves || 0}`,
+                `${safeEmoji(E.team, '👥')} Players Used: ${repeatedCount(homePlayed)}`
+              ].join('\n'),
+              inline: true
+            },
+            {
+              name: `${safeEmoji(E.team, '🏠')} Away Team Stats`,
+              value: [
+                `${safeEmoji(E.tackle, '🛡️')} Tackles: ${awayTackles || '0'}`,
+                `${safeEmoji(E.interception, '🚧')} Interceptions: ${awayInterceptions || '0'}`,
+                `${safeEmoji(E.save, '🧤')} Saves: ${awaySaves || 0}`,
+                `${safeEmoji(E.team, '👥')} Players Used: ${repeatedCount(awayPlayed)}`
+              ].join('\n'),
+              inline: true
+            },
+            {
+              name: `${safeEmoji(E.mvp, '⭐')} Player of the Match`,
+              value: mvp ? `${safeEmoji(E.mvp, '⭐')} **${mvp}**` : 'Not selected',
+              inline: false
+            },
+            {
+              name: `${safeEmoji(E.goal, '⚽')} Goalscorers`,
               value: compactCountList(scorers),
               inline: true
             },
             {
-              name: '🎯 Assists',
+              name: `${safeEmoji(E.assist, '🎯')} Assists`,
               value: compactCountList(assists),
               inline: true
             },
             {
-              name: '⭐ MVP',
-              value: mvp || 'None',
-              inline: true
-            },
-            {
-              name: '🟨 Yellow Cards',
-              value: compactList(yellow),
-              inline: true
-            },
-            {
-              name: '🟥 Red Cards',
-              value: compactList(red),
-              inline: true
-            },
-            {
-              name: '🧤 Saves',
-              value: `${homeTeam}: ${homeSaves || 0}\n${awayTeam}: ${awaySaves || 0}`,
-              inline: true
-            },
-            {
-              name: '🛡️ Tackles',
-              value: `🏠 ${homeTackles || 'None'}\n✈️ ${awayTackles || 'None'}`,
-              inline: true
-            },
-            {
-              name: '🚧 Interceptions',
-              value: `🏠 ${homeInterceptions || 'None'}\n✈️ ${awayInterceptions || 'None'}`,
-              inline: true
-            },
-            {
-              name: '👥 Players Used',
-              value: `🏠 ${repeatedCount(homePlayed)}\n✈️ ${repeatedCount(awayPlayed)}`,
+              name: `${safeEmoji(E.yellow, '🟨')} / ${safeEmoji(E.red, '🟥')} Discipline`,
+              value: `${safeEmoji(E.yellow, '🟨')} Yellow Cards\n${compactList(yellow)}\n\n${safeEmoji(E.red, '🟥')} Red Cards\n${compactList(red)}`,
               inline: true
             }
           )
@@ -755,56 +753,54 @@ module.exports = {
           .setTitle(`${safeEmoji(E.correct, '✅')} Match Result Submitted`)
           .setDescription(
             [
-              `# ${pending.homeTeam} ${pending.hg} - ${pending.ag} ${pending.awayTeam}`,
+              `# ${safeEmoji(E.correct, '✅')} FULL TIME`,
               '',
-              `🏆 **Competition:** ${pending.competition.label || pending.competition.key}`,
-              `📋 **Match No:** ${pending.matchNo}`
+              `### ${safeEmoji(E.team, '🏠')} ${pending.homeTeam}`,
+              `# ${pending.hg} - ${pending.ag}`,
+              `### ${safeEmoji(E.vs, '✈️')} ${pending.awayTeam}`,
+              '',
+              `${safeEmoji(E.trophy, '🏆')} **${pending.competition.label || pending.competition.key}** • ${safeEmoji(E.calendar, '📋')} **${pending.matchNo}**`
             ].join('\n')
           )
           .addFields(
             {
-              name: '⚽ Goalscorers',
+              name: `${safeEmoji(E.team, '🏠')} Home Team Stats`,
+              value: [
+                `${safeEmoji(E.tackle, '🛡️')} Tackles: ${pending.homeTackles || '0'}`,
+                `${safeEmoji(E.interception, '🚧')} Interceptions: ${pending.homeInterceptions || '0'}`,
+                `${safeEmoji(E.save, '🧤')} Saves: ${pending.homeSaves || 0}`,
+                `${safeEmoji(E.team, '👥')} Players Used: ${repeatedCount(pending.homePlayed)}`
+              ].join('\n'),
+              inline: true
+            },
+            {
+              name: `${safeEmoji(E.team, '🏠')} Away Team Stats`,
+              value: [
+                `${safeEmoji(E.tackle, '🛡️')} Tackles: ${pending.awayTackles || '0'}`,
+                `${safeEmoji(E.interception, '🚧')} Interceptions: ${pending.awayInterceptions || '0'}`,
+                `${safeEmoji(E.save, '🧤')} Saves: ${pending.awaySaves || 0}`,
+                `${safeEmoji(E.team, '👥')} Players Used: ${repeatedCount(pending.awayPlayed)}`
+              ].join('\n'),
+              inline: true
+            },
+            {
+              name: `${safeEmoji(E.mvp, '⭐')} Player of the Match`,
+              value: pending.mvp ? `${safeEmoji(E.mvp, '⭐')} **${pending.mvp}**` : 'Not selected',
+              inline: false
+            },
+            {
+              name: `${safeEmoji(E.goal, '⚽')} Goalscorers`,
               value: compactCountList(pending.scorers),
               inline: true
             },
             {
-              name: '🎯 Assists',
+              name: `${safeEmoji(E.assist, '🎯')} Assists`,
               value: compactCountList(pending.assists),
               inline: true
             },
             {
-              name: '⭐ MVP',
-              value: pending.mvp || 'None',
-              inline: true
-            },
-            {
-              name: '🟨 Yellow Cards',
-              value: compactList(pending.yellow),
-              inline: true
-            },
-            {
-              name: '🟥 Red Cards',
-              value: compactList(pending.red),
-              inline: true
-            },
-            {
-              name: '🧤 Saves',
-              value: `${pending.homeTeam}: ${pending.homeSaves || 0}\n${pending.awayTeam}: ${pending.awaySaves || 0}`,
-              inline: true
-            },
-            {
-              name: '🛡️ Tackles',
-              value: `🏠 ${pending.homeTackles || 'None'}\n✈️ ${pending.awayTackles || 'None'}`,
-              inline: true
-            },
-            {
-              name: '🚧 Interceptions',
-              value: `🏠 ${pending.homeInterceptions || 'None'}\n✈️ ${pending.awayInterceptions || 'None'}`,
-              inline: true
-            },
-            {
-              name: '👥 Players Used',
-              value: `🏠 ${repeatedCount(pending.homePlayed)}\n✈️ ${repeatedCount(pending.awayPlayed)}`,
+              name: `${safeEmoji(E.yellow, '🟨')} / ${safeEmoji(E.red, '🟥')} Discipline`,
+              value: `${safeEmoji(E.yellow, '🟨')} Yellow Cards\n${compactList(pending.yellow)}\n\n${safeEmoji(E.red, '🟥')} Red Cards\n${compactList(pending.red)}`,
               inline: true
             }
           )
