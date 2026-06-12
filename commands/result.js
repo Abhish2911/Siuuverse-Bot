@@ -27,10 +27,10 @@ const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const SUBMITTED_AT_INDEX = 18;
 
 const ALL_RESULT_SOURCES = [
-  { key: 'league', label: 'League', range: 'Matches_Entry!A:S' },
-  { key: 'ucl', label: 'UCL', range: 'UCL_Coop_Results!A:S' },
-  { key: 'fa', label: 'FA Cup', range: 'FA_Cup_Coop_Results!A:S' },
-  { key: 'carabao', label: 'Carabao Cup', range: 'Carabao_Coop_Results!A:S' }
+  { key: 'league', label: 'League', range: 'Matches_Entry!A:T' },
+  { key: 'ucl', label: 'UCL', range: 'UCL_Coop_Results!A:T' },
+  { key: 'fa', label: 'FA Cup', range: 'FA_Cup_Coop_Results!A:T' },
+  { key: 'carabao', label: 'Carabao Cup', range: 'Carabao_Coop_Results!A:T' }
 ];
 
 function cleanPending(map) {
@@ -119,6 +119,32 @@ function splitRawEntries(v) {
     .split(',')
     .map(x => x.trim())
     .filter(Boolean);
+}
+
+function getPlayerTeamInfo(player, pending) {
+  const normalized = clean(player).toLowerCase();
+
+  const homePlayers = splitRawEntries(pending.homePlayed);
+  const awayPlayers = splitRawEntries(pending.awayPlayed);
+
+  if (homePlayers.some(p => clean(p).toLowerCase() === normalized)) {
+    return {
+      teamName: pending.homeTeam,
+      teamShort: ''
+    };
+  }
+
+  if (awayPlayers.some(p => clean(p).toLowerCase() === normalized)) {
+    return {
+      teamName: pending.awayTeam,
+      teamShort: ''
+    };
+  }
+
+  return {
+    teamName: pending.homeTeam,
+    teamShort: ''
+  };
 }
 
 function compactList(v, empty = 'None') {
@@ -361,6 +387,14 @@ module.exports = {
     const red = clean(interaction.options.getString('red'));
     const mvp = clean(interaction.options.getString('mvp'));
     const decision = clean(interaction.options.getString('decision'));
+    const homeTackles = clean(interaction.options.getString('hometackles'));
+    const awayTackles = clean(interaction.options.getString('awaytackles'));
+    const homeInterceptions = clean(interaction.options.getString('homeinterceptions'));
+    const awayInterceptions = clean(interaction.options.getString('awayinterceptions'));
+    const homeSaves = interaction.options.getInteger('homesaves') ?? '';
+    const awaySaves = interaction.options.getInteger('awaysaves') ?? '';
+    const homePlayed = clean(interaction.options.getString('homeplayed'));
+    const awayPlayed = clean(interaction.options.getString('awayplayed'));
 
     const competition = getCompetitionConfig(matchNo);
 
@@ -372,45 +406,6 @@ module.exports = {
 
     const fixtures = await getData(competition.fixturesRange);
 
-    if (competition.key === 'ucl') {
-      const rowsForLock = Array.isArray(fixtures) ? fixtures.slice(1) : [];
-
-      const grouped = new Map();
-
-      for (const row of rowsForLock) {
-        const match = normalizeMatchNo(row[0]);
-        const md = getMatchdayKey(match);
-
-        if (!grouped.has(md)) grouped.set(md, []);
-        grouped.get(md).push(row);
-      }
-
-      const ordered = [...grouped.keys()].sort();
-
-      let active = null;
-
-      for (const md of ordered) {
-        const matches = grouped.get(md) || [];
-
-        const completed = matches.filter(
-          r => r[4] !== '' && r[4] !== undefined && r[5] !== '' && r[5] !== undefined
-        );
-
-        if (completed.length < matches.length) {
-          active = md;
-          break;
-        }
-      }
-
-      if (active) {
-        fixtures.__allowedMatchday = active;
-      }
-    }
-
-    if (fixtures.__allowedMatchday) {
-      fixtures.allowedMatchday = fixtures.__allowedMatchday;
-    }
-
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
       return {
         content: `${safeEmoji(E.wrong, '❌')} Fixtures unavailable.`
@@ -418,9 +413,10 @@ module.exports = {
     }
 
     const rows = fixtures.slice(1);
+    const matchNoIndex = pendingResults.get(interaction.user.id)?.competition?.matchNoIndex ?? competition.matchNoIndex ?? 0;
 
     const index = rows.findIndex(
-      r => normalizeMatchNo(r[0]) === matchNo
+      r => normalizeMatchNo(r[competition.matchNoIndex ?? 0]) === matchNo
     );
 
     if (index === -1) {
@@ -430,26 +426,8 @@ module.exports = {
     }
 
     const fixture = rows[index];
-
-    const allowedMatchday = getAllowedMatchday(fixtures);
-
-    if (allowedMatchday) {
-      const requestedMatchday = getMatchdayKey(matchNo);
-
-      if (
-        normalizeMatchNo(requestedMatchday) !==
-        normalizeMatchNo(allowedMatchday)
-      ) {
-        return {
-          content:
-            `${safeEmoji(E.lock, '🔒')} Results are currently locked. ` +
-            `Only fixtures from **${allowedMatchday}** can be submitted right now.`
-        };
-      }
-    }
-
-    const homeTeam = clean(fixture[2]);
-    const awayTeam = clean(fixture[3]);
+    const homeTeam = clean(fixture[competition.homeIndex ?? 2]);
+    const awayTeam = clean(fixture[competition.awayIndex ?? 3]);
 
     const limitCheck = await checkDailyResultLimit({
       competition,
@@ -477,6 +455,14 @@ module.exports = {
       yellow,
       red,
       mvp,
+      homeTackles,
+      awayTackles,
+      homeInterceptions,
+      awayInterceptions,
+      homeSaves,
+      awaySaves,
+      homePlayed,
+      awayPlayed,
       decision,
       resultText: hg > ag ? 'H' : hg < ag ? 'A' : 'D',
       createdAt: Date.now()
@@ -498,45 +484,66 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(0x5865F2)
-          .setTitle(`${safeEmoji(E.correct, '✅')} Preview Result`)
+          .setTitle(`${safeEmoji(E.correct, '✅')} Match Result Preview`)
           .setDescription(
-            `## ${homeTeam} ${hg} - ${ag} ${awayTeam}`
+            [
+              `# ${pending ? '' : ''}${homeTeam} ${hg} - ${ag} ${awayTeam}`,
+              '',
+              `🏆 **Competition:** ${competition.label || competition.key}`,
+              `📋 **Match No:** ${matchNo}`
+            ].join('\n')
           )
           .addFields(
             {
-              name: `${safeEmoji(E.goal, '⚽')} Scorers`,
+              name: '⚽ Goalscorers',
               value: compactCountList(scorers),
               inline: true
             },
             {
-              name: `${safeEmoji(E.assist, '🎯')} Assists`,
+              name: '🎯 Assists',
               value: compactCountList(assists),
               inline: true
             },
             {
-              name: `${safeEmoji(E.mvp, '⭐')} MVP`,
+              name: '⭐ MVP',
               value: mvp || 'None',
               inline: true
             },
             {
-              name: `${safeEmoji(E.yellow, '🟨')} Yellow Cards`,
+              name: '🟨 Yellow Cards',
               value: compactList(yellow),
               inline: true
             },
             {
-              name: `${safeEmoji(E.red, '🟥')} Red Cards`,
+              name: '🟥 Red Cards',
               value: compactList(red),
               inline: true
             },
             {
-              name: `${safeEmoji(E.info, '📌')} Competition`,
-              value: competition.label || competition.key,
+              name: '🧤 Saves',
+              value: `${homeTeam}: ${homeSaves || 0}\n${awayTeam}: ${awaySaves || 0}`,
+              inline: true
+            },
+            {
+              name: '🛡️ Tackles',
+              value: `🏠 ${homeTackles || 'None'}\n✈️ ${awayTackles || 'None'}`,
+              inline: true
+            },
+            {
+              name: '🚧 Interceptions',
+              value: `🏠 ${homeInterceptions || 'None'}\n✈️ ${awayInterceptions || 'None'}`,
+              inline: true
+            },
+            {
+              name: '👥 Players Used',
+              value: `🏠 ${repeatedCount(homePlayed)}\n✈️ ${repeatedCount(awayPlayed)}`,
               inline: true
             }
           )
           .setFooter({
-            text: 'Press Confirm to submit result'
+            text: 'Review carefully and press Confirm to submit.'
           })
+          .setTimestamp()
       ],
       components: [row]
     };
@@ -579,19 +586,19 @@ module.exports = {
       pending.awayTeam,
       pending.hg,
       pending.ag,
-      pending.resultText,
       pending.scorers,
       pending.assists,
       pending.yellow,
       pending.red,
       pending.mvp,
-      '',
-      '',
-      '',
-      '',
-      '',
-      pending.decision,
-      interaction.user.tag,
+      pending.homeTackles,
+      pending.awayTackles,
+      pending.homeInterceptions,
+      pending.awayInterceptions,
+      pending.homeSaves,
+      pending.awaySaves,
+      pending.homePlayed,
+      pending.awayPlayed,
       submittedAt
     ];
 
@@ -610,6 +617,47 @@ module.exports = {
       rows
     );
 
+    // Update fixture sheet scores as well
+    try {
+      const fixtureSheet = await getData(pending.competition.fixturesRange);
+
+      if (Array.isArray(fixtureSheet) && fixtureSheet.length > 1) {
+        const fixtureRows = fixtureSheet.slice(1);
+
+        const fixtureIndex = fixtureRows.findIndex(
+          r => normalizeMatchNo(r[pending.competition.matchNoIndex ?? 0]) === pending.matchNo
+        );
+
+        if (fixtureIndex !== -1) {
+          const isLeagueOrUclGroup = pending.competition.fixturesRange.includes('Fixtures!') || pending.competition.fixturesRange.includes('UCL_Coop_Group_Fixtures');
+
+          const hgIndex = 4;
+          const agIndex = 5;
+          const resultIndex = 6;
+
+          fixtureRows[fixtureIndex][hgIndex] = pending.hg;
+          fixtureRows[fixtureIndex][agIndex] = pending.ag;
+
+          fixtureRows[fixtureIndex][resultIndex] = pending.hg > pending.ag
+            ? 'H'
+            : pending.hg < pending.ag
+              ? 'A'
+              : 'D';
+
+          if (!isLeagueOrUclGroup) {
+            fixtureRows[fixtureIndex][7] = pending.decision || '';
+          }
+
+          await updateData(
+            `${pending.competition.fixturesRange.split('!')[0]}!A2:${pending.competition.fixturesRange.split('!')[1].split(':')[1]}`,
+            fixtureRows
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Fixture update failed:', err);
+    }
+
     invalidateSheetCache([
       pending.competition.resultsRange.split('!')[0]
     ]);
@@ -621,16 +669,55 @@ module.exports = {
     }
 
     try {
+      const suspensionFixtures = (await getData(pending.competition.fixturesRange))
+        .slice(1)
+        .map(row => ({
+          matchNo: row[pending.competition.matchNoIndex ?? 0],
+          homeTeam: row[pending.competition.homeIndex ?? 2],
+          awayTeam: row[pending.competition.awayIndex ?? 3],
+          homeShort: row[pending.competition.homeShortIndex ?? 8],
+          awayShort: row[pending.competition.awayShortIndex ?? 9],
+          hg: row[4],
+          ag: row[5]
+        }));
+
       if (pending.yellow) {
         for (const player of splitRawEntries(pending.yellow)) {
-          await addYellowCard(player, pending.matchNo);
+          const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
+
+          await addYellowCard({
+            guildId: interaction.guildId,
+            competition: pending.competition.key,
+            playerName: player,
+            teamName,
+            teamShort,
+            matchNo: pending.matchNo
+          });
         }
       }
 
       if (pending.red) {
         for (const player of splitRawEntries(pending.red)) {
-          await addRedCard(player, pending.matchNo);
-          await assignNextBannedMatch(player);
+          const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
+
+          await addRedCard({
+            guildId: interaction.guildId,
+            competition: pending.competition.key,
+            playerName: player,
+            teamName,
+            teamShort,
+            matchNo: pending.matchNo
+          });
+
+          await assignNextBannedMatch({
+            guildId: interaction.guildId,
+            competition: pending.competition.key,
+            playerName: player,
+            teamName,
+            teamShort,
+            fixtures: suspensionFixtures,
+            afterMatchNo: pending.matchNo
+          });
         }
       }
     } catch (err) {
@@ -665,34 +752,66 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(0x2ECC71)
-          .setTitle(`${safeEmoji(E.correct, '✅')} Result Submitted`)
+          .setTitle(`${safeEmoji(E.correct, '✅')} Match Result Submitted`)
           .setDescription(
-            `## ${pending.homeTeam} ${pending.hg} - ${pending.ag} ${pending.awayTeam}`
+            [
+              `# ${pending.homeTeam} ${pending.hg} - ${pending.ag} ${pending.awayTeam}`,
+              '',
+              `🏆 **Competition:** ${pending.competition.label || pending.competition.key}`,
+              `📋 **Match No:** ${pending.matchNo}`
+            ].join('\n')
           )
           .addFields(
             {
-              name: `${safeEmoji(E.goal, '⚽')} Goals`,
-              value: String(
-                repeatedCount(pending.scorers)
-              ),
+              name: '⚽ Goalscorers',
+              value: compactCountList(pending.scorers),
               inline: true
             },
             {
-              name: `${safeEmoji(E.assist, '🎯')} Assists`,
-              value: String(
-                repeatedCount(pending.assists)
-              ),
+              name: '🎯 Assists',
+              value: compactCountList(pending.assists),
               inline: true
             },
             {
-              name: `${safeEmoji(E.mvp, '⭐')} MVP`,
+              name: '⭐ MVP',
               value: pending.mvp || 'None',
+              inline: true
+            },
+            {
+              name: '🟨 Yellow Cards',
+              value: compactList(pending.yellow),
+              inline: true
+            },
+            {
+              name: '🟥 Red Cards',
+              value: compactList(pending.red),
+              inline: true
+            },
+            {
+              name: '🧤 Saves',
+              value: `${pending.homeTeam}: ${pending.homeSaves || 0}\n${pending.awayTeam}: ${pending.awaySaves || 0}`,
+              inline: true
+            },
+            {
+              name: '🛡️ Tackles',
+              value: `🏠 ${pending.homeTackles || 'None'}\n✈️ ${pending.awayTackles || 'None'}`,
+              inline: true
+            },
+            {
+              name: '🚧 Interceptions',
+              value: `🏠 ${pending.homeInterceptions || 'None'}\n✈️ ${pending.awayInterceptions || 'None'}`,
+              inline: true
+            },
+            {
+              name: '👥 Players Used',
+              value: `🏠 ${repeatedCount(pending.homePlayed)}\n✈️ ${repeatedCount(pending.awayPlayed)}`,
               inline: true
             }
           )
           .setFooter({
-            text: `${pending.competition.label || pending.competition.key} • Saved successfully`
+            text: `${pending.competition.label || pending.competition.key} • Result saved successfully`
           })
+          .setTimestamp()
       ],
       components: []
     };
