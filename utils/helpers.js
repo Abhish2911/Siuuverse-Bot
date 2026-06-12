@@ -274,41 +274,51 @@ function getCompetitionConfig(matchNo) {
 
   if (id.startsWith('L-')) {
     return {
-      name: 'League',
-      fixturesSheet: 'Fixtures!A:I',
-      resultsSheet: 'Matches_Entry!A:S'
+      key: 'league',
+      label: 'League',
+      fixturesRange: 'Fixtures!A:I',
+      resultsRange: 'Matches_Entry!A:S'
     };
   }
 
   if (id.startsWith('FA-')) {
     return {
-      name: 'FA Cup',
-      fixturesSheet: 'FA_Cup_Coop_Fixtures!A:K',
-      resultsSheet: 'FA_Cup_Coop_Results!A:S'
+      key: 'fa',
+      label: 'FA Cup',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      resultsRange: 'FA_Cup_Coop_Results!A:S'
     };
   }
 
   if (id.startsWith('CB-')) {
     return {
-      name: 'Carabao Cup',
-      fixturesSheet: 'Carabao_Coop_Fixtures!A:K',
-      resultsSheet: 'Carabao_Coop_Results!A:S'
+      key: 'carabao',
+      label: 'Carabao Cup',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      resultsRange: 'Carabao_Coop_Results!A:S'
     };
   }
 
   if (id.startsWith('UCL-GS-')) {
     return {
-      name: 'UCL Group Stage',
-      fixturesSheet: 'UCL_Coop_Group_Fixtures!A:J',
-      resultsSheet: 'UCL_Coop_Results!A:S'
+      key: 'ucl',
+      label: 'UCL Group Stage',
+      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      resultsRange: 'UCL_Coop_Results!A:S'
     };
   }
 
-  if (id.startsWith('UCL-R16-') || id.startsWith('UCL-QF-') || id.startsWith('UCL-SF-') || id.startsWith('UCL-F-')) {
+  if (
+    id.startsWith('UCL-R16-') ||
+    id.startsWith('UCL-QF-') ||
+    id.startsWith('UCL-SF-') ||
+    id.startsWith('UCL-F-')
+  ) {
     return {
-      name: 'UCL Knockout',
-      fixturesSheet: 'UCL_Coop_Knockout_Fixtures!A:L',
-      resultsSheet: 'UCL_Coop_Results!A:S'
+      key: 'ucl',
+      label: 'UCL Knockout',
+      fixturesRange: 'UCL_Coop_Knockout_Fixtures!A:L',
+      resultsRange: 'UCL_Coop_Results!A:S'
     };
   }
 
