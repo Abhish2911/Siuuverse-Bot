@@ -17,10 +17,6 @@ function clean(value) {
   return sharedClean(value);
 }
 
-function normalizeMatchNo(value) {
-  return clean(value).toUpperCase();
-}
-
 function getCompetitionConfig(key) {
   const normalized = clean(key || 'league').toLowerCase();
 
@@ -129,30 +125,29 @@ function getCaptainId(teamRow) {
 function buildResultFormat(matchNo = '<match_no>') {
   return (
     `\`/result match:${matchNo} ` +
-    `homegoals:<home_goals> ` +
-    `awaygoals:<away_goals> ` +
-    `scorers:<player1, player2> ` +
-    `assists:<player1, player2> ` +
-    `yellow:<player1, player2> ` +
-    `red:<player1, player2> ` +
-    `mvp:<player> ` +
-    `tackles1:<home_tackles> ` +
-    `tackles2:<away_tackles> ` +
-    `interceptions1:<home_interceptions> ` +
-    `interceptions2:<away_interceptions> ` +
-    `saves1:<home_saves> ` +
-    `saves2:<away_saves> ` +
-    `homeplayed:<home_player1, home_player2> ` +
-    `awayplayed:<away_player1, away_player2>\``
+    `homegoals:3 ` +
+    `awaygoals:1 ` +
+    `scorers:Abhi(2), Nifuji(1), Neji(1) ` +
+    `assists:Abhi(1), Nifuji(2), Ichigoat(1) ` +
+    `mvp:Abhi ` +
+    `hometackles:Abhi(6), Nifuji(3) ` +
+    `awaytackles:Ichigoat(8), Neji(3) ` +
+    `homeinterceptions:Abhi(1), Nifuji(5) ` +
+    `awayinterceptions:Ichigoat(3), Neji(2) ` +
+    `homesaves:1 ` +
+    `awaysaves:1 ` +
+    `homeplayed:Abhi, Nifuji ` +
+    `awayplayed:Ichigoat, Neji\``
   );
 }
 
 function buildResultEntryGuide() {
   return (
-    `${E.info || '📌'} **Result Entry Guide**\n` +
-    `Use the correct match prefix in \`match:\` → **L / FA / CB / UCL**\n` +
-    `Use the correct round/stage name inside the match ID when needed → **GS / RO16 / QF / SF / F**\n` +
-    `Examples: **L MD2.1**, **FA QF.1**, **CB SF.1**, **UCL GS-A-MD2.1**, **UCL QF.1**`
+    `${E.info || '📌'} **Match ID Guide**\n` +
+    `League: **L-2-8**\n` +
+    `FA Cup: **FA-QF-1**\n` +
+    `Carabao Cup: **CB-SF-1**\n` +
+    `UCL: **UCL-GS-A-2-1** / **UCL-QF-1**`
   );
 }
 
@@ -162,7 +157,25 @@ function buildCaptainPanelButtons(matchNo = 'next', competitionKey = 'league') {
       new ButtonBuilder()
         .setCustomId(`captainpanel_resultformat:${competitionKey}:${matchNo}`)
         .setLabel('Result Format')
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`captainpanel_standings:${competitionKey}`)
+        .setLabel('Standings')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`captainpanel_reserved:${competitionKey}`)
+        .setLabel('Reserved')
+        .setStyle(ButtonStyle.Secondary)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`captainpanel_ucl:${competitionKey}`)
+        .setLabel('UCL Group')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`captainpanel_actions:${competitionKey}`)
+        .setLabel('Captain Actions')
+        .setStyle(ButtonStyle.Success)
     )
   ];
 }
@@ -329,13 +342,7 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
         const date = String(nextMatch[config.dateIndex] || 'TBD').trim();
         const home = String(nextMatch[config.homeShortIndex] || nextMatch[config.homeIndex] || 'HOME').trim();
         const away = String(nextMatch[config.awayShortIndex] || nextMatch[config.awayIndex] || 'AWAY').trim();
-        return truncateField(
-          `${E.doubleArrow} **Match:** ${matchNo}\n` +
-          `${E.calendar} **Date:** ${date}\n` +
-          `${E.vs} **Fixture:** ${home} ${E.vs} ${away}\n` +
-          `${E.goal} Click **Result Format** button below to copy the full ${config.label} result command format.\n` +
-          `${E.info || '📌'} Match IDs must include the right prefix and round/stage name.`
-        );
+        return `${E.goal} Click **Result Format** below for a ready-to-copy result example.`;
       })()
     : `${E.correct} No upcoming unplayed match found.`;
 
@@ -357,13 +364,14 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
       `${E.team || '🏟️'} **Team:** ${teamName}\n` +
       `${E.Badge} **Short:** ${shortName || 'N/A'}\n` +
       `${E.trophy_animated || '🏆'} **Competition:** ${config.label}\n` +
-      `🏟️ **Stadium:** ${stadium}`
+      `🏟️ **Stadium:** ${stadium}` +
+      `\n📊 **Status:** ${suspensions.length} suspension(s) • ${reservedMatches.length} reserve(s)`
     )
     .addFields(
       { name: `${E.calendar} Your Next Match`, value: nextMatchText, inline: false },
       { name: `${E.info || '📌'} Result Entry Guide`, value: buildResultEntryGuide(), inline: false },
-      { name: `${E.reserve || '📌'} Reserved / Pending Played Status`, value: reservedText, inline: false },
-      { name: `${E.profile} Squad Members`, value: squadText, inline: false },
+      { name: `${E.reserve || '📌'} Reserved Matches`, value: reservedText, inline: false },
+      { name: `${E.profile} Squad (${squadNames.length})`, value: squadText, inline: false },
       { name: `${E.suspend} Suspensions`, value: suspensionsText, inline: false }
     )
     .setColor(getTeamColor(teams, teamName, 0x3498DB))
@@ -402,6 +410,22 @@ module.exports = {
   },
 
   async buttonHandler(interaction, action, value, extra) {
+    if (action === 'standings') {
+      return { content: '📊 Standings panel coming soon.', ephemeral: true };
+    }
+
+    if (action === 'reserved') {
+      return { content: '📌 Reserved matches panel coming soon.', ephemeral: true };
+    }
+
+    if (action === 'ucl') {
+      return { content: '🏆 UCL group information coming soon.', ephemeral: true };
+    }
+
+    if (action === 'actions') {
+      return { content: '👑 Captain actions panel coming soon.', ephemeral: true };
+    }
+
     if (action !== 'resultformat') return null;
 
     const raw = String(value || 'league:next');
