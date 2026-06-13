@@ -65,7 +65,7 @@ function getLimitEmoji(count, limit) {
 }
 
 const SUBMITTED_AT_INDEX = 18;
-const TEAMS_PER_PAGE = 6;
+const TEAMS_PER_PAGE = 3;
 
 const RESULT_SOURCES = [
   { key: 'league', label: 'League', range: 'Matches_Entry!A:S' },
@@ -214,9 +214,13 @@ async function buildLimitStatusPage(teamQuery = '', page = 0) {
     return { embeds: [embed], components: [] };
   }
 
+  const fieldValue = pageTeams.map(formatTeamLimitLine).join('\n\n');
+
   embed.addFields({
     name: 'Teams',
-    value: pageTeams.map(formatTeamLimitLine).join('\n\n'),
+    value: fieldValue.length > 1024
+      ? `${fieldValue.slice(0, 1000)}\n...`
+      : fieldValue,
     inline: false
   });
 
