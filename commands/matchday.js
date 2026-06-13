@@ -6,7 +6,6 @@ const {
 } = require('discord.js');
 const {
   cachedGetData,
-  getAllowedMatchday,
   getTeamColor,
   getFixtureMatchday,
   createCompetitionDropdown
@@ -202,13 +201,33 @@ module.exports = {
       return { content: `${safeEmoji(E.wrong, '❌')} Fixtures is empty.` };
     }
 
-    const allowedMD = getAllowedMatchday(fixtures);
+    // Active matchday = first matchday/round that still has an unplayed fixture.
+    let allowedMD = null;
+
+    const grouped = [...new Set(
+      fixtures
+        .slice(1)
+        .filter(row => row?.[0])
+        .map(row => String(getFixtureMatchday(row[0])).trim())
+        .filter(Boolean)
+    )];
+
+    for (const md of grouped) {
+      const mdRows = fixtures
+        .slice(1)
+        .filter(row => String(getFixtureMatchday(row?.[0])).trim() === String(md).trim());
+
+      if (mdRows.some(row => !hasScore(row))) {
+        allowedMD = md;
+        break;
+      }
+    }
 
     if (!allowedMD) {
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle(`${safeEmoji(E.correct, '✅')} League Complete`)
+            .setTitle(`${safeEmoji(E.correct, '✅')} Competition Complete`)
             .setDescription('All fixtures appear to be completed.')
             .setColor(0x2ECC71)
         ]
