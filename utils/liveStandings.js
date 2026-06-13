@@ -371,7 +371,7 @@ async function buildLiveStandingsEmbed(type = 'league') {
       })
       .setColor(0x5865F2)
       .setFooter({
-        text: `UCL Group Standings • Group Winner ${E.winner || '👑'} • Runner-up ${E.runnerUp || '🥈'} • ${E.correct || '✅'} Qualified`
+        text: 'UCL Group Standings • 👑 Group Winner • 🥈 Runner-up • ✅ Qualified'
       })
       .setTimestamp();
   }
