@@ -194,6 +194,7 @@ function getReserveMap(rows, competitionLabel) {
       home: clean(row?.[2]),
       away: clean(row?.[3]),
       by: clean(row?.[4]),
+      byMention: clean(row?.[4]) ? `<@${clean(row?.[4])}>` : '',
       playerName: clean(row?.[5])
     });
   });
@@ -249,7 +250,7 @@ function getStatusText(row, config, reserveMap = new Map()) {
 
   if (reserve) {
     return `${safeEmoji(E.lock, '🔒')} RESERVED${
-      reserve.by ? ` by ${reserve.by}` : ''
+      reserve.byMention ? ` by ${reserve.byMention}` : ''
     }`;
   }
 
@@ -314,7 +315,7 @@ function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
       ? `${getResultEmoji(hg, ag)} **${hg}-${ag}** (${res})`
       : reserve
         ? `${safeEmoji(E.lock, '🔒')} Reserved${
-            reserve.by ? ` by **${reserve.by}**` : ''
+            reserve.byMention ? ` by ${reserve.byMention}` : ''
           }${
             reserve.playerName
               ? ` • **${reserve.playerName}**`
