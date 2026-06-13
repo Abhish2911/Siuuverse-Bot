@@ -19,7 +19,7 @@ const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const TEAMS_SHEET_RANGE = 'Teams!A:Z';
 const FIXTURES_SHEET_RANGE = 'Fixtures!A:J';
 const MAX_ACTIVE_RESERVES_PER_CAPTAIN = 4;
-const RESERVES_PER_PAGE = 10;
+const RESERVES_PER_PAGE = 5;
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
@@ -239,16 +239,28 @@ async function buildReserveListEmbed(page = 0) {
     .addFields(
       {
         name: `${safeEmoji(E.stats || E.rank, '📊')} Reserve Feed`,
-        value: pageRows.length
-          ? pageRows
-              .map((row, index) =>
-                `**${page * RESERVES_PER_PAGE + index + 1}. ${clean(row[1]) || 'N/A'}** • ${clean(row[0]) || 'N/A'}\n` +
-                `${safeEmoji(E.home || E.team, '🏠')} **Home:** ${clean(row[2]) || 'N/A'}\n` +
-                `${safeEmoji(E.away || E.team, '🚩')} **Away:** ${clean(row[3]) || 'N/A'}\n` +
-                `${safeEmoji(E.profile, '👤')} **By:** ${clean(row[4]) ? `<@${clean(row[4])}>` : 'N/A'}${clean(row[5]) ? ` • **Player:** ${clean(row[5])}` : ''}`
-              )
-              .join('\n\n')
-          : 'No reserved matches yet.',
+        value: (() => {
+          if (!pageRows.length) return 'No reserved matches yet.';
+
+          let output = '';
+
+          for (const [index, row] of pageRows.entries()) {
+            const entry =
+              `**${page * RESERVES_PER_PAGE + index + 1}. ${clean(row[1]) || 'N/A'}** • ${clean(row[0]) || 'N/A'}\n` +
+              `${safeEmoji(E.home || E.team, '🏠')} **Home:** ${clean(row[2]) || 'N/A'}\n` +
+              `${safeEmoji(E.away || E.team, '🚩')} **Away:** ${clean(row[3]) || 'N/A'}\n` +
+              `${safeEmoji(E.profile, '👤')} **By:** ${clean(row[4]) ? `<@${clean(row[4])}>` : 'N/A'}${clean(row[5]) ? ` • **Player:** ${clean(row[5])}` : ''}\n\n`;
+
+            if ((output + entry).length > 1000) {
+              output += `...and ${pageRows.length - index} more reserve(s).`;
+              break;
+            }
+
+            output += entry;
+          }
+
+          return output.trim();
+        })(),
         inline: false
       },
       {
