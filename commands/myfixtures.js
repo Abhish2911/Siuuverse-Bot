@@ -455,25 +455,25 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
     return aNo.localeCompare(bNo, undefined, { numeric: true, sensitivity: 'base' });
   });
 
-  const totalPages = Math.max(1, Math.ceil(orderedRows.length / pageSize));
-  page = Math.max(0, Math.min(page, totalPages - 1));
-
-  const pageRows = orderedRows.slice(page * pageSize, page * pageSize + pageSize);
   const record = config.key === 'league' ? getRecord(standings, team.teamName, team.shortName) : { wins: 0, draws: 0, losses: 0, gd: 0, pts: 0 };
   const reserveMatches = getReserveMatches(reserveRows, team, config.reserveLabel);
+
+  const reservedMatchNos = new Set(
+    reserveMatches.map(match => normalizeMatchNo(match.matchNo))
+  );
+
+  const visibleRows = orderedRows.filter(
+    row => !reservedMatchNos.has(normalizeMatchNo(row[config.matchNoIndex]))
+  );
+
   const summary = buildFixtureSummary(team, rows, upcoming, played, reserveMatches, current, config);
+
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
+  page = Math.max(0, Math.min(page, totalPages - 1));
+
+  const pageRows = visibleRows.slice(page * pageSize, page * pageSize + pageSize);
   const currentOpponent = current ? (normalize(current[config.homeIndex]) === teamKey ? current[config.awayIndex] : current[config.homeIndex]) : null;
-  const reserveBlock = reserveMatches.length
-    ? `${safeEmoji(E.lock, '🔒')} **Reserved Matches**\n` +
-      reserveMatches
-        .slice(0, 5)
-        .map(match =>
-          `> **${match.matchNo}** • \`${match.home}\` ${safeEmoji(E.vs, '⚔️')} \`${match.away}\`${match.by ? ` • by <@${match.by}>` : ''}${match.playerName ? ` • **${match.playerName}**` : ''}`
-        )
-        .join('\n') +
-      (reserveMatches.length > 5 ? `\n> +${reserveMatches.length - 5} more reserved matches` : '') +
-      '\n\n'
-    : '';
+  const reserveBlock = '';
 
   const currentBlock = current
     ? `${safeEmoji(E.fire, '🔥')} **Next Match**\n` +
@@ -487,7 +487,7 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
 
   const embed = new EmbedBuilder()
     .setTitle(`${safeEmoji(E.calendar, '📅')} ${team.teamName.toUpperCase()} ${config.label} Fixtures`)
-    .setDescription(buildFixtureDescription(team, summary, record, currentBlock, reserveBlock, pageRows, page, orderedRows))
+    .setDescription(buildFixtureDescription(team, summary, record, currentBlock, reserveBlock, pageRows, page, visibleRows))
     .addFields(
       {
         name: `${safeEmoji(E.fire, '🔥')} Fixture List`,
