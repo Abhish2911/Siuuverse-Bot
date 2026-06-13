@@ -116,7 +116,7 @@ module.exports = {
       return `  ${line}`;
     }).join('\n');
 
-    const header = '      # TEAM    P  W  D  L   GD  PTS';
+    const header = '  📈  # TEAM    P  W  D  L   GD  PTS';
     const summary = buildStandingsSummary(rows);
     const leader = rows[0]?.[1] || '';
     const bottomZone = rows.slice(-3).map(row => row[1]).filter(Boolean).join('\n') || 'N/A';
