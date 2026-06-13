@@ -75,7 +75,7 @@ function rankIcon(index, total) {
   if (index === 0) return '👑';
   if (index === 1) return '🥈';
   if (index === 2) return '🥉';
-  if (index >= total - 2) return '▫️';
+  if (index >= total - 3) return '🔻';
   return '▫️';
 }
 
