@@ -19,7 +19,7 @@ const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const TEAMS_SHEET_RANGE = 'Teams!A:Z';
 const FIXTURES_SHEET_RANGE = 'Fixtures!A:J';
 const MAX_ACTIVE_RESERVES_PER_CAPTAIN = 4;
-const RESERVES_PER_PAGE = 5;
+const RESERVES_PER_PAGE = 4;
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
@@ -450,8 +450,12 @@ module.exports = {
 
   async buttonHandler(interaction, action) {
     // Handle pagination for reserve list
-    if (String(action).startsWith('page_')) {
-      const page = Number(String(action).replace('page_', '')) || 0;
+    if (String(action).startsWith('page_') || String(action).startsWith('reserve_page_')) {
+      const page = Number(
+        String(action)
+          .replace('reserve_page_', '')
+          .replace('page_', '')
+      ) || 0;
       const rows = await getReserveRows();
       const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
 
