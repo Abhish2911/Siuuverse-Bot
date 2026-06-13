@@ -363,6 +363,12 @@ module.exports = {
       } else if (type === 'ga') {
         nameIndex = 16;
         valueIndex = 17;
+      } else if (type === 'tackles') {
+        nameIndex = 19;
+        valueIndex = 20;
+      } else if (type === 'interceptions') {
+        nameIndex = 22;
+        valueIndex = 23;
       } else {
         return { rank: '-', value: 0 };
       }
@@ -390,7 +396,14 @@ module.exports = {
     const ga = getStat('ga');
 
     if (!teamData) teamData = getTeamDataFromPlayer(teams, inputName);
-    const extraStats = sumExtraStats(matchesEntry, inputName, teamData);
+
+    const tackleStats = getStat('tackles');
+    const interceptionStats = getStat('interceptions');
+
+    const extraStats = {
+      tackles: tackleStats.value,
+      interceptions: interceptionStats.value
+    };
 
     const teamName = teamData?.teamName || 'Free Agent';
     const shortName = teamData?.shortName || 'FA';
@@ -446,8 +459,8 @@ module.exports = {
         {
           name: `${safeEmoji(E.defense, '🛡️')} Defensive Stats`,
           value:
-            `${safeEmoji(E.tackle, '🛡️')} **Tackles:** ${extraStats.tackles}\n` +
-            `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions}`,
+            `${safeEmoji(E.tackle, '🛡️')} **Tackles:** ${extraStats.tackles} (#${tackleStats.rank}) ${rankBadge(tackleStats.rank)}\n` +
+            `${safeEmoji(E.interception, '✂️')} **Interceptions:** ${extraStats.interceptions} (#${interceptionStats.rank}) ${rankBadge(interceptionStats.rank)}`,
           inline: true
         },
         {
