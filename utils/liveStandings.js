@@ -338,7 +338,7 @@ async function buildLiveStandingsEmbed(type = 'league') {
             : `  ${line}`;
         }).join('\n');
 
-        return `**Group ${group}**\n\`\`\`diff\n      # TEAM    P  W  D  L   GD  PTS\n${lines}\n\`\`\``;
+        return `**Group ${group}**\n\`\`\`diff\n  📈  # TEAM    P  W  D  L   GD  PTS\n${lines}\n\`\`\``;
       })
       .join('\n\n');
   } else {
@@ -361,8 +361,8 @@ async function buildLiveStandingsEmbed(type = 'league') {
   }
 
   const header = normalizedType === 'ucl'
-    ? '      # TEAM    P  W  D  L   GD  PTS'
-    : '      # TEAM    P  W  D  L   GD  PTS';
+    ? '  📈  # TEAM    P  W  D  L   GD  PTS'
+    : '  📈  # TEAM    P  W  D  L   GD  PTS';
 
   if (normalizedType === 'ucl') {
     return new EmbedBuilder()
