@@ -71,11 +71,17 @@ function buildStandingsDescription(summary) {
   );
 }
 
-function rankIcon(index, total) {
+function rankIcon(index, total, isUcl = false) {
   if (index === 0) return '👑';
   if (index === 1) return '🥈';
   if (index === 2) return '🥉';
-  if (index >= total - 3) return '🔻';
+
+  if (isUcl) {
+    if (index === total - 3) return '▫️';
+  } else {
+    if (index >= total - 3) return '🔻';
+  }
+
   return '▫️';
 }
 
@@ -325,7 +331,7 @@ async function buildLiveStandingsEmbed(type = 'league') {
           const l = pad(toNumber(r?.[6]), 2, 'start');
           const gd = pad(formatGD(r?.[9]), 4, 'start');
           const pts = pad(toNumber(r?.[10]), 3, 'start');
-          const line = `${rankIcon(i, groupRows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
+          const line = `${rankIcon(i, groupRows.length, true)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
 
           return qualifiedTeams.has(clean(r?.[2]))
             ? `+ ${line}`
