@@ -35,6 +35,42 @@ function formatGD(value) {
   return num > 0 ? `+${num}` : String(num);
 }
 
+function safeEmoji(value, fallback = '') {
+  return value || fallback;
+}
+
+function buildStandingsSummary(rows) {
+  const leader = rows[0];
+  const second = rows[1];
+  const third = rows[2];
+  const bottom = rows[rows.length - 1];
+
+  const formatTeamLine = row => {
+    if (!row) return 'N/A';
+    return `\`${clean(row[1])}\` • ${row[9] || 0} pts`;
+  };
+
+  return {
+    teams: rows.length,
+    leader: formatTeamLine(leader),
+    second: formatTeamLine(second),
+    third: formatTeamLine(third),
+    bottom: formatTeamLine(bottom)
+  };
+}
+
+function buildStandingsDescription(summary) {
+  return (
+    `${safeEmoji(E.trophy_animated, E.PL || '🏆')} **League Table Overview**\n` +
+    `Current coop league standings sorted by points, goal difference and goals scored.\n\n` +
+    `${safeEmoji(E.team, '👥')} **Teams:** ${summary.teams}\n` +
+    `${safeEmoji(E.goldenBoot, '👑')} **Leader:** ${summary.leader}\n` +
+    `${safeEmoji(E.runnerUp, '🥈')} **2nd:** ${summary.second}\n` +
+    `${safeEmoji(E.medal, '🥉')} **3rd:** ${summary.third}\n` +
+    `🔻 **Bottom:** ${summary.bottom}`
+  );
+}
+
 function rankIcon(index, total) {
   if (index === 0) return '👑';
   if (index === 1) return '🥈';
@@ -313,7 +349,7 @@ async function buildLiveStandingsEmbed(type = 'league') {
       const line = `${rankIcon(i, rows.length)} ${pos} ${tm} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
 
       if (i < 3) return `+ ${line}`;
-      if (i >= rows.length - 2) return `- ${line}`;
+      if (i >= rows.length - 3) return `- ${line}`;
       return `  ${line}`;
     }).join('\n');
   }
@@ -337,39 +373,49 @@ async function buildLiveStandingsEmbed(type = 'league') {
     ? 'UCL auto-updated board'
     : 'COOP auto-updated board';
 
+  if (normalizedType === 'ucl') {
+    return new EmbedBuilder()
+      .setTitle(`${E.UCL || '🏆'} UCL Group Standings`)
+      .setDescription(
+        `${E.goal || '⚽'} UCL Group Stage Standings\n\n${E.up || '🟢'} Top 2 teams qualify automatically\n${E.up || '🟢'} Best 2 third-place teams qualify\n\n${table}`
+      )
+      .addFields({
+        name: `${E.correct || '✅'} Qualification`,
+        value: `Qualified Teams: **${qualifiedTeams.size}**\nTop 2 from each group + Best 2 third-place teams`,
+        inline: false
+      })
+      .setColor(0x5865F2)
+      .setFooter({
+        text: `UCL Group Standings • ${E.correct || '✅'} Qualified • 👑 Group Winner • 🥈 Runner-up`
+      })
+      .setTimestamp();
+  }
+
+  const summary = buildStandingsSummary(rows);
+  const bottomZone = rows
+    .slice(-3)
+    .map(row => clean(row?.[1]))
+    .filter(Boolean)
+    .join('\n') || 'N/A';
+
   return new EmbedBuilder()
-    .setTitle(
-      normalizedType === 'ucl'
-        ? `${E.UCL || '🏆'} UCL Group Standings`
-        : '🏆 COOP Live Standings'
-    )
-    .setDescription(
-      normalizedType === 'ucl'
-        ? `${E.goal || '⚽'} UCL Group Stage Standings\n\n${E.up || '🟢'} Top 2 teams qualify automatically\n${E.up || '🟢'} Best 2 third-place teams qualify\n\n${table}`
-        : `\`\`\`diff\n${header}\n${table}\n\`\`\``
-    )
+    .setTitle(`${safeEmoji(E.trophy_animated, E.PL || '🏆')} Coop League Table`)
+    .setDescription(buildStandingsDescription(summary))
     .addFields(
-      normalizedType === 'ucl'
-        ? {
-            name: `${E.correct || '✅'} Qualification`,
-            value: `Qualified Teams: **${qualifiedTeams.size}**\nTop 2 from each group + Best 2 third-place teams`,
-            inline: false
-          }
-        : [
-            { name: '👥 Teams', value: String(rows.length), inline: true },
-            {
-              name: '👑 Leader',
-              value: `${leaderName}\n**${leaderPts} pts**`,
-              inline: true
-            },
-            { name: '🔻 Bottom Zone', value: bottomZone, inline: true }
-          ]
+      {
+        name: `${safeEmoji(E.stats || E.rank, '📊')} Table`,
+        value: `\`\`\`diff\n${header}\n${table}\n\`\`\``,
+        inline: false
+      },
+      {
+        name: '🔻 Bottom Zone',
+        value: bottomZone,
+        inline: false
+      }
     )
     .setColor(0x5865F2)
     .setFooter({
-      text: normalizedType === 'ucl'
-        ? `UCL Group Standings • ${E.correct || '✅'} Qualified • 👑 Group Winner • 🥈 Runner-up`
-        : `Live Standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 2 • ${boardLabel}`
+      text: 'Coop league standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 3'
     })
     .setTimestamp();
 }
