@@ -185,11 +185,28 @@ module.exports = {
           { name: 'All Competitions', value: 'all' }
         )
     )
+    .addStringOption(opt =>
+      opt
+        .setName('matchday')
+        .setDescription('Specific matchday/round to remind (optional)')
+        .setRequired(false)
+    )
     .addBooleanOption(opt =>
       opt
         .setName('silent')
         .setDescription('Send without captain/player mentions')
         .setRequired(false)
+    )
+    .addStringOption(opt =>
+      opt
+        .setName('notify')
+        .setDescription('How players should be notified')
+        .setRequired(false)
+        .addChoices(
+          { name: 'DM Players', value: 'dm' },
+          { name: 'Mention Players', value: 'mention' },
+          { name: 'No Notifications', value: 'none' }
+        )
     ),
 
   async execute(interaction) {
@@ -198,7 +215,11 @@ module.exports = {
     }
 
     const competition = interaction.options.getString('competition') || 'all';
+    const selectedMatchday = String(
+      interaction.options.getString('matchday') || ''
+    ).trim();
     const silent = interaction.options.getBoolean('silent') || false;
+    const notifyMode = interaction.options.getString('notify') || 'dm';
 
     let configs = getCompetitionConfigs();
 
@@ -230,10 +251,16 @@ module.exports = {
 
       let rows = fixtures.slice(1);
 
-      if (config.activeMatchday) {
+      if (selectedMatchday) {
+        rows = rows.filter(r =>
+          String(r[config.matchdayColumn] || '')
+            .trim()
+            .toUpperCase()
+            .includes(selectedMatchday.toUpperCase())
+        );
+      } else if (config.activeMatchday) {
         const active = getAllowedMatchday(fixtures);
 
-        // Fallback if helper fails to detect an active matchday
         if (!active) {
           rows = rows.filter(r => {
             const hg = r[config.scoreHomeCol];
@@ -276,18 +303,30 @@ module.exports = {
     const fixtureLines = [];
     const playerIds = new Set();
 
+    const reserveData = await cachedGetData('Reserve!A:F').catch(() => []);
+    const reservedMatches = new Set(
+      (Array.isArray(reserveData) ? reserveData.slice(1) : [])
+        .map(r => String(r[0] || '').trim().toUpperCase())
+        .filter(Boolean)
+    );
+
     for (const item of remaining) {
       const row = item.row;
       const config = item.config;
 
       const matchNo = String(row[config.matchdayColumn] || '-').trim();
+
+      if (reservedMatches.has(matchNo.toUpperCase())) {
+        continue;
+      }
+
       const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
       const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
 
       const homeTeam = findCoopTeamRow(teamRows, homeShort, row[config.homeCol]);
       const awayTeam = findCoopTeamRow(teamRows, awayShort, row[config.awayCol]);
 
-      if (!silent) {
+      if (!silent && notifyMode !== 'none') {
         getAllPlayerIds(homeTeam).forEach(id => playerIds.add(id));
         getAllPlayerIds(awayTeam).forEach(id => playerIds.add(id));
       }
@@ -302,8 +341,8 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle(
         competition === 'all'
-          ? 'League • UCL • FA Cup • Carabao Cup Reminder'
-          : `${configs[0].key} Reminder`
+          ? `League • UCL • FA Cup • Carabao Cup ${selectedMatchday ? `• ${selectedMatchday}` : ''} Reminder`
+          : `${configs[0].key}${selectedMatchday ? ` • ${selectedMatchday}` : ''} Reminder`
       )
       .setDescription(buildReminderDescription(summary))
       .addFields(
@@ -316,7 +355,9 @@ module.exports = {
       .setColor(0xF1C40F)
       .setFooter({ text: silent ? 'Remind Fixtures • Silent reminder sent' : 'Remind Fixtures • Players notified via DM' });
 
-    if (!silent) {
+    let mentionText = '';
+
+    if (!silent && notifyMode === 'dm') {
       for (const userId of playerIds) {
         try {
           const user = await interaction.client.users.fetch(userId);
@@ -339,12 +380,18 @@ module.exports = {
       }
     }
 
+    if (!silent && notifyMode === 'mention' && playerIds.size) {
+      mentionText = [...playerIds].map(id => `<@${id}>`).join(' ');
+    }
+
     await interaction.channel.send({
-      content: `⚽ **${
-        competition === 'all'
-          ? 'All Competitions'
-          : configs[0].key
-      } Fixtures Reminder**`,
+      content:
+        `${mentionText}${mentionText ? '\n\n' : ''}` +
+        `⚽ **${
+          competition === 'all'
+            ? 'All Competitions'
+            : configs[0].key
+        } Fixtures Reminder**`,
       embeds: [embed]
     });
 
@@ -356,6 +403,7 @@ module.exports = {
       color: 0xF1C40F,
       fields: [
         { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
+        { name: '📢 Notify Mode', value: notifyMode, inline: true },
         { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true }
       ]
     });
@@ -368,12 +416,15 @@ module.exports = {
             (competition === 'all'
               ? 'Reminder posted in this channel for all pending League, UCL, FA Cup and Carabao Cup fixtures.\n\n'
               : `Reminder posted in this channel for pending ${configs[0].key} fixtures.\n\n`) +
+            (selectedMatchday ? `Matchday/Round Filter: **${selectedMatchday}**\n\n` : '') +
             `${safeEmoji(E.missing, '⏳')} Remaining Matches: **${remaining.length}**\n` +
-            `🔕 Silent: **${silent ? 'Yes' : 'No'}**`
+            `🔕 Silent: **${silent ? 'Yes' : 'No'}**\n` +
+            `📢 Notify Mode: **${notifyMode}**`
           )
           .addFields(
             { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
             { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true },
+            { name: '📢 Notify Mode', value: notifyMode, inline: true },
             { name: '📩 Players Notified', value: String(silent ? 0 : playerIds.size), inline: true }
           )
           .setColor(0x2ECC71)
