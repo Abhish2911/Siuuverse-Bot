@@ -19,6 +19,7 @@ const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const TEAMS_SHEET_RANGE = 'Teams!A:Z';
 const FIXTURES_SHEET_RANGE = 'Fixtures!A:J';
 const MAX_ACTIVE_RESERVES_PER_CAPTAIN = 4;
+const RESERVES_PER_PAGE = 10;
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
@@ -222,8 +223,14 @@ async function getReserveRows() {
   return cleanRows(data);
 }
 
-async function buildReserveListEmbed() {
+async function buildReserveListEmbed(page = 0) {
   const rows = await getReserveRows();
+  const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
+  page = Math.max(0, Math.min(page, totalPages - 1));
+  const pageRows = rows.slice(
+    page * RESERVES_PER_PAGE,
+    page * RESERVES_PER_PAGE + RESERVES_PER_PAGE
+  );
   const summary = buildReserveSummary(rows);
 
   const embed = new EmbedBuilder()
@@ -232,10 +239,10 @@ async function buildReserveListEmbed() {
     .addFields(
       {
         name: `${safeEmoji(E.stats || E.rank, '📊')} Reserve Feed`,
-        value: rows.length
-          ? rows
+        value: pageRows.length
+          ? pageRows
               .map((row, index) =>
-                `**${index + 1}. ${clean(row[1]) || 'N/A'}** • ${clean(row[0]) || 'N/A'}\n` +
+                `**${page * RESERVES_PER_PAGE + index + 1}. ${clean(row[1]) || 'N/A'}** • ${clean(row[0]) || 'N/A'}\n` +
                 `${safeEmoji(E.home || E.team, '🏠')} **Home:** ${clean(row[2]) || 'N/A'}\n` +
                 `${safeEmoji(E.away || E.team, '🚩')} **Away:** ${clean(row[3]) || 'N/A'}\n` +
                 `${safeEmoji(E.profile, '👤')} **By:** ${clean(row[4]) ? `<@${clean(row[4])}>` : 'N/A'}${clean(row[5]) ? ` • **Player:** ${clean(row[5])}` : ''}`
@@ -251,10 +258,26 @@ async function buildReserveListEmbed() {
       }
     )
     .setColor(0x3498DB)
-    .setFooter({ text: `Reserve List • Total Reserved: ${rows.length}` })
+    .setFooter({
+      text: `Page ${page + 1}/${totalPages} • Total Reserved: ${rows.length}`
+    })
     .setTimestamp();
 
   return embed;
+}
+function buildReservePageButtons(page, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`reserve_page_${page - 1}`)
+      .setLabel('Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0),
+    new ButtonBuilder()
+      .setCustomId(`reserve_page_${page + 1}`)
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages - 1)
+  );
 }
 
 module.exports = {
@@ -305,8 +328,11 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'list') {
+      const rows = await getReserveRows();
+      const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
       return {
-        embeds: [await buildReserveListEmbed()]
+        embeds: [await buildReserveListEmbed(0)],
+        components: [buildReservePageButtons(0, totalPages)]
       };
     }
 
@@ -315,7 +341,7 @@ module.exports = {
         return `${safeEmoji(E.wrong || E.error, '❌')} Only admins or owners can use **/reserve remove**.`;
       }
 
-      const matchNo = clean(interaction.options.getString('matchno'));
+      const matchNo = normalizeMatchNo(interaction.options.getString('matchno'));
       const allData = await cachedGetData(RESERVE_SHEET_RANGE);
       const rows = cleanRows(allData);
       const targetIndex = rows.findIndex(row => normalizeMatchNo(row[1]) === normalizeMatchNo(matchNo));
@@ -339,7 +365,7 @@ module.exports = {
       };
     }
 
-    const matchNo = clean(interaction.options.getString('matchno'));
+    const matchNo = normalizeMatchNo(interaction.options.getString('matchno'));
     const competition = getCompetitionConfig(matchNo);
     const byUser = interaction.options.getUser('by');
     const playerName = clean(interaction.options.getString('playername'));
@@ -411,6 +437,19 @@ module.exports = {
   },
 
   async buttonHandler(interaction, action) {
+    // Handle pagination for reserve list
+    if (String(action).startsWith('page_')) {
+      const page = Number(String(action).replace('page_', '')) || 0;
+      const rows = await getReserveRows();
+      const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
+
+      return {
+        embeds: [await buildReserveListEmbed(page)],
+        components: [buildReservePageButtons(page, totalPages)]
+      };
+    }
+
+    // Everything below is for reserve preview confirm/cancel
     const pending = pendingReserves.get(interaction.user.id);
 
     if (!pending) {
