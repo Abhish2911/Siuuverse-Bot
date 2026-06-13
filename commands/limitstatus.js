@@ -44,7 +44,7 @@ function sameTeam(a, b) {
 }
 
 function getCompetitionDailyLimit(key) {
-  if (key === 'league') return envNumber('MAX_LEAGUE_RESULTS_PER_TEAM_PER_DAY', 3);
+  if (key === 'league') return envNumber('MAX_LEAGUE_RESULTS_PER_TEAM_PER_DAY', 4);
   if (key === 'ucl') return envNumber('MAX_UCL_RESULTS_PER_TEAM_PER_DAY', 2);
   return envNumber('MAX_CUP_RESULTS_PER_TEAM_PER_DAY', 2);
 }
