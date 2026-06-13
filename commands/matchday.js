@@ -2,7 +2,9 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 const {
   cachedGetData,
@@ -58,6 +60,21 @@ const buildProgressBar = (completed, total) => {
 const lineLimit = (lines, max = 8) => {
   if (lines.length <= max) return lines.join('\n');
   return [...lines.slice(0, max), `+${lines.length - max} more...`].join('\n');
+};
+
+const buildMatchdayButtons = (competition, matchdays, currentIndex) => {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`matchday_prev_${competition}_${currentIndex}`)
+      .setLabel('Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(currentIndex <= 0),
+    new ButtonBuilder()
+      .setCustomId(`matchday_next_${competition}_${currentIndex}`)
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(currentIndex >= matchdays.length - 1)
+  );
 };
 
 const findNextMatchdayRows = (fixtures, activeMD) => {
@@ -212,6 +229,8 @@ module.exports = {
         .filter(Boolean)
     )];
 
+    const requestedIndex = Number(interaction.matchdayIndex ?? -1);
+
     for (const md of grouped) {
       const mdRows = fixtures
         .slice(1)
@@ -234,7 +253,17 @@ module.exports = {
       };
     }
 
-    const activeMD = String(allowedMD).trim();
+    const activeMD = String(
+      requestedIndex >= 0 && grouped[requestedIndex]
+        ? grouped[requestedIndex]
+        : allowedMD
+    ).trim();
+
+    const currentIndex = Math.max(
+      0,
+      grouped.findIndex(md => String(md).trim() === activeMD)
+    );
+
     console.log('[MATCHDAY]', competition, 'ACTIVE_MD =', activeMD);
 
     const rows = fixtures
@@ -305,6 +334,7 @@ module.exports = {
       content: `${safeEmoji(E.calendar, '📅')} **Current matchday overview**`,
       embeds: [embed],
       components: [
+        buildMatchdayButtons(competition, grouped, currentIndex),
         createCompetitionDropdown({
           prefix: 'matchday',
           selectedCompetition: competition,
@@ -314,6 +344,21 @@ module.exports = {
         })
       ]
     };
+  },
+
+  async buttonHandler(interaction, action, value) {
+    const competition = value.split('_')[0] || 'league';
+    const currentIndex = Number(value.split('_')[1] || 0);
+
+    interaction.options = {
+      getString: () => competition
+    };
+
+    interaction.matchdayIndex = action === 'next'
+      ? currentIndex + 1
+      : Math.max(0, currentIndex - 1);
+
+    return this.execute(interaction);
   },
 
   async selectMenuHandler(interaction) {
