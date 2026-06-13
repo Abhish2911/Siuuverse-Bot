@@ -450,12 +450,15 @@ module.exports = {
 
   async buttonHandler(interaction, action) {
     // Handle pagination for reserve list
-    if (String(action).startsWith('page_') || String(action).startsWith('reserve_page_')) {
-      const page = Number(
-        String(action)
-          .replace('reserve_page_', '')
-          .replace('page_', '')
-      ) || 0;
+    const actionId = String(action || interaction.customId || '');
+
+    if (
+      actionId.includes('reserve_page_') ||
+      actionId.startsWith('page_') ||
+      actionId.startsWith('reserve_page_')
+    ) {
+      const match = actionId.match(/reserve_page_(\d+)|page_(\d+)/);
+      const page = Number(match?.[1] || match?.[2] || 0);
       const rows = await getReserveRows();
       const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
 
