@@ -357,21 +357,6 @@ async function buildLiveStandingsEmbed(type = 'league') {
   const header = normalizedType === 'ucl'
     ? '      # TEAM    P  W  D  L   GD  PTS'
     : '      # TEAM    P  W  D  L   GD  PTS';
-  const leaderName = normalizedType === 'ucl'
-    ? 'Group Stage'
-    : clean(rows[0]?.[1]) || 'N/A';
-  const leaderPts = normalizedType === 'ucl'
-    ? qualifiedTeams.size
-    : toNumber(rows[0]?.[9]);
-  const bottomZone = normalizedType === 'ucl'
-    ? 'Qualification Based'
-    : rows.slice(-2)
-        .map(row => clean(row?.[1]))
-        .filter(Boolean)
-        .join('\n') || 'N/A';
-  const boardLabel = normalizedType === 'ucl'
-    ? 'UCL auto-updated board'
-    : 'COOP auto-updated board';
 
   if (normalizedType === 'ucl') {
     return new EmbedBuilder()
