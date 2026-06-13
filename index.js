@@ -409,6 +409,28 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // reserve pagination buttons
+      if (cmd === 'reserve' && action === 'page') {
+        const command = client.commands.get('reserve');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(
+          interaction,
+          interaction.customId
+        );
+
+        if (result) {
+          await interaction.message.edit({
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
