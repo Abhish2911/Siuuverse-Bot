@@ -362,16 +362,16 @@ async function buildLiveStandingsEmbed(type = 'league') {
     return new EmbedBuilder()
       .setTitle(`${E.UCL || '🏆'} UCL Group Standings`)
       .setDescription(
-        `${E.goal || '⚽'} UCL Group Stage Standings\n\n${E.up || '🟢'} Top 2 teams qualify automatically\n${E.up || '🟢'} Best 2 third-place teams qualify\n\n${table}`
+        `${E.goal || '⚽'} UCL Group Stage Standings\n\n${E.winner || '👑'} Group Winners qualify automatically\n${E.runnerUp || '🥈'} Group Runner-ups qualify automatically\n${E.correct || '✅'} Best 2 third-place teams qualify\n\n${table}`
       )
       .addFields({
         name: `${E.correct || '✅'} Qualification`,
-        value: `Qualified Teams: **${qualifiedTeams.size}**\nTop 2 from each group + Best 2 third-place teams`,
+        value: `${E.correct || '✅'} Qualified Teams: **${qualifiedTeams.size}**\n${E.winner || '👑'} Group Winners • ${E.runnerUp || '🥈'} Group Runner-ups • ${E.correct || '✅'} Best 2 Third-Place Teams`,
         inline: false
       })
       .setColor(0x5865F2)
       .setFooter({
-        text: `UCL Group Standings • ${E.correct || '✅'} Qualified • 👑 Group Winner • 🥈 Runner-up`
+        text: `UCL Group Standings • Group Winner ${E.winner || '👑'} • Runner-up ${E.runnerUp || '🥈'} • ${E.correct || '✅'} Qualified`
       })
       .setTimestamp();
   }
