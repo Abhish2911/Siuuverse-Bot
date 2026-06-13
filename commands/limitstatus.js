@@ -1,6 +1,10 @@
-
-
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require('discord.js');
 const { getData } = require('../utils/sheets');
 const E = require('../utils/emojis');
 
@@ -61,6 +65,7 @@ function getLimitEmoji(count, limit) {
 }
 
 const SUBMITTED_AT_INDEX = 18;
+const TEAMS_PER_PAGE = 6;
 
 const RESULT_SOURCES = [
   { key: 'league', label: 'League', range: 'Matches_Entry!A:S' },
@@ -157,6 +162,70 @@ function chunkLines(lines, maxChars = 950) {
   return chunks;
 }
 
+function buildPageButtons(page, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`limitstatus_prev_${page}`)
+      .setLabel('Previous')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0),
+    new ButtonBuilder()
+      .setCustomId(`limitstatus_next_${page}`)
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(page >= totalPages - 1)
+  );
+}
+
+async function buildLimitStatusPage(teamQuery = '', page = 0) {
+  const today = getTodayKey();
+  const counts = await readTodayCounts();
+  const filtered = teamQuery
+    ? counts.filter(team => normalize(team.name).includes(normalize(teamQuery)))
+    : counts;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / TEAMS_PER_PAGE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageTeams = filtered.slice(
+    safePage * TEAMS_PER_PAGE,
+    safePage * TEAMS_PER_PAGE + TEAMS_PER_PAGE
+  );
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${safeEmoji(E.lock, '🔒')} Daily Result Limit Status`)
+    .setDescription(
+      `${safeEmoji(E.calendar, '📅')} **Date:** ${today} IST\n` +
+      `${safeEmoji(E.played, '🎮')} **Limits:** League **${getCompetitionDailyLimit('league')}** • UCL **${getCompetitionDailyLimit('ucl')}** • Cups **${getCompetitionDailyLimit('fa')}** • Total **${getTotalDailyLimit()}**\n` +
+      `━━━━━━━━━━━━━━━━━━━━`
+    )
+    .setColor(0x5865F2)
+    .setFooter({ text: `Page ${safePage + 1}/${totalPages} • ${filtered.length} Teams` })
+    .setTimestamp();
+
+  if (!filtered.length) {
+    embed.addFields({
+      name: teamQuery ? 'No matching team found' : 'No results submitted today',
+      value: teamQuery
+        ? `No team matched **${teamQuery}** in today result logs.`
+        : 'No submitted results found for today yet.',
+      inline: false
+    });
+
+    return { embeds: [embed], components: [] };
+  }
+
+  embed.addFields({
+    name: 'Teams',
+    value: pageTeams.map(formatTeamLimitLine).join('\n\n'),
+    inline: false
+  });
+
+  return {
+    embeds: [embed],
+    components: teamQuery ? [] : [buildPageButtons(safePage, totalPages)]
+  };
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('limitstatus')
@@ -170,46 +239,20 @@ module.exports = {
 
   async execute(interaction) {
     const teamQuery = clean(interaction.options.getString('team'));
-    const today = getTodayKey();
-    const counts = await readTodayCounts();
-    const filtered = teamQuery
-      ? counts.filter(team => normalize(team.name).includes(normalize(teamQuery)))
-      : counts;
+    return buildLimitStatusPage(teamQuery, 0);
+  },
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.lock, '🔒')} Daily Result Limit Status`)
-      .setDescription(
-        `${safeEmoji(E.calendar, '📅')} **Date:** ${today} IST\n` +
-        `${safeEmoji(E.played, '🎮')} **Limits:** League **${getCompetitionDailyLimit('league')}** • UCL **${getCompetitionDailyLimit('ucl')}** • Cups **${getCompetitionDailyLimit('fa')}** • Total **${getTotalDailyLimit()}**\n` +
-        `━━━━━━━━━━━━━━━━━━━━`
-      )
-      .setColor(0x5865F2)
-      .setFooter({ text: 'Limit Status • Counts only results with Submitted At in column S' })
-      .setTimestamp();
+  async buttonHandler(interaction, action, value) {
+    const currentPage = Number(value || 0);
 
-    if (!filtered.length) {
-      embed.addFields({
-        name: teamQuery ? 'No matching team found' : 'No results submitted today',
-        value: teamQuery
-          ? `No team matched **${teamQuery}** in today result logs.`
-          : 'No submitted results found for today yet.',
-        inline: false
-      });
-
-      return { embeds: [embed] };
+    if (action === 'prev') {
+      return buildLimitStatusPage('', Math.max(0, currentPage - 1));
     }
 
-    const lines = filtered.map(formatTeamLimitLine);
-    const chunks = chunkLines(lines);
+    if (action === 'next') {
+      return buildLimitStatusPage('', currentPage + 1);
+    }
 
-    chunks.slice(0, 6).forEach((chunk, index) => {
-      embed.addFields({
-        name: index === 0 ? 'Teams' : `Teams ${index + 1}`,
-        value: chunk,
-        inline: false
-      });
-    });
-
-    return { embeds: [embed] };
+    return null;
   }
 };
