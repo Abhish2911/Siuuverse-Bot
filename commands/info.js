@@ -16,14 +16,16 @@ module.exports = {
         return { content: '❌ No team data found.' };
       }
 
+      rows.shift(); // Remove sheet header row BEFORE sorting
+
+      rows.sort((a, b) =>
+        String(a?.[0] || '').localeCompare(String(b?.[0] || '') )
+      );
+
       const messages = [];
       let current = '# 🏆 Team Information\n\n';
 
-      rows.sort((a, b) =>
-        String(a?.[0] || '').localeCompare(String(b?.[0] || ''))
-      );
-
-      rows.shift(); // Remove sheet header row
+      let teamCount = 0;
 
       for (const row of rows) {
         const [
@@ -47,18 +49,15 @@ module.exports = {
           `👥 Players: ${players || 'No players listed'}\n` +
           `🏷️ Users: ${mentions || 'No users linked'}\n\n`;
 
-        if ((current + section).length > 1900) {
+        if (teamCount >= 9 || (current + section).length > 1900) {
           messages.push(current);
           current = section;
+          teamCount = 1;
         } else {
           current += section;
+          teamCount++;
         }
       }
-
-      current = current.replace(
-        '**Team Name (Short Name)**\n👥 Players: Players\n🏷️ Users: <@UsersID>\n\n',
-        ''
-      );
 
       if (current.trim()) messages.push(current);
 
