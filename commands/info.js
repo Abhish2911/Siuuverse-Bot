@@ -19,18 +19,24 @@ module.exports = {
       const messages = [];
       let current = '# 🏆 Team Information\n\n';
 
+      rows.sort((a, b) =>
+        String(a?.[0] || '').localeCompare(String(b?.[0] || ''))
+      );
+
+      rows.shift(); // Remove sheet header row
+
       for (const row of rows) {
         const [
           teamName = 'Unknown Team',
           players = '',
           shortName = '-',
           ,
-          ,
+          captainId = '',
           usersId = ''
         ] = row;
 
-        const mentions = usersId
-          .split(',')
+        const mentions = [captainId, usersId]
+          .flatMap(value => String(value || '').split(/[\n,;|]+/))
           .map(id => id.trim())
           .filter(Boolean)
           .map(id => `<@${id}>`)
@@ -48,6 +54,11 @@ module.exports = {
           current += section;
         }
       }
+
+      current = current.replace(
+        '**Team Name (Short Name)**\n👥 Players: Players\n🏷️ Users: <@UsersID>\n\n',
+        ''
+      );
 
       if (current.trim()) messages.push(current);
 
