@@ -67,11 +67,15 @@ module.exports = {
 
       for (let i = 1; i < messages.length; i++) {
         await interaction.channel.send({
-          content: messages[i]
+          content: messages[i],
+          allowedMentions: { parse: [] }
         });
       }
 
-      return { content: messages[0] };
+      return {
+        content: messages[0],
+        allowedMentions: { parse: [] }
+      };
     } catch (error) {
       console.error('Info command error:', error);
       return { content: '❌ Failed to fetch team information.' };
