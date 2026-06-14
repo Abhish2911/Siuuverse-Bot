@@ -333,18 +333,56 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
-        .setDescription('Show all reserved matches')
+        .setDescription('Show reserved matches')
+        .addUserOption(option =>
+          option
+            .setName('user')
+            .setDescription('Show reserves for a specific user')
+            .setRequired(false)
+        )
     ),
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'list') {
+      const targetUser = interaction.options.getUser('user');
+
+      if (!targetUser) {
+        const rows = await getReserveRows();
+        const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
+
+        return {
+          embeds: [await buildReserveListEmbed(0)],
+          components: [buildReservePageButtons(0, totalPages)]
+        };
+      }
+
       const rows = await getReserveRows();
-      const totalPages = Math.max(1, Math.ceil(rows.length / RESERVES_PER_PAGE));
+      const userRows = rows.filter(row => clean(row[4]) === targetUser.id);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${safeEmoji(E.calendar, '📅')} Reserve List`)
+        .setDescription(`Reserved matches for ${targetUser}`)
+        .setColor(0x3498DB)
+        .setTimestamp();
+
+      if (!userRows.length) {
+        embed.addFields({
+          name: 'No Reserves',
+          value: 'This user has no active reserves.'
+        });
+      } else {
+        embed.addFields({
+          name: `Active Reserves (${userRows.length})`,
+          value: userRows.map(row =>
+            `• **${clean(row[1])}** (${clean(row[0])})\n🏠 ${clean(row[2])} vs ${clean(row[3])}`
+          ).join('\n\n').slice(0, 1024)
+        });
+      }
+
       return {
-        embeds: [await buildReserveListEmbed(0)],
-        components: [buildReservePageButtons(0, totalPages)]
+        embeds: [embed]
       };
     }
 
