@@ -52,7 +52,11 @@ module.exports = {
 
       if (current.trim()) messages.push(current);
 
-      await interaction.editReply(messages[0]);
+      if (!messages.length) {
+        return interaction.editReply('❌ No team data found.');
+      }
+
+      await interaction.editReply({ content: messages[0] });
 
       for (let i = 1; i < messages.length; i++) {
         await interaction.followUp({
@@ -61,7 +65,14 @@ module.exports = {
       }
     } catch (error) {
       console.error('Info command error:', error);
-      await interaction.editReply('❌ Failed to fetch team information.');
+
+      const message = '❌ Failed to fetch team information.';
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: message, ephemeral: true }).catch(() => {});
+      } else {
+        await interaction.reply({ content: message, ephemeral: true }).catch(() => {});
+      }
     }
   }
 };
