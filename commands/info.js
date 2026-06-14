@@ -22,7 +22,7 @@ module.exports = {
       for (const row of rows) {
         const [
           teamName = 'Unknown Team',
-          ,
+          players = '',
           shortName = '-',
           ,
           ,
@@ -38,7 +38,8 @@ module.exports = {
 
         const section =
           `**${teamName} (${shortName})**\n` +
-          `👥 ${mentions || 'No players'}\n\n`;
+          `👥 Players: ${players || 'No players listed'}\n` +
+          `🏷️ Users: ${mentions || 'No users linked'}\n\n`;
 
         if ((current + section).length > 1900) {
           messages.push(current);
