@@ -101,16 +101,16 @@ function buildBadges(goals, assists, ga, mvp, extraStats) {
     badges.push(`☠️ Untouchable`);
   }
 
-  if (extraStats.tackles >= 50) badges.push(`${safeEmoji(E.tackle, '🛡️')} Tackle Machine`);
-  else if (extraStats.tackles >= 30) badges.push(`${safeEmoji(E.tackle, '🛡️')} Ball Winner`);
-  else if (extraStats.tackles >= 15) badges.push(`${safeEmoji(E.tackle, '🛡️')} Tackler`);
+  if (extraStats.tackles >= 80) badges.push(`${safeEmoji(E.tackle, '🛡️')} Tackle Machine`);
+  else if (extraStats.tackles >= 50) badges.push(`${safeEmoji(E.tackle, '🛡️')} Ball Winner`);
+  else if (extraStats.tackles >= 20) badges.push(`${safeEmoji(E.tackle, '🛡️')} Tackler`);
 
-  if (extraStats.interceptions >= 50) badges.push(`${safeEmoji(E.interception, '✂️')} Interception King`);
-  else if (extraStats.interceptions >= 30) badges.push(`${safeEmoji(E.interception, '✂️')} Passing Lane Hunter`);
-  else if (extraStats.interceptions >= 15) badges.push(`${safeEmoji(E.interception, '✂️')} Reader`);
+  if (extraStats.interceptions >= 80) badges.push(`${safeEmoji(E.interception, '✂️')} Interception King`);
+  else if (extraStats.interceptions >= 50) badges.push(`${safeEmoji(E.interception, '✂️')} Passing Lane Hunter`);
+  else if (extraStats.interceptions >= 25) badges.push(`${safeEmoji(E.interception, '✂️')} Reader`);
 
-  if (extraStats.tackles >= 25 && extraStats.interceptions >= 25) badges.push(`${safeEmoji(E.defense, '🛡️')} Defensive Wall`);
-  if (extraStats.tackles >= 50 && extraStats.interceptions >= 50) badges.push(`🚫 Lockdown Defender`);
+  if (extraStats.tackles >= 50 && extraStats.interceptions >= 50) badges.push(`${safeEmoji(E.defense, '🛡️')} Defensive Wall`);
+  if (extraStats.tackles >= 75 && extraStats.interceptions >= 75) badges.push(`🚫 Lockdown Defender`);
 
 
   return badges.length ? badges.join('\n') : 'No badges yet';
