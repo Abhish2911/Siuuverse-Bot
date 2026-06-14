@@ -9,13 +9,11 @@ module.exports = {
     .setDescription('Show all teams and their players'),
 
   async execute(interaction) {
-    await interaction.deferReply();
-
     try {
       const rows = await cachedGetData(TEAMS_SHEET_RANGE);
 
       if (!rows?.length) {
-        return interaction.editReply('❌ No team data found.');
+        return { content: '❌ No team data found.' };
       }
 
       const messages = [];
@@ -53,26 +51,19 @@ module.exports = {
       if (current.trim()) messages.push(current);
 
       if (!messages.length) {
-        return interaction.editReply('❌ No team data found.');
+        return { content: '❌ No team data found.' };
       }
 
-      await interaction.editReply({ content: messages[0] });
-
       for (let i = 1; i < messages.length; i++) {
-        await interaction.followUp({
+        await interaction.channel.send({
           content: messages[i]
         });
       }
+
+      return { content: messages[0] };
     } catch (error) {
       console.error('Info command error:', error);
-
-      const message = '❌ Failed to fetch team information.';
-
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: message, ephemeral: true }).catch(() => {});
-      } else {
-        await interaction.reply({ content: message, ephemeral: true }).catch(() => {});
-      }
+      return { content: '❌ Failed to fetch team information.' };
     }
   }
 };
