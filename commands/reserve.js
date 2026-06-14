@@ -359,18 +359,32 @@ module.exports = {
       }
 
       const rows = await getReserveRows();
-      const userRows = rows.filter(row => clean(row[4]) === targetUser.id);
+      const teamRows = await getTeamRows();
+
+      const userDigits = extractDigits(targetUser.id);
+      const userTeams = teamRows
+        .filter(row => extractDigits(row[4]) === userDigits)
+        .flatMap(row => [clean(row[0]), clean(row[2])])
+        .filter(Boolean)
+        .map(normalize);
+
+      const userRows = rows.filter(row => {
+        const homeTeam = normalize(row[2]);
+        const awayTeam = normalize(row[3]);
+
+        return userTeams.includes(homeTeam) || userTeams.includes(awayTeam);
+      });
 
       const embed = new EmbedBuilder()
         .setTitle(`${safeEmoji(E.calendar, '📅')} Reserve List`)
-        .setDescription(`Reserved matches for ${targetUser}`)
+        .setDescription(`Reserved matches involving ${targetUser}'s team`)
         .setColor(0x3498DB)
         .setTimestamp();
 
       if (!userRows.length) {
         embed.addFields({
           name: 'No Reserves',
-          value: 'This user has no active reserves.'
+          value: 'No active reserves found for this user\'s team.'
         });
       } else {
         embed.addFields({
