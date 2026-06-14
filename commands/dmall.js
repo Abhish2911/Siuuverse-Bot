@@ -129,7 +129,7 @@ module.exports = {
                 .setTitle('📢 Announcement')
                 .setDescription(message)
                 .setFooter({
-                  text: `Sent by ${interaction.user.username}`
+                  text: `Sent From Siuuverse}`
                 })
             ]
           });
