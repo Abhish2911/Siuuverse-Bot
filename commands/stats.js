@@ -329,17 +329,36 @@ module.exports = {
   },
 
   async buttonHandler(interaction, action, page, type) {
+    const parts = String(type || '').split('__');
+    const ownerId = parts[parts.length - 1];
+
+    if (ownerId && ownerId !== interaction.user.id) {
+      return {
+        content: '❌ You cannot use another user\'s stats menu.',
+        ephemeral: true
+      };
+    }
+
     let newPage = Number.parseInt(page, 10);
     if (Number.isNaN(newPage)) newPage = 0;
 
     if (action === 'prev') newPage--;
     if (action === 'next') newPage++;
 
-    const [resolvedType = 'goals', competitionKey = 'league'] = String(type || 'goals_league').split('__');
+    const [resolvedType = 'goals', competitionKey = 'league'] = parts;
     return buildStats(interaction, resolvedType, newPage, competitionKey);
   },
 
   async selectHandler(interaction) {
+    const ownerId = interaction.customId.split('_').pop();
+
+    if (ownerId && ownerId !== interaction.user.id) {
+      return {
+        content: '❌ You cannot use another user\'s stats menu.',
+        ephemeral: true
+      };
+    }
+
     const [resolvedType = 'goals', competitionKey = 'league'] = String(interaction.values[0] || 'goals__league').split('__');
     return buildStats(interaction, resolvedType, 0, competitionKey);
   }
@@ -409,18 +428,18 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`stats_prev_${page}_${type}__${competitionKey}`)
+      .setCustomId(`stats_prev_${page}_${type}__${competitionKey}__${interaction.user.id}`)
       .setLabel('Previous')
       .setEmoji('⬅️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page === 0),
     new ButtonBuilder()
-      .setCustomId(`stats_refresh_${page}_${type}__${competitionKey}`)
+      .setCustomId(`stats_refresh_${page}_${type}__${competitionKey}__${interaction.user.id}`)
       .setLabel('Refresh')
       .setEmoji('🔄')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`stats_next_${page}_${type}__${competitionKey}`)
+      .setCustomId(`stats_next_${page}_${type}__${competitionKey}__${interaction.user.id}`)
       .setLabel('Next')
       .setEmoji('➡️')
       .setStyle(ButtonStyle.Secondary)
@@ -429,7 +448,7 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
 
   const dropdown = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId('stats_select')
+      .setCustomId(`stats_select_${interaction.user.id}`)
       .setPlaceholder(cleanTitle(config.title))
       .addOptions(Object.entries(STAT_DEFS).map(([key, value]) => ({
         label: cleanTitle(value.title).slice(0, 100),
