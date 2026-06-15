@@ -367,22 +367,25 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
   const start = page * perPage;
   const pageData = players.slice(start, start + perPage);
   const viewerNames = getViewerNames(interaction);
-  const playerMap = await cachedGetData('Players!A:Z').then(data => {
+  const playerMap = await cachedGetData('Teams!A:Z').then(data => {
     if (!Array.isArray(data)) return new Map();
 
     const map = new Map();
 
     for (const row of data.slice(1)) {
-      const playerName = row[0];
-      const teamShort = row[1];
-      const discordId = row[2];
+      const players = String(row[1] || '');
+      const teamShort = row[2] || 'N/A';
 
-      if (!playerName) continue;
-
-      map.set(normalize(playerName), {
-        teamShort: teamShort || 'N/A',
-        discordId: discordId || null
-      });
+      players
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean)
+        .forEach(playerName => {
+          map.set(normalize(playerName), {
+            teamShort,
+            discordId: null
+          });
+        });
     }
 
     return map;
