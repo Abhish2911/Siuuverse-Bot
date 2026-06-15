@@ -39,12 +39,19 @@ module.exports = {
         .setName('embed')
         .setDescription('Send as embed (default true)')
         .setRequired(false)
+    )
+    .addUserOption(opt =>
+      opt
+        .setName('user')
+        .setDescription('Send DM to one specific user')
+        .setRequired(false)
     ),
 
   async execute(interaction) {
     const message = interaction.options.getString('message');
     const target = interaction.options.getString('target') || 'all';
     const teamFilter = interaction.options.getString('team');
+    const targetUser = interaction.options.getUser('user');
 
     const useEmbed = interaction.options.getBoolean('embed');
 
@@ -85,6 +92,10 @@ module.exports = {
 
     const recipients = new Set();
 
+    if (targetUser) {
+      recipients.add(targetUser.id);
+    } else {
+
     for (const row of teams.slice(1)) {
       const teamName = String(row[0] || '').trim();
       const shortName = String(row[2] || '').trim();
@@ -114,6 +125,7 @@ module.exports = {
         .filter(Boolean)
         .forEach(id => recipients.add(id));
     }
+    }
 
     for (const userId of recipients) {
       try {
@@ -129,7 +141,7 @@ module.exports = {
                 .setTitle('📢 Announcement')
                 .setDescription(message)
                 .setFooter({
-                  text: `Sent From Siuuverse}`
+                  text: `Sent by ${interaction.user.username}`
                 })
             ]
           });
@@ -154,7 +166,9 @@ module.exports = {
             { name: 'Recipients', value: String(recipients.size), inline: true },
             {
               name: 'Target',
-              value: teamFilter || target,
+              value: targetUser
+                ? `${targetUser.username} (${targetUser.id})`
+                : (teamFilter || target),
               inline: true
             },
             {
