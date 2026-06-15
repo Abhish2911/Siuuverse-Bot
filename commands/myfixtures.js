@@ -561,6 +561,14 @@ module.exports = {
   },
 
   async buttonHandler(interaction, action, page, targetType, targetValue) {
+    const ownerId = interaction.message?.interaction?.user?.id;
+
+    if (ownerId && interaction.user.id !== ownerId) {
+      return {
+        content: `${safeEmoji(E.wrong, '❌')} Only the user who opened this fixture view can use these controls.`,
+        ephemeral: true
+      };
+    }
     const currentPage = Number(page) || 0;
     const nextPage = action === 'next'
       ? currentPage + 1
@@ -580,6 +588,14 @@ module.exports = {
   },
 
   async selectMenuHandler(interaction, targetType, targetValue) {
+    const ownerId = interaction.message?.interaction?.user?.id;
+
+    if (ownerId && interaction.user.id !== ownerId) {
+      return {
+        content: `${safeEmoji(E.wrong, '❌')} Only the user who opened this fixture view can use these controls.`,
+        ephemeral: true
+      };
+    }
     const competitionKey = interaction.values[0] || 'league';
     const value = decodeURIComponent(targetValue || interaction.user.id);
 
