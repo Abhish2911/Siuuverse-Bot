@@ -63,8 +63,12 @@ async function refreshLiveStandings2(client, guildId) {
     if (!message) return { ok: false, reason: 'Message not found' };
     const imageBuffer = await buildLiveStandings2Image();
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'standings2.png' });
+    const unix = Math.floor(Date.now() / 1000);
+
     await message.edit({
-      content: null,
+      content:
+        `🏆 **Siuuverse ePremierLeague S2 — League LIVE STANDINGS**\n` +
+        `• Updated: <t:${unix}:R>`,
       embeds: [],
       files: [attachment]
     });
