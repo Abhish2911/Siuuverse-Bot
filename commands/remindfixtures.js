@@ -252,12 +252,15 @@ module.exports = {
       let rows = fixtures.slice(1);
 
       if (selectedMatchday) {
-        rows = rows.filter(r =>
-          String(r[config.matchdayColumn] || '')
+        const wantedMatchday = selectedMatchday.toUpperCase().trim();
+
+        rows = rows.filter(r => {
+          const fixtureId = String(r[config.matchdayColumn] || '')
             .trim()
-            .toUpperCase()
-            .includes(selectedMatchday.toUpperCase())
-        );
+            .toUpperCase();
+
+          return fixtureId === wantedMatchday;
+        });
       } else if (config.activeMatchday) {
         const active = getAllowedMatchday(fixtures);
 
