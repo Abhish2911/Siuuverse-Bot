@@ -305,6 +305,7 @@ module.exports = {
 
     const fixtureLines = [];
     const playerIds = new Set();
+    const playerFixtures = new Map();
 
     const reserveData = await cachedGetData('Reserve!A:F').catch(() => []);
     const reservedMatches = new Set(
@@ -319,9 +320,6 @@ module.exports = {
 
       const matchNo = String(row[config.matchdayColumn] || '-').trim();
 
-      if (reservedMatches.has(matchNo.toUpperCase())) {
-        continue;
-      }
 
       const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
       const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
@@ -330,12 +328,23 @@ module.exports = {
       const awayTeam = findCoopTeamRow(teamRows, awayShort, row[config.awayCol]);
 
       if (!silent && notifyMode !== 'none') {
-        getAllPlayerIds(homeTeam).forEach(id => playerIds.add(id));
-        getAllPlayerIds(awayTeam).forEach(id => playerIds.add(id));
+        const fixtureText = `${config.key} • ${matchNo}${reservedMatches.has(matchNo.toUpperCase()) ? ' 🔒 RESERVED' : ''} • ${homeShort} vs ${awayShort}`;
+
+        [...getAllPlayerIds(homeTeam), ...getAllPlayerIds(awayTeam)].forEach(id => {
+          playerIds.add(id);
+
+          if (!playerFixtures.has(id)) {
+            playerFixtures.set(id, []);
+          }
+
+          playerFixtures.get(id).push(fixtureText);
+        });
       }
 
+      const isReserved = reservedMatches.has(matchNo.toUpperCase());
+
       fixtureLines.push(
-        `**${config.key} • ${matchNo}** • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\``
+        `**${config.key} • ${matchNo}**${isReserved ? ' 🔒 RESERVED' : ''} • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\``
       );
     }
 
@@ -365,17 +374,21 @@ module.exports = {
         try {
           const user = await interaction.client.users.fetch(userId);
 
+          const fixtures = playerFixtures.get(userId) || [];
+
           await user.send({
             embeds: [
               new EmbedBuilder()
                 .setTitle('⚽ Fixture Reminder')
                 .setDescription(
-                  `You have pending fixtures in ${
-                    competition === 'all'
-                      ? 'COOP competitions'
-                      : configs[0].key
-                  }.\n\nPlease arrange and play your matches as soon as possible.`
+                  `You have ${fixtures.length} pending or reserved fixture(s).
+
+Please contact your opponents and complete the matches as soon as possible.`
                 )
+                .addFields({
+                  name: '📋 Your Fixtures',
+                  value: fixtures.join('\n')?.slice(0, 1024) || 'No fixtures found.'
+                })
                 .setColor(0xF1C40F)
             ]
           });
