@@ -2,6 +2,7 @@ const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { cachedGetData } = require('../utils/helpers');
 const path = require('path');
+const fs = require('fs');
 
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
@@ -189,9 +190,7 @@ async function buildLiveStandings2Image() {
         rank: Number(row[0]) || index + 1,
         name: row[1] || `Team ${index + 1}`,
         short: (teamMap[normalize(row[1])] && teamMap[normalize(row[1])][2]) || '',
-        logo: `${(row[1] || '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '')}.png`,
+        logo: null,
         color: (teamMap[normalize(row[1])] && teamMap[normalize(row[1])][7]) || '#475569',
         p: Number(row[2]) || 0,
         w: Number(row[3]) || 0,
@@ -210,16 +209,36 @@ async function buildLiveStandings2Image() {
     const logoCache = new Map();
 
     for (const team of dummyData) {
-      if (!team.logo) continue;
-
       try {
-        const logoPath = path.join(__dirname, '..', 'Logos', team.logo);
-        // Example: "BALL SNATCHERS FC" -> "ballsnatchersfc.png"
+        const normalized = (team.name || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '');
+
+        const logosDir = path.join(__dirname, '..', 'Logos');
+        const files = fs.readdirSync(logosDir);
+
+        const matchedFile = files.find(file => {
+          const fileName = file
+            .replace(/\.[^.]+$/, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '');
+
+          return fileName === normalized;
+        });
+
+        if (!matchedFile) {
+          console.log(`[STANDINGS2] No logo found for ${team.name}`);
+          continue;
+        }
+
+        team.logo = matchedFile;
+
+        const logoPath = path.join(logosDir, matchedFile);
         const logo = await loadImage(logoPath);
+
         logoCache.set(team.logo, logo);
       } catch (err) {
         console.error(`Failed to preload logo for ${team.name}:`, err.message);
-        console.error('Path:', path.join(__dirname, '..', 'Logos', team.logo));
       }
     }
 
