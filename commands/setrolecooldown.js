@@ -77,7 +77,7 @@ module.exports = {
       },
       {
         upsert: true,
-        new: true
+        returnDocument: 'after'
       }
     );
 
