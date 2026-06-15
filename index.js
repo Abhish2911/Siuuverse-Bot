@@ -674,7 +674,7 @@ client.on('messageCreate', async message => {
         },
         {
           upsert: true,
-          new: true
+          returnDocument: 'after'
         }
       );
 
