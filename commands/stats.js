@@ -257,22 +257,21 @@ function buildAnsiTable(pageData, valueLabel, viewerNames) {
   return `\`\`\`ansi\n${header}\n${body || 'No data'}\n\`\`\``;
 }
 
-async function buildTopFive(players, config, interaction, discordIdMap = new Map()) {
+async function buildTopFive(players, config, interaction, playerMap = new Map()) {
   const top = players.slice(0, 5);
   if (!top.length) return 'No data';
 
   const lines = await Promise.all(top.map(async (p, index) => {
     const rawName = String(p.name || '').trim();
-    const text = rawName || 'Unknown';
-    const hasTag = text.includes('-');
-    const [tagRaw, ...rest] = hasTag ? text.split('-') : ['', text];
-    const tag = String(tagRaw || '').trim().toUpperCase();
-    const enteredName = hasTag ? rest.join('-').trim() : text;
-    const mention = await findMemberMention(interaction, rawName, discordIdMap);
-    const playerDisplay = mention && mention !== 'Unknown' ? mention : enteredName || 'Unknown';
-    const tagDisplay = tag ? `\`${tag}\`` : '`N/A`';
+    const enteredName = stripPrefix(rawName);
+    const playerInfo = playerMap.get(normalize(enteredName));
 
-    return `${index + 1}. ${tagDisplay} ${playerDisplay} - **${p.value}** ${config.icon}`;
+    const teamShort = playerInfo?.teamShort || 'N/A';
+    const mention = playerInfo?.discordId
+      ? `<@${playerInfo.discordId}>`
+      : await findMemberMention(interaction, rawName);
+
+    return `${index + 1}. ${teamShort}-${enteredName.toUpperCase()} ${mention} - **${p.value}** ${config.icon}`;
   }));
 
   return lines.join('\n');
@@ -368,17 +367,27 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
   const start = page * perPage;
   const pageData = players.slice(start, start + perPage);
   const viewerNames = getViewerNames(interaction);
-  const discordIdMap = await cachedGetData('Teams!A:Z').then(data => {
+  const playerMap = await cachedGetData('Players!A:Z').then(data => {
     if (!Array.isArray(data)) return new Map();
+
     const map = new Map();
-    for (const row of data) {
-      if (row[0] && row[7]) {
-        map.set(normalize(row[0]), row[7]);
-      }
+
+    for (const row of data.slice(1)) {
+      const playerName = row[0];
+      const teamShort = row[1];
+      const discordId = row[2];
+
+      if (!playerName) continue;
+
+      map.set(normalize(playerName), {
+        teamShort: teamShort || 'N/A',
+        discordId: discordId || null
+      });
     }
+
     return map;
   });
-  const topFiveText = await buildTopFive(players, config, interaction, discordIdMap);
+  const topFiveText = await buildTopFive(players, config, interaction, playerMap);
   const summary = buildStatsSummary(players, config, type, page, totalPages);
 
   const embed = new EmbedBuilder()
