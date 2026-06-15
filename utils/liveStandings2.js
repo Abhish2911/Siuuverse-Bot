@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { AttachmentBuilder } = require('discord.js');
+const E = require('./emojis');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'liveStandings2.json');
@@ -67,7 +68,7 @@ async function refreshLiveStandings2(client, guildId) {
 
     await message.edit({
       content:
-        `🏆 **Siuuverse ePremierLeague S2 — League LIVE STANDINGS**\n` +
+        `${E.PL || '🏆'} **Siuuverse ePremierLeague S2 — League LIVE STANDINGS**\n` +
         `• Updated: <t:${unix}:R>`,
       embeds: [],
       files: [attachment]
