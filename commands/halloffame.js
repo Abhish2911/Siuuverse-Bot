@@ -381,24 +381,16 @@ function buildHallDescription(isClubView, summary, currentPage, totalPages) {
 }
 
 function safeFieldValue(lines) {
-  if (!lines.length) return ['N/A'];
+  const text = Array.isArray(lines) ? lines.join('\n\n') : String(lines || '');
+
+  if (!text) return ['N/A'];
 
   const chunks = [];
-  let current = '';
 
-  for (const line of lines) {
-    const safeLine = String(line || '').slice(0, 900);
-    const block = current ? `\n\n${safeLine}` : safeLine;
-
-    if ((current + block).length > 950) {
-      if (current) chunks.push(current);
-      current = safeLine;
-    } else {
-      current += block;
-    }
+  for (let i = 0; i < text.length; i += 1024) {
+    chunks.push(text.slice(i, i + 1024));
   }
 
-  if (current) chunks.push(current);
   return chunks.length ? chunks : ['N/A'];
 }
 
@@ -471,22 +463,27 @@ async function buildHallPayload(view = 'players', page = 0) {
     currentPage * HALL_OF_FAME_PAGE_SIZE,
     currentPage * HALL_OF_FAME_PAGE_SIZE + HALL_OF_FAME_PAGE_SIZE
   );
-  const chunk = pageItems
-    .map((item, index) => isClubView ? formatTeam(item, index) : formatPlayer(item, index))
-    .join('\n\n') || 'N/A';
+  const entries = pageItems.map((item, index) =>
+    isClubView ? formatTeam(item, index) : formatPlayer(item, index)
+  );
+
+  const safeChunks = safeFieldValue(entries);
 
   const embed = new EmbedBuilder()
     .setColor(0xD4AF37)
     .setTitle(`${safeEmoji(E.trophy_animated, '🏆')} SiuuVerse Hall of Fame`)
     .setDescription(buildHallDescription(isClubView, summary, currentPage, totalPages))
     .addFields(
-      {
-        name: isClubView
-          ? `${safeEmoji(E.team, '👥')} Club Ranking`
-          : `${safeEmoji(E.profile, '👤')} Player Ranking`,
-        value: chunk,
+      ...safeChunks.map((value, index) => ({
+        name:
+          index === 0
+            ? (isClubView
+                ? `${safeEmoji(E.team, '👥')} Club Ranking`
+                : `${safeEmoji(E.profile, '👤')} Player Ranking`)
+            : 'Continued',
+        value,
         inline: false
-      }
+      }))
     )
     .setFooter({ text: `Hall of Fame = overall legacy ranking • Records = category leaders • Page ${currentPage + 1}/${totalPages}` })
     .setTimestamp();
