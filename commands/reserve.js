@@ -415,7 +415,17 @@ module.exports = {
       }
 
       rows.splice(targetIndex, 1);
-      await updateData('Reserve!A2:F', rows);
+
+      // Rewrite the entire reserve data range so removed rows do not leave
+      // stale data behind (which causes the previous last row to appear duplicated).
+      const blankRows = Array.from({ length: Math.max(1, rows.length + 10) }, () => ['', '', '', '', '', '']);
+
+      await updateData('Reserve!A2:F', blankRows);
+
+      if (rows.length) {
+        await updateData('Reserve!A2:F', rows);
+      }
+
       invalidateSheetCache(['Reserve!']);
 
       return {
