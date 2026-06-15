@@ -288,9 +288,9 @@ function buildStatsSummary(players, config, type, page, totalPages) {
     competition: config.competition.label,
     entries: players.length,
     page: `${page + 1}/${totalPages}`,
-    leader: leader ? `\`${clean(leader.name)}\` • ${leader.value}` : 'N/A',
-    second: second ? `\`${clean(second.name)}\` • ${second.value}` : 'N/A',
-    third: third ? `\`${clean(third.name)}\` • ${third.value}` : 'N/A',
+    leader: leader ? `\`${stripPrefix(leader.name)}\` • ${leader.value}` : 'N/A',
+    second: second ? `\`${stripPrefix(second.name)}\` • ${second.value}` : 'N/A',
+    third: third ? `\`${stripPrefix(third.name)}\` • ${third.value}` : 'N/A',
     type
   };
 }
