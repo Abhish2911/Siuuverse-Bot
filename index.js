@@ -170,7 +170,8 @@ client.once('clientReady', async () => {
 
   const restoreCommands = [
     'setlivestats',
-    'setlivestandings'
+    'setlivestandings',
+    'setlivestandings2'
   ];
 
   for (const commandName of restoreCommands) {
