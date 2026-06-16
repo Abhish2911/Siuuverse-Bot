@@ -4,6 +4,8 @@ const { cachedGetData } = require('../utils/helpers');
 const path = require('path');
 const antonFontPath = path.join(__dirname, '../assets/fonts/Anton-Regular.ttf');
 GlobalFonts.registerFromPath(antonFontPath, 'Anton');
+const dejavuFontPath = path.join(__dirname, '../assets/fonts/DejaVuSansMono.ttf');
+GlobalFonts.registerFromPath(dejavuFontPath, 'DejaVuSansMono');
 
 function clean(value) {
   return String(value || '').trim();
@@ -158,11 +160,11 @@ async function buildLiveStandings2Image() {
       
       // Group Header Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px Arial';
+      ctx.font = 'bold 18px DejaVuSansMono';
       ctx.textAlign = 'left';
       ctx.fillText(gName, x + 20, y + 23);
       
-      ctx.font = 'bold 13px Arial';
+      ctx.font = 'bold 13px DejaVuSansMono';
       ctx.fillStyle = '#8e9cc2';
       ctx.textAlign = 'center';
       ctx.fillText('P', x + 305, y + 23);
@@ -206,7 +208,7 @@ async function buildLiveStandings2Image() {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px DejaVuSansMono';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
