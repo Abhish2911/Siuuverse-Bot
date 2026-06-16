@@ -69,6 +69,7 @@ function getLiveStandings2Config(guildId, type = 'standings2') {
   if (!entry) return null;
 
   if (entry.types) {
+    console.log('[LiveStandings2] Config lookup:', guildId, normalizedType, Object.keys(entry.types || {}));
     return entry.types[normalizedType] || null;
   }
 
@@ -90,7 +91,11 @@ async function buildLiveStandings2Image(type = 'standings2') {
       return await imageModule.buildLiveStandings2Image();
     }
 
-    throw new Error(`buildLiveStandings2Image() not found in ${modulePath}`);
+    if (typeof imageModule.generateImage === 'function') {
+      return await imageModule.generateImage();
+    }
+
+    throw new Error(`No image generator found in ${modulePath}`);
   } catch (err) {
     throw new Error(`Failed to build standings image: ${err.message}`);
   }
@@ -132,9 +137,15 @@ async function refreshLiveStandings2(client, guildId, type = 'standings2') {
 function startLiveStandings2Updater(client, guildId, type = 'standings2') {
   const normalizedType = normalizeType(type);
 
-  // Refresh once on creation/restoration only.
-  // Additional refreshes should be triggered manually after result entry.
-  refreshLiveStandings2(client, guildId, normalizedType).catch(() => null);
+  console.log('[LiveStandings2] Starting updater:', guildId, normalizedType);
+
+  refreshLiveStandings2(client, guildId, normalizedType)
+    .then(result => {
+      console.log('[LiveStandings2] Refresh result:', normalizedType, result);
+    })
+    .catch(error => {
+      console.error('[LiveStandings2] Refresh failed:', normalizedType, error);
+    });
 }
 
 module.exports = {
