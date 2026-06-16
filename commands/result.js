@@ -675,7 +675,18 @@ module.exports = {
 
     try {
       await refreshLiveStandings(pending.competition.key);
-      await refreshLiveStandings2(interaction.client, interaction.guildId);
+
+      await refreshLiveStandings2(
+        interaction.client,
+        interaction.guildId,
+        'standings2'
+      );
+
+      await refreshLiveStandings2(
+        interaction.client,
+        interaction.guildId,
+        'uclstandings2'
+      );
     } catch (err) {
       console.error('Live standings refresh failed:', err);
     }
