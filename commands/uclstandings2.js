@@ -1,7 +1,9 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { cachedGetData } = require('../utils/helpers');
 const path = require('path');
+const antonFontPath = path.join(__dirname, '../assets/fonts/Anton-Regular.ttf');
+GlobalFonts.registerFromPath(antonFontPath, 'Anton');
 
 function clean(value) {
   return String(value || '').trim();
@@ -133,7 +135,7 @@ module.exports = {
 
     // Top Title
     ctx.fillStyle = '#ffffff';
-    ctx.font = '64px Anton';
+    ctx.font = '64px "Anton"';
     ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
@@ -161,7 +163,7 @@ module.exports = {
       
       // Group Header Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px Arial';
+      ctx.font = '18px "Anton"';
       ctx.textAlign = 'left';
       ctx.fillText(gName, x + 20, y + 23);
       
@@ -209,7 +211,7 @@ module.exports = {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = isQualified ? 'bold 14px Arial' : '500 14px Arial';
+        ctx.font = isQualified ? '15px "Anton"' : '14px Arial';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
