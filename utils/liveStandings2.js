@@ -56,16 +56,23 @@ function saveLiveStandings2Config(guildId, { channelId, messageId }, type = 'sta
 
 function getLiveStandings2Config(guildId, type = 'standings2') {
   const normalizedType = normalizeType(type);
-  const store = readStore();
+  console.log(`[LiveStandings2] Looking up config for guild=${guildId} type=${normalizedType}`);
 
   const entry = store[guildId];
-  if (!entry) return null;
-
-  if (entry.types) {
-    return entry.types[normalizedType] || null;
+  if (!entry) {
+    console.log(`[LiveStandings2] No guild entry found for ${guildId}`);
+    return null;
   }
 
-  return normalizedType === 'standings2' ? entry : null;
+  if (entry.types) {
+    const config = entry.types[normalizedType] || null;
+    console.log(`[LiveStandings2] Config lookup result for ${normalizedType}:`, config);
+    return config;
+  }
+
+  const legacyConfig = normalizedType === 'standings2' ? entry : null;
+  console.log(`[LiveStandings2] Legacy config result for ${normalizedType}:`, legacyConfig);
+  return legacyConfig;
 }
 
 async function buildLiveStandings2Image(type = 'standings2') {
