@@ -37,7 +37,7 @@ async function buildLiveStandings2Image() {
     ctx.roundRect(cardX, cardY, cardWidth, 930, 24);
     ctx.fill();
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#e90052';
     ctx.font = 'bold 28px Arial';
     ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 30, cardY + 46);
 
