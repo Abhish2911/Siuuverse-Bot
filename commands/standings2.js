@@ -1,8 +1,6 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas } = require('@napi-rs/canvas');
 const { cachedGetData } = require('../utils/helpers');
-const path = require('path');
-const fs = require('fs');
 
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
@@ -206,42 +204,6 @@ async function buildLiveStandings2Image() {
 
     const rankColors = ['#fbbf24', '#d1d5db', '#cd7c2f'];
 
-    const logoCache = new Map();
-
-    for (const team of dummyData) {
-      try {
-        const normalized = (team.name || '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '');
-
-        const logosDir = path.join(__dirname, '..', 'Logos');
-        const files = fs.readdirSync(logosDir);
-
-        const matchedFile = files.find(file => {
-          const fileName = file
-            .replace(/\.[^.]+$/, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '');
-
-          return fileName === normalized;
-        });
-
-        if (!matchedFile) {
-          console.log(`[STANDINGS2] No logo found for ${team.name}`);
-          continue;
-        }
-
-        team.logo = matchedFile;
-
-        const logoPath = path.join(logosDir, matchedFile);
-        const logo = await loadImage(logoPath);
-
-        logoCache.set(team.logo, logo);
-      } catch (err) {
-        console.error(`Failed to preload logo for ${team.name}:`, err.message);
-      }
-    }
-
     // --- 5. ROW GENERATION LOOP ---
     const rowHeight = 42;
     const startY = 200;
@@ -271,20 +233,14 @@ async function buildLiveStandings2Image() {
       ctx.font = 'bold 15px Arial';
       ctx.fillText(String(team.rank), 68, y + 22);
 
-      // Cached Local Logo Handling
-      const logo = logoCache.get(team.logo);
-      if (logo) {
-        ctx.drawImage(logo, 109, y + 1, 32, 32);
-      }
-
       // Row Text Elements
       ctx.fillStyle = '#ffffff';
       ctx.font = index < 3 ? 'bold 16px Arial' : '500 16px Arial';
-      ctx.fillText(team.name, 160, y + 22);
+      ctx.fillText(team.name, 110, y + 22);
 
       ctx.fillStyle = clubColor;
       ctx.font = 'bold 12px Arial';
-      ctx.fillText(team.short || '', 545, y + 22);
+      ctx.fillText(team.short || '', 495, y + 22);
 
       const form = team.form && team.form.length
         ? team.form
