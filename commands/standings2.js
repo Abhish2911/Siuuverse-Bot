@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { cachedGetData } = require('../utils/helpers');
+const arialFontPath = path.join(__dirname, '../assets/fonts/Arial.ttf');
+GlobalFonts.registerFromPath(arialFontPath, 'Arial');
 
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
