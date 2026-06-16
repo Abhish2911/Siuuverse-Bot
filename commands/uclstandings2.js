@@ -163,7 +163,7 @@ module.exports = {
       
       // Group Header Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px Arial';
+      ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'left';
       ctx.fillText(gName, x + 20, y + 23);
       
@@ -211,7 +211,7 @@ module.exports = {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = isQualified ? 'bold 14px Arial' : '500 14px Arial';
+        ctx.font = 'bold 16px Arial';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
