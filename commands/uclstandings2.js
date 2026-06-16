@@ -23,12 +23,7 @@ function sortTeams(a, b) {
   return gfB - gfA;
 }
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('uclstandings2')
-    .setDescription('Generates a TV-broadcast style Grid layout for group standings'),
-
-  async execute(interaction) {
+async function buildLiveStandings2Image() {
 
     const rows = await cachedGetData('UCL_Coop_Group_Standings!A:K');
     const teamsSheet = await cachedGetData('Teams!A:Z');
@@ -247,7 +242,28 @@ module.exports = {
       }
     });
 
-    const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'ucl-group-grid.png' });
+    return canvas.toBuffer('image/png');
+}
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('uclstandings2')
+    .setDescription('Generates a TV-broadcast style Grid layout for group standings'),
+
+  async execute(interaction) {
+    const attachment = new AttachmentBuilder(
+      await buildLiveStandings2Image(),
+      { name: 'ucl-group-grid.png' }
+    );
+
     return interaction.editReply({ files: [attachment] });
+  }
+
+,
+
+  buildLiveStandings2Image,
+
+  async generateImage() {
+    return await buildLiveStandings2Image();
   }
 };
