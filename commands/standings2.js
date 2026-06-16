@@ -3,8 +3,8 @@ const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const path = require('path');
 const { cachedGetData } = require('../utils/helpers');
 
-const arialFontPath = path.join(__dirname, '../assets/fonts/Arial.ttf');
-GlobalFonts.registerFromPath(arialFontPath, 'Arial');
+const dejavuFontPath = path.join(__dirname, '../assets/fonts/DejaVuSansMono.ttf');
+GlobalFonts.registerFromPath(dejavuFontPath, 'DejaVuSansMono');
 
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
@@ -48,11 +48,11 @@ async function buildLiveStandings2Image() {
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px Arial';
+    ctx.font = 'bold 28px DejaVuSansMono';
     ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 30, cardY + 46);
 
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = 'bold 18px Arial';
+    ctx.font = 'bold 18px DejaVuSansMono';
     ctx.textAlign = 'right';
     ctx.fillText('Season 2', cardX + cardWidth - 30, cardY + 46);
     ctx.textAlign = 'left';
@@ -62,7 +62,7 @@ async function buildLiveStandings2Image() {
     ctx.fillRect(cardX, subHeaderY, cardWidth, 45);
 
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 13px Arial';
+    ctx.font = 'bold 13px DejaVuSansMono';
 
     ctx.fillText('RANK', cardX + 30, subHeaderY + 28);
     ctx.fillText('TEAM', cardX + 100, subHeaderY + 28);
@@ -165,7 +165,7 @@ async function buildLiveStandings2Image() {
         ctx.fillRect(cardX, y, 8, rowHeight);
 
         ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px DejaVuSansMono';
         ctx.fillText(String(team.rank), cardX + 40, y + 28);
 
         if (team.logo) {
@@ -176,11 +176,11 @@ async function buildLiveStandings2Image() {
         }
 
         ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px DejaVuSansMono';
         ctx.fillText(team.name, cardX + 100, y + 28);
 
         ctx.fillStyle = clubColor;
-        ctx.font = 'bold 12px Arial';
+        ctx.font = 'bold 12px DejaVuSansMono';
         ctx.fillText(team.short || '', cardX + 410, y + 28);
 
         const form = team.form.length ? team.form : ['-','-','-','-','-'];
@@ -194,12 +194,12 @@ async function buildLiveStandings2Image() {
             ctx.fill();
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px Arial';
+            ctx.font = 'bold 10px DejaVuSansMono';
             ctx.fillText(r, cardX + 465 + j * 22, y + 21);
         }
 
         ctx.fillStyle = '#334155';
-        ctx.font = '500 15px Arial';
+        ctx.font = '500 15px DejaVuSansMono';
         ctx.textAlign = 'right';
 
         ctx.fillText(String(team.p), colX.p, y + 27);
@@ -211,7 +211,7 @@ async function buildLiveStandings2Image() {
         ctx.fillText(String(team.gd), colX.gd, y + 27);
 
         ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px DejaVuSansMono';
         ctx.fillText(String(team.pts), colX.pts, y + 28);
 
         ctx.textAlign = 'left';
