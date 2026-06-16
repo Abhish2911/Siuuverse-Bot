@@ -58,6 +58,7 @@ function getLiveStandings2Config(guildId, type = 'standings2') {
   const normalizedType = normalizeType(type);
   console.log(`[LiveStandings2] Looking up config for guild=${guildId} type=${normalizedType}`);
 
+  const store = readStore();
   const entry = store[guildId];
   if (!entry) {
     console.log(`[LiveStandings2] No guild entry found for ${guildId}`);
