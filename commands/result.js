@@ -672,10 +672,13 @@ module.exports = {
       pending.competition.resultsRange.split('!')[0]
     ]);
 
+    // Standings are refreshed only after a result has been successfully saved.
     try {
-      await refreshLiveStandings(pending.competition.key);
+      if (['league', 'ucl', 'fa', 'carabao'].includes(pending.competition.key)) {
+        await refreshLiveStandings(pending.competition.key);
+      }
     } catch (err) {
-      console.error('Live standings refresh failed:', err);
+      console.error(`Live standings refresh failed for ${pending.competition.key}:`, err);
     }
 
     try {
