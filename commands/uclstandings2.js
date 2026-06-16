@@ -211,7 +211,7 @@ module.exports = {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 16px Arial';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
