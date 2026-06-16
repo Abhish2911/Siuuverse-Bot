@@ -90,6 +90,7 @@ async function buildLiveStandings2Image(type = 'standings2') {
 
 async function refreshLiveStandings2(client, guildId, type = 'standings2') {
   const normalizedType = normalizeType(type);
+  console.log(`[LiveStandings2] Refresh requested for ${guildId} (${normalizedType})`);
   const config = getLiveStandings2Config(guildId, normalizedType);
   if (!config) return { ok: false, reason: 'No config' };
   try {
@@ -99,6 +100,7 @@ async function refreshLiveStandings2(client, guildId, type = 'standings2') {
     if (!channel) return { ok: false, reason: 'Channel not found' };
     const message = await channel.messages.fetch(config.messageId);
     if (!message) return { ok: false, reason: 'Message not found' };
+    console.log(`[LiveStandings2] Building image for ${normalizedType}`);
     const imageBuffer = await buildLiveStandings2Image(normalizedType);
     const attachment = new AttachmentBuilder(imageBuffer, {
       name: `${normalizedType}.png`
@@ -113,9 +115,10 @@ async function refreshLiveStandings2(client, guildId, type = 'standings2') {
       embeds: [],
       files: [attachment]
     });
+    console.log(`[LiveStandings2] Successfully updated ${normalizedType} message ${config.messageId}`);
     return { ok: true };
   } catch (e) {
-    // silent fail
+    console.error(`[LiveStandings2] Refresh failed for ${guildId} (${normalizedType})`, e);
     return { ok: false, reason: e.message || String(e) };
   }
 }
@@ -125,6 +128,7 @@ function startLiveStandings2Updater(client, guildId, type = 'standings2') {
 
   // Refresh once on creation/restoration only.
   // Additional refreshes should be triggered manually after result entry.
+  console.log(`[LiveStandings2] Starting refresh for ${guildId} (${normalizedType})`);
   refreshLiveStandings2(client, guildId, normalizedType).catch(() => null);
 }
 
