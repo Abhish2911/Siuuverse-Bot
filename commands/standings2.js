@@ -191,7 +191,7 @@ async function buildLiveStandings2Image() {
 
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 10px Arial';
-            ctx.fillText(r, cardX + 465 + j * 22, y + 21);
+            ctx.fillText(r, cardX + 470 + j * 22, y + 21);
         }
 
         ctx.fillStyle = '#334155';
