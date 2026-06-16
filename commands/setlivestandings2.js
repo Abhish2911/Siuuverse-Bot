@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const liveStandings2 = require('../utils/liveStandings2');
 const standings2 = require('./standings2');
+const uclstandings2 = require('./uclstandings2');
 
 function isOwner(interaction) {
   const ownerIds = String(process.env.OWNER_IDS || '')
@@ -17,7 +18,17 @@ function isOwner(interaction) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setlivestandings2')
-    .setDescription('Create a live image standings message (Standings2)'),
+    .setDescription('Create a live image standings message')
+    .addStringOption(option =>
+      option
+        .setName('type')
+        .setDescription('Image type')
+        .setRequired(true)
+        .addChoices(
+          { name: 'League Standings', value: 'standings2' },
+          { name: 'UCL Standings', value: 'uclstandings2' }
+        )
+    ),
 
   async execute(interaction) {
     if (!interaction.guild) {
@@ -37,15 +48,21 @@ module.exports = {
     try {
       console.log('Starting standings2 image generation...');
 
-      if (typeof standings2.generateImage !== 'function') {
-        throw new Error('standings2.generateImage() is not exported');
+      const type = interaction.options.getString('type');
+
+      const imageModule = type === 'uclstandings2'
+        ? uclstandings2
+        : standings2;
+
+      if (typeof imageModule.generateImage !== 'function') {
+        throw new Error(`${type}.generateImage() is not exported`);
       }
 
-      const imageBuffer = await standings2.generateImage();
+      const imageBuffer = await imageModule.generateImage();
       console.log('Standings2 image generation completed.');
 
       const attachment = new AttachmentBuilder(imageBuffer, {
-        name: 'standings2.png'
+        name: `${type}.png`
       });
 
       const sent = await interaction.channel.send({
@@ -56,14 +73,22 @@ module.exports = {
         throw new Error('saveLiveStandings2Config is not exported from utils/liveStandings2.js');
       }
 
-      liveStandings2.saveLiveStandings2Config(interaction.guild.id, {
-        guildId: interaction.guild.id,
-        channelId: interaction.channel.id,
-        messageId: sent.id
-      });
+      liveStandings2.saveLiveStandings2Config(
+        interaction.guild.id,
+        {
+          guildId: interaction.guild.id,
+          channelId: interaction.channel.id,
+          messageId: sent.id
+        },
+        type
+      );
 
       if (typeof liveStandings2.startLiveStandings2Updater === 'function') {
-        liveStandings2.startLiveStandings2Updater(interaction.client, interaction.guild.id);
+        liveStandings2.startLiveStandings2Updater(
+          interaction.client,
+          interaction.guild.id,
+          type
+        );
       }
 
       return {
@@ -79,26 +104,35 @@ module.exports = {
   },
 
   async restore(client) {
-    try {
-      const guilds = client.guilds.cache.map(g => g.id);
-      let restored = false;
+    const guilds = client.guilds.cache.map(g => g.id);
+    let restored = false;
 
-      for (const guildId of guilds) {
-        const config = typeof liveStandings2.getLiveStandings2Config === 'function'
-          ? liveStandings2.getLiveStandings2Config(guildId)
-          : null;
+    for (const guildId of guilds) {
+      for (const type of ['standings2', 'uclstandings2']) {
+        try {
+          console.log('[Restore] Checking:', guildId, type);
 
-        if (!config) continue;
+          const config = typeof liveStandings2.getLiveStandings2Config === 'function'
+            ? liveStandings2.getLiveStandings2Config(guildId, type)
+            : null;
 
-        if (typeof liveStandings2.startLiveStandings2Updater === 'function') {
-          liveStandings2.startLiveStandings2Updater(client, guildId);
-          restored = true;
+          if (!config) {
+            console.log('[Restore] Missing config:', guildId, type);
+            continue;
+          }
+
+          console.log('[Restore] Found config:', guildId, type, config.messageId);
+
+          if (typeof liveStandings2.startLiveStandings2Updater === 'function') {
+            liveStandings2.startLiveStandings2Updater(client, guildId, type);
+            restored = true;
+          }
+        } catch (error) {
+          console.error('[Restore] Failed:', guildId, type, error);
         }
       }
-
-      return restored;
-    } catch {
-      return false;
     }
+
+    return restored;
   }
 };
