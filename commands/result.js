@@ -8,6 +8,7 @@ const {
   getCompetitionConfig
 } = require('../utils/helpers');
 const { refreshLiveStandings } = require('../utils/liveStandings');
+const { refreshLiveStandings2 } = require('../utils/liveStandings2');
 
 let addYellowCard = async () => null;
 let addRedCard = async () => null;
@@ -672,13 +673,11 @@ module.exports = {
       pending.competition.resultsRange.split('!')[0]
     ]);
 
-    // Standings are refreshed only after a result has been successfully saved.
     try {
-      if (['league', 'ucl', 'fa', 'carabao'].includes(pending.competition.key)) {
-        await refreshLiveStandings(pending.competition.key);
-      }
+      await refreshLiveStandings(pending.competition.key);
+      await refreshLiveStandings2(interaction.client, interaction.guildId);
     } catch (err) {
-      console.error(`Live standings refresh failed for ${pending.competition.key}:`, err);
+      console.error('Live standings refresh failed:', err);
     }
 
     try {
