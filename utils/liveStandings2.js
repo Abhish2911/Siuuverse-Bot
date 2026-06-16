@@ -81,14 +81,8 @@ async function refreshLiveStandings2(client, guildId) {
 }
 
 function startLiveStandings2Updater(client, guildId) {
-  if (!client.liveStandings2Intervals) client.liveStandings2Intervals = {};
-  if (client.liveStandings2Intervals[guildId]) {
-    clearInterval(client.liveStandings2Intervals[guildId]);
-  }
+  // No interval polling. Refresh once on startup/restore.
   refreshLiveStandings2(client, guildId).catch(() => null);
-  client.liveStandings2Intervals[guildId] = setInterval(async () => {
-    await refreshLiveStandings2(client, guildId);
-  }, 60 * 1000);
 }
 
 module.exports = {
