@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const path = require('path');
 const { cachedGetData } = require('../utils/helpers');
+
 const arialFontPath = path.join(__dirname, '../assets/fonts/Arial.ttf');
 GlobalFonts.registerFromPath(arialFontPath, 'Arial');
 
