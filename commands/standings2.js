@@ -1,8 +1,24 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const path = require('path');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { cachedGetData } = require('../utils/helpers');
 
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
+
+// Load local fonts from assets/fonts if present.
+try {
+    GlobalFonts.registerFromPath(
+        path.join(__dirname, '..', 'assets', 'fonts', 'Arial.ttf'),
+        'Arial'
+    );
+} catch {}
+
+try {
+    GlobalFonts.registerFromPath(
+        path.join(__dirname, '..', 'assets', 'fonts', 'Arial Bold.ttf'),
+        'Arial'
+    );
+} catch {}
 
 async function buildLiveStandings2Image() {
     const canvas = createCanvas(1200, 1050);
