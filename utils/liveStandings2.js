@@ -81,7 +81,7 @@ async function refreshLiveStandings2(client, guildId) {
 }
 
 function startLiveStandings2Updater(client, guildId) {
-  // No interval polling. Refresh once on startup/restore.
+  // Refresh only when explicitly called.
   refreshLiveStandings2(client, guildId).catch(() => null);
 }
 
