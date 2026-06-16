@@ -32,7 +32,7 @@ async function buildLiveStandings2Image() {
     const cardWidth = 1080;
     const headerHeight = 75;
 
-    ctx.fillStyle = '#e90052';
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardWidth, 930, 24);
     ctx.fill();
@@ -147,10 +147,9 @@ async function buildLiveStandings2Image() {
         const y = startY + i * rowHeight;
         const clubColor = team.color || '#cbd5e1';
 
-        if (i % 2 === 1) {
-            ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(cardX, y, cardWidth, rowHeight);
-        }
+        // Clean alternating row background (solid, no bleed)
+        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#f9fafb';
+        ctx.fillRect(cardX, y, cardWidth, rowHeight);
 
         ctx.fillStyle = clubColor;
         ctx.fillRect(cardX, y, 8, rowHeight);
