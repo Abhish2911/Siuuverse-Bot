@@ -163,9 +163,9 @@ module.exports = {
       
       // Group Header Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px Arial';
+      ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'left';
-      ctx.fillText(gName, x + 20, y + 23);
+      ctx.fillText(gName, x + 20, y + 24);
       
       ctx.font = 'bold 13px Arial';
       ctx.fillStyle = '#8e9cc2';
@@ -211,7 +211,7 @@ module.exports = {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = isQualified ? 'bold 14px Arial' : '500 14px Arial';
+        ctx.font = 'bold 16px Arial';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
@@ -220,7 +220,7 @@ module.exports = {
         teamName = teamName.toUpperCase();
         if (isQualified) teamName += ' (Q)'; // Add marker
         
-        ctx.fillText(`${tIndex + 1}`, x + 20, rowY + 21);
+        ctx.fillText(`${tIndex + 1}`, x + 20, rowY + 22);
         
         // Qualification color tint for team name
         if (isTop2) ctx.fillStyle = '#ffffff';
@@ -228,7 +228,7 @@ module.exports = {
         
         let displayName = teamName;
         if (displayName.length > 26) displayName = `${displayName.slice(0, 26)}...`;
-        ctx.fillText(displayName, x + 42, rowY + 21);
+        ctx.fillText(displayName, x + 42, rowY + 22);
 
         // Stats (P, GD, PTS)
         const p = clean(teamRow[3]) || '0';
