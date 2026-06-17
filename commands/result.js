@@ -26,7 +26,7 @@ const pendingResults = new Map();
 function getPendingKey(userId, matchNo = '') {
   return `${userId}:${normalizeMatchNo(matchNo)}`;
 }
-const PENDING_TTL = 5 * 60 * 1000;
+const PENDING_TTL = 15 * 60 * 1000;
 const RESERVE_SHEET_RANGE = 'Reserve!A:F';
 const SUBMITTED_AT_INDEX = 18;
 
@@ -469,7 +469,8 @@ module.exports = {
       awayPlayed,
       decision,
       resultText: hg > ag ? 'H' : hg < ag ? 'A' : 'D',
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      ownerId: interaction.user.id
     });
 
     const row = new ActionRowBuilder().addComponents(
@@ -571,17 +572,36 @@ module.exports = {
       };
     }
 
-    const pending = pendingResults.get(
+    let pending = pendingResults.get(
       getPendingKey(interaction.user.id, matchNo)
     );
 
+    // Fallback lookup in case the key format changed, the interaction was
+    // restored after a reload, or the match number casing differs.
+    if (!pending && matchNo) {
+      for (const [key, value] of pendingResults.entries()) {
+        if (
+          value &&
+          normalizeMatchNo(value.matchNo) === matchNo &&
+          key.startsWith(`${interaction.user.id}:`)
+        ) {
+          pending = value;
+          break;
+        }
+      }
+    }
+
     if (!pending) {
       return {
-        content: `${safeEmoji(E.wrong, '❌')} Result submission expired.`,
+        content: `${safeEmoji(E.wrong, '❌')} Result submission not found. Please run /result again.`,
         components: [],
         embeds: []
       };
     }
+
+    // Refresh TTL when user clicks confirm so long sheet operations do not
+    // cause the submission to disappear during processing.
+    pending.createdAt = Date.now();
 
     const sheet = await getData(pending.competition.resultsRange);
 
