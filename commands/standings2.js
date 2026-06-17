@@ -42,7 +42,7 @@ async function buildLiveStandings2Image() {
     ctx.fill();
 
     // Header bar (same magenta style as before)
-    ctx.fillStyle = '#e90052';
+    ctx.fillStyle = '#bb0000';
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardWidth, headerHeight, [24, 24, 0, 0]);
     ctx.fill();
