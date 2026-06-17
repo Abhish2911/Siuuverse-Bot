@@ -167,7 +167,7 @@ async function buildLiveStandings2Image() {
       ctx.font = 'bold 13px DejaVuSansMono';
       ctx.fillStyle = '#8e9cc2';
       ctx.textAlign = 'center';
-      ctx.fillText('P', x + 305, y + 23);
+      ctx.fillText('P', x + 310, y + 23);
       ctx.fillText('GD', x + 360, y + 23);
       ctx.fillText('PTS', x + 420, y + 23);
 
@@ -208,7 +208,7 @@ async function buildLiveStandings2Image() {
 
         // Typography weights based on qualification
         ctx.fillStyle = isQualified ? '#ffffff' : '#6f83b5';
-        ctx.font = 'bold 16px DejaVuSansMono';
+        ctx.font = 'bold 14px DejaVuSansMono';
         
         // Team Rank & Name
         ctx.textAlign = 'left';
