@@ -58,7 +58,7 @@ async function buildLiveStandings2Image() {
     ctx.textAlign = 'left';
 
     const subHeaderY = cardY + headerHeight;
-    ctx.fillStyle = '#d00049';
+    ctx.fillStyle = '#bb0000';
     ctx.fillRect(cardX, subHeaderY, cardWidth, 45);
 
     ctx.fillStyle = '#fff';
