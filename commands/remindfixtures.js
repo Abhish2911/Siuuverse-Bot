@@ -193,6 +193,12 @@ module.exports = {
     )
     .addBooleanOption(opt =>
       opt
+        .setName('include_reserved')
+        .setDescription('Include reserved matches in the reminder')
+        .setRequired(false)
+    )
+    .addBooleanOption(opt =>
+      opt
         .setName('silent')
         .setDescription('Send without captain/player mentions')
         .setRequired(false)
@@ -218,6 +224,7 @@ module.exports = {
     const selectedMatchday = String(
       interaction.options.getString('matchday') || ''
     ).trim();
+    const includeReserved = interaction.options.getBoolean('include_reserved') || false;
     const silent = interaction.options.getBoolean('silent') || false;
     const notifyMode = interaction.options.getString('notify') || 'dm';
 
@@ -288,7 +295,58 @@ module.exports = {
       }
     }
 
-    if (!remaining.length) {
+    const fixtureLines = [];
+    const playerIds = new Set();
+    const playerFixtures = new Map();
+
+    const reserveData = await cachedGetData('Reserve!A:F').catch(() => []);
+    const reserveRows = Array.isArray(reserveData) ? reserveData.slice(1) : [];
+    const reservedMatches = new Set(
+      reserveRows
+        .map(r => String(r[0] || '').trim().toUpperCase())
+        .filter(Boolean)
+    );
+
+    for (const item of remaining) {
+      const row = item.row;
+      const config = item.config;
+
+      const matchNo = String(row[config.matchdayColumn] || '-').trim();
+
+      const isReserved = reservedMatches.has(matchNo.toUpperCase());
+
+      if (isReserved && !includeReserved) {
+        continue;
+      }
+
+      const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
+      const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
+
+      const homeTeam = findCoopTeamRow(teamRows, homeShort, row[config.homeCol]);
+      const awayTeam = findCoopTeamRow(teamRows, awayShort, row[config.awayCol]);
+
+      if (!silent && notifyMode !== 'none') {
+        const fixtureText = `${matchNo}${isReserved ? ' 🔒 RESERVED' : ''} • ${homeShort} vs ${awayShort}`;
+
+        [...getAllPlayerIds(homeTeam), ...getAllPlayerIds(awayTeam)].forEach(id => {
+          playerIds.add(id);
+
+          if (!playerFixtures.has(id)) {
+            playerFixtures.set(id, []);
+          }
+
+          playerFixtures.get(id).push(fixtureText);
+        });
+      }
+
+      fixtureLines.push(
+        `**${config.key} • ${matchNo}**${isReserved ? ' 🔒 RESERVED' : ''} • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\``
+      );
+    }
+
+    const filteredRemaining = fixtureLines.length;
+
+    if (!filteredRemaining) {
       return {
         embeds: [
           new EmbedBuilder()
@@ -303,52 +361,14 @@ module.exports = {
       };
     }
 
-    const fixtureLines = [];
-    const playerIds = new Set();
-    const playerFixtures = new Map();
-
-    const reserveData = await cachedGetData('Reserve!A:F').catch(() => []);
-    const reservedMatches = new Set(
-      (Array.isArray(reserveData) ? reserveData.slice(1) : [])
-        .map(r => String(r[0] || '').trim().toUpperCase())
-        .filter(Boolean)
+    const summary = buildReminderSummary(
+      'All Competitions',
+      remaining
+        .filter(x => includeReserved || !reservedMatches.has(String(x.row[x.config.matchdayColumn] || '').trim().toUpperCase()))
+        .map(x => x.row),
+      silent,
+      playerIds
     );
-
-    for (const item of remaining) {
-      const row = item.row;
-      const config = item.config;
-
-      const matchNo = String(row[config.matchdayColumn] || '-').trim();
-
-
-      const homeShort = String(row[config.homeShortCol] || row[config.homeCol] || 'HOME').trim();
-      const awayShort = String(row[config.awayShortCol] || row[config.awayCol] || 'AWAY').trim();
-
-      const homeTeam = findCoopTeamRow(teamRows, homeShort, row[config.homeCol]);
-      const awayTeam = findCoopTeamRow(teamRows, awayShort, row[config.awayCol]);
-
-      if (!silent && notifyMode !== 'none') {
-        const fixtureText = `${config.key} • ${matchNo}${reservedMatches.has(matchNo.toUpperCase()) ? ' 🔒 RESERVED' : ''} • ${homeShort} vs ${awayShort}`;
-
-        [...getAllPlayerIds(homeTeam), ...getAllPlayerIds(awayTeam)].forEach(id => {
-          playerIds.add(id);
-
-          if (!playerFixtures.has(id)) {
-            playerFixtures.set(id, []);
-          }
-
-          playerFixtures.get(id).push(fixtureText);
-        });
-      }
-
-      const isReserved = reservedMatches.has(matchNo.toUpperCase());
-
-      fixtureLines.push(
-        `**${config.key} • ${matchNo}**${isReserved ? ' 🔒 RESERVED' : ''} • \`${homeShort}\` ${safeEmoji(E.vs, '⚔️')} \`${awayShort}\``
-      );
-    }
-
-    const summary = buildReminderSummary('All Competitions', remaining.map(x => x.row), silent, playerIds);
 
     const embed = new EmbedBuilder()
       .setTitle(
@@ -418,9 +438,10 @@ Please contact your opponents and complete the matches as soon as possible.`
         : `Remaining fixture reminder posted for ${configs[0].key}.`,
       color: 0xF1C40F,
       fields: [
-        { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
+        { name: '⏳ Remaining Matches', value: String(filteredRemaining), inline: true },
         { name: '📢 Notify Mode', value: notifyMode, inline: true },
-        { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true }
+        { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true },
+        { name: '🔒 Include Reserved', value: includeReserved ? 'Yes' : 'No', inline: true }
       ]
     });
 
@@ -433,14 +454,15 @@ Please contact your opponents and complete the matches as soon as possible.`
               ? 'Reminder posted in this channel for all pending League, UCL, FA Cup and Carabao Cup fixtures.\n\n'
               : `Reminder posted in this channel for pending ${configs[0].key} fixtures.\n\n`) +
             (selectedMatchday ? `Matchday/Round Filter: **${selectedMatchday}**\n\n` : '') +
-            `${safeEmoji(E.missing, '⏳')} Remaining Matches: **${remaining.length}**\n` +
+            `${safeEmoji(E.missing, '⏳')} Remaining Matches: **${filteredRemaining}**\n` +
             `🔕 Silent: **${silent ? 'Yes' : 'No'}**\n` +
-            `📢 Notify Mode: **${notifyMode}**`
+            `📢 Notify Mode: **${notifyMode}**\n🔒 Include Reserved: **${includeReserved ? 'Yes' : 'No'}**`
           )
           .addFields(
-            { name: '⏳ Remaining Matches', value: String(remaining.length), inline: true },
+            { name: '⏳ Remaining Matches', value: String(filteredRemaining), inline: true },
             { name: '🔕 Silent', value: silent ? 'Yes' : 'No', inline: true },
             { name: '📢 Notify Mode', value: notifyMode, inline: true },
+            { name: '🔒 Include Reserved', value: includeReserved ? 'Yes' : 'No', inline: true },
             { name: '📩 Players Notified', value: String(silent ? 0 : playerIds.size), inline: true }
           )
           .setColor(0x2ECC71)
