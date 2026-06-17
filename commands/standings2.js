@@ -20,7 +20,7 @@ async function buildLiveStandings2Image() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#ff007f';
+    ctx.fillStyle = '#d10000';
     ctx.beginPath();
     ctx.arc(1200, 200, 400, 0, Math.PI * 2);
     ctx.fill();
