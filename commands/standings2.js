@@ -91,13 +91,13 @@ async function buildLiveStandings2Image() {
     ctx.fillText('FORM HISTORY', cardX + 490, subHeaderY + 27);
 
     const colX = {
-    p: cardX + 695,   // Shifted right to group stats closer
-    w: cardX + 740,   // 45px gap
-    d: cardX + 785,   // 45px gap
-    l: cardX + 830,   // 45px gap
-    gf: cardX + 875,  // 45px gap
-    ga: cardX + 920,  // 45px gap
-    gd: cardX + 965,  // 45px gap
+    p: cardX + 660,   // Shifted right to group stats closer
+    w: cardX + 710,   // 45px gap
+    d: cardX + 760,   // 45px gap
+    l: cardX + 810,   // 45px gap
+    gf: cardX + 860,  // 45px gap
+    ga: cardX + 910,  // 45px gap
+    gd: cardX + 960,  // 45px gap
     pts: cardX + 1055 // Large 90px gap separating Points from GD
     };   
 
@@ -197,18 +197,14 @@ async function buildLiveStandings2Image() {
         ctx.fillStyle = clubColor;
         ctx.fillRect(cardX, y, 6, rowHeight);
 
-        // --- CREATIVE ELEMENT A: STYLIZED RANKING SHIELDS ---
+       // --- UPDATED: FLAT STYLIZED RANKING SHIELDS ---
         ctx.save();
         if (team.rank <= 4) {
-            // Dynamic emerald gradient badge for top-tier promotion positions
-            const badgeGrad = ctx.createLinearGradient(cardX + 30, y + 10, cardX + 54, y + 34);
-            badgeGrad.addColorStop(0, '#00f5a0');
-            badgeGrad.addColorStop(1, '#059669');
-            ctx.fillStyle = badgeGrad;
+            ctx.fillStyle = '#d1fae5'; // Flat soft mint-green background (No Gradient)
         } else if (team.rank >= 15) {
-            ctx.fillStyle = '#fee2e2'; // Light soft red badge background for elimination zone
+            ctx.fillStyle = '#fee2e2'; // Flat soft red background
         } else {
-            ctx.fillStyle = '#f1f5f9'; // Clean slate fallback badge
+            ctx.fillStyle = '#f1f5f9'; // Flat slate fallback background
         }
         ctx.beginPath();
         ctx.arc(cardX + 44, y + 22, 13, 0, Math.PI * 2);
@@ -216,7 +212,7 @@ async function buildLiveStandings2Image() {
         ctx.restore();
 
         // Rank Digit Print Content
-        ctx.fillStyle = team.rank <= 4 ? '#ffffff' : team.rank >= 15 ? '#ef4444' : '#475569';
+        ctx.fillStyle = team.rank <= 3 ? '#ffffff' : team.rank >= 15 ? '#ef4444' : '#475569';
         ctx.font = 'bold 13px DejaVuSansMono';
         ctx.textAlign = 'center';
         ctx.fillText(String(team.rank), cardX + 44, y + 26);
