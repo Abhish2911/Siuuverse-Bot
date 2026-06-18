@@ -9,65 +9,63 @@ GlobalFonts.registerFromPath(dejavuFontPath, 'DejaVuSansMono');
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
 async function buildLiveStandings2Image() {
-    const canvas = createCanvas(1200, 1050);
+    const canvas = createCanvas(1200, 1120);
     const ctx = canvas.getContext('2d');
 
-    const bg = ctx.createLinearGradient(0, 0, 1200, 1050);
-    bg.addColorStop(0, '#2b003a');
-    bg.addColorStop(0.6, '#38003c');
-    bg.addColorStop(1, '#1f0022');
+    // Cyber background
+    const bg = ctx.createLinearGradient(0, 0, 1200, 1120);
+    bg.addColorStop(0, '#0f172a'); // navy
+    bg.addColorStop(0.5, '#064e3b'); // greenish
+    bg.addColorStop(1, '#0f172a'); // navy
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#d10000';
-    ctx.beginPath();
-    ctx.arc(1200, 200, 400, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#00ffcc';
-    ctx.beginPath();
-    ctx.arc(0, 900, 350, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
+    // Floating card rows background
     const cardX = 60;
     const cardY = 60;
     const cardWidth = 1080;
     const headerHeight = 75;
 
-    ctx.fillStyle = '#ffffff';
+    // Card background
+    ctx.fillStyle = '#1e293b'; // navy-ish card background
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardWidth, 930, 24);
+    ctx.roundRect(cardX, cardY, cardWidth, 1000, 24);
     ctx.fill();
 
-    // Header bar (same magenta style as before)
-    ctx.fillStyle = '#bb0000';
+    // Header bar
+    ctx.fillStyle = '#0f766e'; // dark green header
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardWidth, headerHeight, [24, 24, 0, 0]);
     ctx.fill();
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px DejaVuSansMono';
-    ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 30, cardY + 46);
+    // Header text
+    ctx.fillStyle = '#ecfccb'; // light green text
+    ctx.font = 'bold 32px DejaVuSansMono';
+    ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 30, cardY + 50);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = 'bold 18px DejaVuSansMono';
+    ctx.fillStyle = 'rgba(236,252,203,0.8)';
+    ctx.font = 'bold 20px DejaVuSansMono';
     ctx.textAlign = 'right';
-    ctx.fillText('Season 2', cardX + cardWidth - 30, cardY + 46);
+    ctx.fillText('Season 2', cardX + cardWidth - 30, cardY + 50);
     ctx.textAlign = 'left';
 
-    const subHeaderY = cardY + headerHeight;
-    ctx.fillStyle = '#bb0000';
-    ctx.fillRect(cardX, subHeaderY, cardWidth, 45);
+    // Divider below header
+    const dividerY = cardY + headerHeight;
+    ctx.fillStyle = '#22c55e'; // bright green divider
+    ctx.fillRect(cardX, dividerY, cardWidth, 6);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 13px DejaVuSansMono';
+    // Column headers background
+    const subHeaderY = dividerY + 6;
+    ctx.fillStyle = '#0f172a'; // dark navy for column header background
+    ctx.fillRect(cardX, subHeaderY, cardWidth, 50);
 
-    ctx.fillText('RANK', cardX + 30, subHeaderY + 28);
-    ctx.fillText('TEAM', cardX + 100, subHeaderY + 28);
-    ctx.fillText('SHORT', cardX + 410, subHeaderY + 28);
-    ctx.fillText('FORM', cardX + 480, subHeaderY + 28);
+    // Column headers text
+    ctx.fillStyle = '#a3e635'; // lime green text
+    ctx.font = 'bold 16px DejaVuSansMono';
+    ctx.fillText('RANK', cardX + 40, subHeaderY + 32);
+    ctx.fillText('TEAM', cardX + 110, subHeaderY + 32);
+    ctx.fillText('SHORT', cardX + 420, subHeaderY + 32);
+    ctx.fillText('FORM', cardX + 480, subHeaderY + 32);
 
     const colX = {
         p: cardX + 630,
@@ -76,21 +74,22 @@ async function buildLiveStandings2Image() {
         l: cardX + 810,
         gf: cardX + 870,
         ga: cardX + 930,
-        gd: cardX + 990,
-        pts: cardX + 1050
+        gd: cardX + 970,
+        pts: cardX + 1085
     };
 
     ctx.textAlign = 'right';
-    ctx.fillText('P', colX.p, subHeaderY + 28);
-    ctx.fillText('W', colX.w, subHeaderY + 28);
-    ctx.fillText('D', colX.d, subHeaderY + 28);
-    ctx.fillText('L', colX.l, subHeaderY + 28);
-    ctx.fillText('GF', colX.gf, subHeaderY + 28);
-    ctx.fillText('GA', colX.ga, subHeaderY + 28);
-    ctx.fillText('GD', colX.gd, subHeaderY + 28);
-    ctx.fillText('PTS', colX.pts, subHeaderY + 28);
+    ctx.fillText('P', colX.p, subHeaderY + 32);
+    ctx.fillText('W', colX.w, subHeaderY + 32);
+    ctx.fillText('D', colX.d, subHeaderY + 32);
+    ctx.fillText('L', colX.l, subHeaderY + 32);
+    ctx.fillText('GF', colX.gf, subHeaderY + 32);
+    ctx.fillText('GA', colX.ga, subHeaderY + 32);
+    ctx.fillText('GD', colX.gd, subHeaderY + 32);
+    ctx.fillText('PTS', colX.pts, subHeaderY + 32);
     ctx.textAlign = 'left';
 
+    // Fetch data
     const [standings, teamRows, fixtures] = await Promise.all([
         cachedGetData('Standings!A:J'),
         cachedGetData('Teams!A:H'),
@@ -150,80 +149,110 @@ async function buildLiveStandings2Image() {
     }));
 
     const rowHeight = 44;
-    const startY = subHeaderY + 45;
+    const startY = subHeaderY + 50;
 
     for (let i = 0; i < dummyData.length; i++) {
         const team = dummyData[i];
         const y = startY + i * rowHeight;
         const clubColor = team.color || '#cbd5e1';
 
-        // Clean alternating row background (solid, no bleed)
-        ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#f9fafb';
-        ctx.fillRect(cardX, y, cardWidth, rowHeight);
-
-        ctx.fillStyle = clubColor;
-        ctx.fillRect(cardX, y, 8, rowHeight);
-
+        // Floating card row background with subtle shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
         ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 16px DejaVuSansMono';
-        ctx.fillText(String(team.rank), cardX + 40, y + 28);
+        ctx.beginPath();
+        ctx.roundRect(cardX, y, cardWidth, rowHeight, 12);
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
 
+        // Circular rank badge
+        ctx.fillStyle = clubColor;
+        ctx.beginPath();
+        ctx.arc(cardX + 25, y + rowHeight / 2, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 18px DejaVuSansMono';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(team.rank), cardX + 25, y + rowHeight / 2 + 7);
+        ctx.textAlign = 'left';
+
+        // Team logo
         if (team.logo) {
             try {
                 const img = await loadImage(team.logo);
-                ctx.drawImage(img, cardX + 85, y + 10, 24, 24);
+                ctx.drawImage(img, cardX + 65, y + 10, 28, 28);
             } catch {}
         }
 
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 16px DejaVuSansMono';
-        ctx.fillText(team.name, cardX + 100, y + 28);
+        // Team name
+        ctx.fillStyle = '#ecfccb';
+        ctx.font = 'bold 18px DejaVuSansMono';
+        ctx.fillText(team.name, cardX + 110, y + 30);
 
+        // Short name
         ctx.fillStyle = clubColor;
-        ctx.font = 'bold 12px DejaVuSansMono';
-        ctx.fillText(team.short || '', cardX + 410, y + 28);
+        ctx.font = 'bold 14px DejaVuSansMono';
+        ctx.fillText(team.short || '', cardX + 420, y + 30);
 
+        // Form capsules
         const form = team.form.length ? team.form : ['-','-','-','-','-'];
-
         for (let j = 0; j < form.length; j++) {
             const r = form[j];
-            ctx.fillStyle = r === 'W' ? '#22c55e' : r === 'D' ? '#f59e0b' : r === 'L' ? '#ef4444' : '#ddd';
+            ctx.fillStyle = r === 'W' ? '#22c55e' : r === 'D' ? '#f59e0b' : r === 'L' ? '#ef4444' : '#444';
 
             ctx.beginPath();
-            ctx.roundRect(cardX + 460 + j * 22, y + 8, 18, 18, 4);
+            ctx.roundRect(cardX + 480 + j * 26, y + 12, 22, 22, 12);
             ctx.fill();
 
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 10px DejaVuSansMono';
-            ctx.fillText(r, cardX + 465 + j * 22, y + 21);
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 14px DejaVuSansMono';
+            ctx.textAlign = 'center';
+            ctx.fillText(r, cardX + 480 + j * 26 + 11, y + 28);
+            ctx.textAlign = 'left';
         }
 
-        ctx.fillStyle = '#334155';
-        ctx.font = '500 15px DejaVuSansMono';
+        // Stats columns
+        ctx.fillStyle = '#a3e635';
+        ctx.font = 'bold 16px DejaVuSansMono';
         ctx.textAlign = 'right';
 
-        ctx.fillText(String(team.p), colX.p, y + 27);
-        ctx.fillText(String(team.w), colX.w, y + 27);
-        ctx.fillText(String(team.d), colX.d, y + 27);
-        ctx.fillText(String(team.l), colX.l, y + 27);
-        ctx.fillText(String(team.gf), colX.gf, y + 27);
-        ctx.fillText(String(team.ga), colX.ga, y + 27);
-        ctx.fillText(String(team.gd), colX.gd, y + 27);
+        ctx.fillText(String(team.p), colX.p, y + 30);
+        ctx.fillText(String(team.w), colX.w, y + 30);
+        ctx.fillText(String(team.d), colX.d, y + 30);
+        ctx.fillText(String(team.l), colX.l, y + 30);
+        ctx.fillText(String(team.gf), colX.gf, y + 30);
+        ctx.fillText(String(team.ga), colX.ga, y + 30);
+        ctx.fillText(String(team.gd), colX.gd, y + 30);
+
+        // PTS pill styling
+        const ptsText = String(team.pts);
+        const ptsWidth = ctx.measureText(ptsText).width + 28;
+        const ptsX = colX.pts - ptsWidth + 12;
+        const ptsY = y + 6;
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.roundRect(ptsX, ptsY, ptsWidth, 32, 16);
+        ctx.fill();
 
         ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 16px DejaVuSansMono';
-        ctx.fillText(String(team.pts), colX.pts, y + 28);
+        ctx.font = 'bold 18px DejaVuSansMono';
+        ctx.fillText(ptsText, colX.pts, y + 30);
 
         ctx.textAlign = 'left';
 
+        // Highlight top 3 with a cyan left border
         if (team.rank <= 3) {
             ctx.fillStyle = '#06b6d4';
-            ctx.fillRect(cardX + cardWidth - 6, y + 2, 4, rowHeight - 4);
+            ctx.fillRect(cardX, y, 6, rowHeight);
         }
 
-        if (team.rank >= 16) {
+        // Highlight bottom 3 with a red left border
+        if (team.rank >= dummyData.length - 2) {
             ctx.fillStyle = '#ef4444';
-            ctx.fillRect(cardX + cardWidth - 6, y + 2, 4, rowHeight - 4);
+            ctx.fillRect(cardX, y, 6, rowHeight);
         }
     }
 
@@ -233,7 +262,7 @@ async function buildLiveStandings2Image() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('standings2')
-    .setDescription('Generates a premium, ePremier-style standings image'),
+    .setDescription('Generates ePremier League standings image'),
 
   async execute() {
     const attachment = new AttachmentBuilder(
