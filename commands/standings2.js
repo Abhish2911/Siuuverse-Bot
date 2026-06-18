@@ -9,87 +9,111 @@ GlobalFonts.registerFromPath(dejavuFontPath, 'DejaVuSansMono');
 const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
 async function buildLiveStandings2Image() {
+    // Height extended slightly to perfectly fit floating cards + extra row padding gaps
     const canvas = createCanvas(1200, 1120);
     const ctx = canvas.getContext('2d');
 
-    // Cyber background
+    // --- 1. CYAN MATRIX CYBER BACKGROUND ---
     const bg = ctx.createLinearGradient(0, 0, 1200, 1120);
-    bg.addColorStop(0, '#0f172a'); // navy
-    bg.addColorStop(0.5, '#064e3b'); // greenish
-    bg.addColorStop(1, '#0f172a'); // navy
+    bg.addColorStop(0, '#030712'); // Pitch obsidian black
+    bg.addColorStop(0.5, '#0b1536'); // Deep sapphire navy
+    bg.addColorStop(1, '#02050c');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Floating card rows background
+    // Modern Tech Vector Grid Accents
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 245, 160, 0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < canvas.width; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+    }
+    ctx.restore();
+
+    // Ambient Lighting Glows
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = '#00f5a0';
+    ctx.beginPath();
+    ctx.arc(1150, 200, 400, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(50, 950, 450, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
     const cardX = 60;
     const cardY = 60;
     const cardWidth = 1080;
-    const headerHeight = 75;
+    const headerHeight = 80;
 
-    // Card background
-    ctx.fillStyle = '#1e293b'; // navy-ish card background
+    // --- 2. BASE INTERACTIVE CANVAS CONTAINER ---
+    ctx.fillStyle = '#f1f5f9'; // Clean modern slate-gray background area
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardWidth, 1000, 24);
+    ctx.roundRect(cardX, cardY, cardWidth, 1000, 20);
     ctx.fill();
 
-    // Header bar
-    ctx.fillStyle = '#0f766e'; // dark green header
+    // --- 3. PREMIUM MATTE NAVY HEADER BLOCK ---
+    ctx.fillStyle = '#090f26'; 
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardWidth, headerHeight, [24, 24, 0, 0]);
+    ctx.roundRect(cardX, cardY, cardWidth, headerHeight, [20, 20, 0, 0]);
     ctx.fill();
 
-    // Header text
-    ctx.fillStyle = '#ecfccb'; // light green text
-    ctx.font = 'bold 32px DejaVuSansMono';
-    ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 30, cardY + 50);
+    // High-tech electric line dividing main header sections
+    ctx.fillStyle = '#00f5a0';
+    ctx.fillRect(cardX, cardY + headerHeight - 4, cardWidth, 4);
 
-    ctx.fillStyle = 'rgba(236,252,203,0.8)';
-    ctx.font = 'bold 20px DejaVuSansMono';
+    // Title Brand Typography
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px DejaVuSansMono';
+    ctx.fillText('SIUUVERSE ePREMIER LEAGUE', cardX + 35, cardY + 46);
+
+    ctx.fillStyle = 'rgba(0, 245, 160, 0.9)';
+    ctx.font = 'bold 15px DejaVuSansMono';
     ctx.textAlign = 'right';
-    ctx.fillText('Season 2', cardX + cardWidth - 30, cardY + 50);
+    ctx.fillText('SEASON 2 OVERVIEW', cardX + cardWidth - 35, cardY + 46);
     ctx.textAlign = 'left';
 
-    // Divider below header
-    const dividerY = cardY + headerHeight;
-    ctx.fillStyle = '#22c55e'; // bright green divider
-    ctx.fillRect(cardX, dividerY, cardWidth, 6);
+    // --- 4. THE SUB-HEADER NAV TRACK STRIP ---
+    const subHeaderY = cardY + headerHeight;
+    ctx.fillStyle = '#111936'; 
+    ctx.fillRect(cardX, subHeaderY, cardWidth, 45);
 
-    // Column headers background
-    const subHeaderY = dividerY + 6;
-    ctx.fillStyle = '#0f172a'; // dark navy for column header background
-    ctx.fillRect(cardX, subHeaderY, cardWidth, 50);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 12px DejaVuSansMono';
 
-    // Column headers text
-    ctx.fillStyle = '#a3e635'; // lime green text
-    ctx.font = 'bold 16px DejaVuSansMono';
-    ctx.fillText('RANK', cardX + 40, subHeaderY + 32);
-    ctx.fillText('TEAM', cardX + 110, subHeaderY + 32);
-    ctx.fillText('SHORT', cardX + 420, subHeaderY + 32);
-    ctx.fillText('FORM', cardX + 480, subHeaderY + 32);
+    ctx.fillText('RANK', cardX + 35, subHeaderY + 27);
+    ctx.fillText('TEAM', cardX + 115, subHeaderY + 27);
+    ctx.fillText('SHORT', cardX + 410, subHeaderY + 27);
+    ctx.fillText('FORM HISTORY', cardX + 490, subHeaderY + 27);
 
     const colX = {
-        p: cardX + 630,
-        w: cardX + 690,
-        d: cardX + 750,
-        l: cardX + 810,
-        gf: cardX + 870,
-        ga: cardX + 930,
-        gd: cardX + 970,
-        pts: cardX + 1085
+        p: cardX + 640,
+        w: cardX + 700,
+        d: cardX + 760,
+        l: cardX + 820,
+        gf: cardX + 880,
+        ga: cardX + 940,
+        gd: cardX + 1000,
+        pts: cardX + 1055
     };
 
     ctx.textAlign = 'right';
-    ctx.fillText('P', colX.p, subHeaderY + 32);
-    ctx.fillText('W', colX.w, subHeaderY + 32);
-    ctx.fillText('D', colX.d, subHeaderY + 32);
-    ctx.fillText('L', colX.l, subHeaderY + 32);
-    ctx.fillText('GF', colX.gf, subHeaderY + 32);
-    ctx.fillText('GA', colX.ga, subHeaderY + 32);
-    ctx.fillText('GD', colX.gd, subHeaderY + 32);
-    ctx.fillText('PTS', colX.pts, subHeaderY + 32);
+    ctx.fillText('P', colX.p, subHeaderY + 27);
+    ctx.fillText('W', colX.w, subHeaderY + 27);
+    ctx.fillText('D', colX.d, subHeaderY + 27);
+    ctx.fillText('L', colX.l, subHeaderY + 27);
+    ctx.fillText('GF', colX.gf, subHeaderY + 27);
+    ctx.fillText('GA', colX.ga, subHeaderY + 27);
+    ctx.fillText('GD', colX.gd, subHeaderY + 27);
+    ctx.fillStyle = '#00f5a0';
+    ctx.fillText('PTS', colX.pts - 10, subHeaderY + 27);
     ctx.textAlign = 'left';
 
-    // Fetch data
+    // --- 5. DATA FETCHING LAYER ---
     const [standings, teamRows, fixtures] = await Promise.all([
         cachedGetData('Standings!A:J'),
         cachedGetData('Teams!A:H'),
@@ -105,7 +129,6 @@ async function buildLiveStandings2Image() {
     });
 
     const formMap = {};
-
     const completedMatches = fixtures
       .slice(1)
       .filter(r => r[2] && r[3] && r[4] !== '' && r[5] !== '');
@@ -146,114 +169,127 @@ async function buildLiveStandings2Image() {
         gd: Number(row[8]) || 0,
         pts: Number(row[9]) || 0,
         form: (formMap[normalize(row[1])] || []).slice(-5)
-    }));
+    })).slice(0, 17); // Sliced neatly to guarantee seamless canvas proportion layout constraints
 
+    // --- 6. FLOATING CREATIVE TABLE ROW PRODUCTION ---
     const rowHeight = 44;
-    const startY = subHeaderY + 50;
+    const rowGap = 7; // Breathing gap spacing converting rows into floating card elements
+    const startY = subHeaderY + 55;
 
     for (let i = 0; i < dummyData.length; i++) {
         const team = dummyData[i];
-        const y = startY + i * rowHeight;
+        const y = startY + i * (rowHeight + rowGap);
         const clubColor = team.color || '#cbd5e1';
 
-        // Floating card row background with subtle shadow
-        ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 2;
-        ctx.fillStyle = '#1e293b';
+        // Simulated Drop Shadow beneath each floating card layer
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.04)';
         ctx.beginPath();
-        ctx.roundRect(cardX, y, cardWidth, rowHeight, 12);
+        ctx.roundRect(cardX + 2, y + 3, cardWidth - 4, rowHeight, 8);
         ctx.fill();
-        ctx.shadowColor = 'transparent';
 
-        // Circular rank badge
+        // Core Solid Row Floating Board Base
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(cardX, y, cardWidth, rowHeight, 8);
+        ctx.fill();
+
+        // Left Identity Border Marker Strip
         ctx.fillStyle = clubColor;
+        ctx.fillRect(cardX, y, 6, rowHeight);
+
+        // --- CREATIVE ELEMENT A: STYLIZED RANKING SHIELDS ---
+        ctx.save();
+        if (team.rank <= 4) {
+            // Dynamic emerald gradient badge for top-tier promotion positions
+            const badgeGrad = ctx.createLinearGradient(cardX + 30, y + 10, cardX + 54, y + 34);
+            badgeGrad.addColorStop(0, '#00f5a0');
+            badgeGrad.addColorStop(1, '#059669');
+            ctx.fillStyle = badgeGrad;
+        } else if (team.rank >= 15) {
+            ctx.fillStyle = '#fee2e2'; // Light soft red badge background for elimination zone
+        } else {
+            ctx.fillStyle = '#f1f5f9'; // Clean slate fallback badge
+        }
         ctx.beginPath();
-        ctx.arc(cardX + 25, y + rowHeight / 2, 18, 0, Math.PI * 2);
+        ctx.arc(cardX + 44, y + 22, 13, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
 
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 18px DejaVuSansMono';
+        // Rank Digit Print Content
+        ctx.fillStyle = team.rank <= 4 ? '#ffffff' : team.rank >= 15 ? '#ef4444' : '#475569';
+        ctx.font = 'bold 13px DejaVuSansMono';
         ctx.textAlign = 'center';
-        ctx.fillText(String(team.rank), cardX + 25, y + rowHeight / 2 + 7);
-        ctx.textAlign = 'left';
+        ctx.fillText(String(team.rank), cardX + 44, y + 26);
+        ctx.textAlign = 'left'; // Reset
 
-        // Team logo
+        // Team Logo Graphic Loader Integration Layer
         if (team.logo) {
             try {
                 const img = await loadImage(team.logo);
-                ctx.drawImage(img, cardX + 65, y + 10, 28, 28);
+                ctx.drawImage(img, cardX + 78, y + 10, 24, 24);
             } catch {}
         }
 
-        // Team name
-        ctx.fillStyle = '#ecfccb';
-        ctx.font = 'bold 18px DejaVuSansMono';
-        ctx.fillText(team.name, cardX + 110, y + 30);
-
-        // Short name
-        ctx.fillStyle = clubColor;
+        // Main Profile Labels
+        ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 14px DejaVuSansMono';
-        ctx.fillText(team.short || '', cardX + 420, y + 30);
+        ctx.fillText(team.name.toUpperCase(), cardX + 115, y + 27);
 
-        // Form capsules
+        // Clean subtle pill container backplate for the club short code
+        ctx.fillStyle = 'rgba(241, 245, 249, 0.8)';
+        ctx.beginPath();
+        ctx.roundRect(cardX + 404, y + 12, 50, 20, 4);
+        ctx.fill();
+        
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 12px DejaVuSansMono';
+        ctx.fillText(team.short || '---', cardX + 412, y + 26);
+
+        // --- CREATIVE ELEMENT B: UNIFIED FORM CAPSULE TRACK CONTAINER ---
+        ctx.fillStyle = '#f1f5f9';
+        ctx.beginPath();
+        ctx.roundRect(cardX + 484, y + 11, 114, 22, 11);
+        ctx.fill();
+
         const form = team.form.length ? team.form : ['-','-','-','-','-'];
         for (let j = 0; j < form.length; j++) {
             const r = form[j];
-            ctx.fillStyle = r === 'W' ? '#22c55e' : r === 'D' ? '#f59e0b' : r === 'L' ? '#ef4444' : '#444';
+            ctx.fillStyle = r === 'W' ? '#10b981' : r === 'D' ? '#f59e0b' : r === 'L' ? '#f43f5e' : '#cbd5e1';
 
             ctx.beginPath();
-            ctx.roundRect(cardX + 480 + j * 26, y + 12, 22, 22, 12);
+            ctx.arc(cardX + 497 + j * 22, y + 22, 8, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = '#0f172a';
-            ctx.font = 'bold 14px DejaVuSansMono';
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 9px DejaVuSansMono';
             ctx.textAlign = 'center';
-            ctx.fillText(r, cardX + 480 + j * 26 + 11, y + 28);
+            ctx.fillText(r, cardX + 497 + j * 22, y + 25);
             ctx.textAlign = 'left';
         }
 
-        // Stats columns
-        ctx.fillStyle = '#a3e635';
-        ctx.font = 'bold 16px DejaVuSansMono';
+        // --- STANDARD MATRIX STATS ROW SETS ---
+        ctx.fillStyle = '#475569';
+        ctx.font = '500 14px DejaVuSansMono';
         ctx.textAlign = 'right';
 
-        ctx.fillText(String(team.p), colX.p, y + 30);
-        ctx.fillText(String(team.w), colX.w, y + 30);
-        ctx.fillText(String(team.d), colX.d, y + 30);
-        ctx.fillText(String(team.l), colX.l, y + 30);
-        ctx.fillText(String(team.gf), colX.gf, y + 30);
-        ctx.fillText(String(team.ga), colX.ga, y + 30);
-        ctx.fillText(String(team.gd), colX.gd, y + 30);
+        ctx.fillText(String(team.p), colX.p, y + 26);
+        ctx.fillText(String(team.w), colX.w, y + 26);
+        ctx.fillText(String(team.d), colX.d, y + 26);
+        ctx.fillText(String(team.l), colX.l, y + 26);
+        ctx.fillText(String(team.gf), colX.gf, y + 26);
+        ctx.fillText(String(team.ga), colX.ga, y + 26);
+        ctx.fillText(String(team.gd), colX.gd, y + 26);
 
-        // PTS pill styling
-        const ptsText = String(team.pts);
-        const ptsWidth = ctx.measureText(ptsText).width + 28;
-        const ptsX = colX.pts - ptsWidth + 12;
-        const ptsY = y + 6;
-        ctx.fillStyle = '#22c55e';
+        // --- CREATIVE ELEMENT C: PREMIUM EMBEDDED HIGH-LIGHT SCORE CARD PILL ---
+        ctx.fillStyle = team.rank <= 4 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(15, 23, 42, 0.05)';
         ctx.beginPath();
-        ctx.roundRect(ptsX, ptsY, ptsWidth, 32, 16);
+        ctx.roundRect(colX.pts - 48, y + 10, 48, 24, 6);
         ctx.fill();
 
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 18px DejaVuSansMono';
-        ctx.fillText(ptsText, colX.pts, y + 30);
-
-        ctx.textAlign = 'left';
-
-        // Highlight top 3 with a cyan left border
-        if (team.rank <= 3) {
-            ctx.fillStyle = '#06b6d4';
-            ctx.fillRect(cardX, y, 6, rowHeight);
-        }
-
-        // Highlight bottom 3 with a red left border
-        if (team.rank >= dummyData.length - 2) {
-            ctx.fillStyle = '#ef4444';
-            ctx.fillRect(cardX, y, 6, rowHeight);
-        }
+        ctx.fillStyle = team.rank <= 4 ? '#059669' : '#0f172a';
+        ctx.font = 'bold 15px DejaVuSansMono';
+        ctx.fillText(String(team.pts), colX.pts - 12, y + 27);
+        ctx.textAlign = 'left'; // Always safely clear configuration state pointers
     }
 
     return canvas.toBuffer('image/png');
@@ -262,22 +298,14 @@ async function buildLiveStandings2Image() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('standings2')
-    .setDescription('Generates ePremier League standings image'),
+    .setDescription('Generates a premium cyber sapphire standings layout with custom modular row tracks'),
 
-  async execute() {
-    const attachment = new AttachmentBuilder(
-      await buildLiveStandings2Image(),
-      { name: 'standings-s2.png' }
-    );
+  async execute(interaction) {
+    const buffer = await buildLiveStandings2Image();
+    const attachment = new AttachmentBuilder(buffer, { name: 'cyber-standings.png' });
 
-    return {
-      files: [attachment]
-    };
+    return interaction.editReply({ files: [attachment] });
   },
 
-  buildLiveStandings2Image,
-
-  async generateImage() {
-    return await buildLiveStandings2Image();
-  }
+  buildLiveStandings2Image
 };
