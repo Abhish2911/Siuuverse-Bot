@@ -91,15 +91,15 @@ async function buildLiveStandings2Image() {
     ctx.fillText('FORM HISTORY', cardX + 490, subHeaderY + 27);
 
     const colX = {
-        p: cardX + 640,
-        w: cardX + 700,
-        d: cardX + 760,
-        l: cardX + 820,
-        gf: cardX + 880,
-        ga: cardX + 940,
-        gd: cardX + 1000,
-        pts: cardX + 1055
-    };
+    p: cardX + 695,   // Shifted right to group stats closer
+    w: cardX + 740,   // 45px gap
+    d: cardX + 785,   // 45px gap
+    l: cardX + 830,   // 45px gap
+    gf: cardX + 875,  // 45px gap
+    ga: cardX + 920,  // 45px gap
+    gd: cardX + 965,  // 45px gap
+    pts: cardX + 1055 // Large 90px gap separating Points from GD
+    };   
 
     ctx.textAlign = 'right';
     ctx.fillText('P', colX.p, subHeaderY + 27);
@@ -243,7 +243,7 @@ async function buildLiveStandings2Image() {
         
         ctx.fillStyle = '#475569';
         ctx.font = 'bold 12px DejaVuSansMono';
-        ctx.fillText(team.short || '---', cardX + 412, y + 26);
+        ctx.fillText(team.short || '---', cardX + 415, y + 26);
 
         // --- CREATIVE ELEMENT B: UNIFIED FORM CAPSULE TRACK CONTAINER ---
         ctx.fillStyle = '#f1f5f9';
