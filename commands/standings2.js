@@ -212,24 +212,19 @@ async function buildLiveStandings2Image() {
         ctx.restore();
 
         // Rank Digit Print Content
-        ctx.fillStyle = team.rank <= 3 ? '#ffffff' : team.rank >= 15 ? '#ef4444' : '#475569';
+        ctx.fillStyle = team.rank <= 4 ? '#059669' : team.rank >= 15 ? '#ef4444' : '#475569';
         ctx.font = 'bold 13px DejaVuSansMono';
         ctx.textAlign = 'center';
         ctx.fillText(String(team.rank), cardX + 44, y + 26);
         ctx.textAlign = 'left'; // Reset
 
         // Team Logo Graphic Loader Integration Layer
-        if (team.logo) {
-            try {
-                const img = await loadImage(team.logo);
-                ctx.drawImage(img, cardX + 78, y + 10, 24, 24);
-            } catch {}
-        }
+        
 
         // Main Profile Labels
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 14px DejaVuSansMono';
-        ctx.fillText(team.name.toUpperCase(), cardX + 115, y + 27);
+        ctx.fillText(team.name.toUpperCase(), cardX + 78, y + 27);
 
         // Clean subtle pill container backplate for the club short code
         ctx.fillStyle = 'rgba(241, 245, 249, 0.8)';
@@ -239,7 +234,7 @@ async function buildLiveStandings2Image() {
         
         ctx.fillStyle = '#475569';
         ctx.font = 'bold 12px DejaVuSansMono';
-        ctx.fillText(team.short || '---', cardX + 415, y + 26);
+        ctx.fillText(team.short || '---', cardX + 412, y + 26);
 
         // --- CREATIVE ELEMENT B: UNIFIED FORM CAPSULE TRACK CONTAINER ---
         ctx.fillStyle = '#f1f5f9';
