@@ -219,7 +219,7 @@ async function buildLiveStandings2Image() {
         ctx.restore();
 
         // Rank Digit Print Content
-        ctx.fillStyle = team.rank <= 4 ? '#059669' : team.rank >= 15 ? '#ef4444' : '#475569';
+        ctx.fillStyle = team.rank <= 4 ? '#059669' : team.rank >= 16 ? '#ef4444' : '#475569';
         ctx.font = 'bold 13px DejaVuSansMono';
         ctx.textAlign = 'center';
         ctx.fillText(String(team.rank), cardX + 44, y + 26);
