@@ -350,16 +350,18 @@ module.exports = {
   },
 
   async selectHandler(interaction) {
-    const ownerId = interaction.customId.split('_').pop();
+    const ownerId = String(interaction.customId || '').split('_').pop();
 
     if (ownerId && ownerId !== interaction.user.id) {
       return {
-        content: '❌ You cannot use another user\'s stats menu.',
+        content: '❌ Only the user who opened this stats menu can use it.',
         ephemeral: true
       };
     }
 
-    const [resolvedType = 'goals', competitionKey = 'league'] = String(interaction.values[0] || 'goals__league').split('__');
+    const selected = String(interaction.values?.[0] || 'goals__league');
+    const [resolvedType = 'goals', competitionKey = 'league'] = selected.split('__');
+
     return buildStats(interaction, resolvedType, 0, competitionKey);
   }
 };
@@ -423,7 +425,7 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
       { name: '📊 Category', value: cleanTitle(config.title), inline: true },
       { name: '🏆 Competition', value: config.competition.label, inline: true }
     )
-    .setFooter({ text: `${config.competition.label} Stats • Buttons = pages • Dropdown = stat type • Top 3 colored • Your line highlighted` })
+    .setFooter({ text: `${config.competition.label} Stats • Only ${interaction.user.username} can use this menu` })
     .setColor(config.color);
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -449,7 +451,7 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
   const dropdown = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`stats_select_${interaction.user.id}`)
-      .setPlaceholder(cleanTitle(config.title))
+      .setPlaceholder(`Selected: ${cleanTitle(config.title)}`.slice(0, 150))
       .addOptions(Object.entries(STAT_DEFS).map(([key, value]) => ({
         label: cleanTitle(value.title).slice(0, 100),
         value: `${key}__${competitionKey}`,
