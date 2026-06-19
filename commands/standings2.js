@@ -10,16 +10,28 @@ const TEAMS_SHEET_RANGE = 'Teams!A:Q';
 
 async function buildLiveStandings2Image() {
     // Height extended slightly to perfectly fit floating cards + extra row padding gaps
-    const canvas = createCanvas(1200, 1120);
+    const [standings, teamRows, fixtures] = await Promise.all([
+        cachedGetData('Standings!A:J'),
+        cachedGetData('Teams!A:H'),
+        cachedGetData('Fixtures!A:J')
+    ]);
+
+    const totalTeams = Math.max(standings.length - 1, 1);
+    const rowHeight = 44;
+    const rowGap = 7;
+    const dynamicCanvasHeight = Math.max(1120, 240 + totalTeams * (rowHeight + rowGap));
+
+    const canvas = createCanvas(1200, dynamicCanvasHeight);
     const ctx = canvas.getContext('2d');
 
     // --- 1. CYAN MATRIX CYBER BACKGROUND ---
-    const bg = ctx.createLinearGradient(0, 0, 1200, 1120);
+    const bg = ctx.createLinearGradient(0, 0, 1200, dynamicCanvasHeight);
     bg.addColorStop(0, '#030712'); // Pitch obsidian black
     bg.addColorStop(0.5, '#0b1536'); // Deep sapphire navy
     bg.addColorStop(1, '#02050c');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const cardHeight = dynamicCanvasHeight - 120;
 
     // Modern Tech Vector Grid Accents
     ctx.save();
@@ -53,7 +65,7 @@ async function buildLiveStandings2Image() {
     // --- 2. BASE INTERACTIVE CANVAS CONTAINER ---
     ctx.fillStyle = '#f1f5f9'; // Clean modern slate-gray background area
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardWidth, 1000, 20);
+    ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 20);
     ctx.fill();
 
     // --- 3. PREMIUM MATTE NAVY HEADER BLOCK ---
@@ -114,11 +126,7 @@ async function buildLiveStandings2Image() {
     ctx.textAlign = 'left';
 
     // --- 5. DATA FETCHING LAYER ---
-    const [standings, teamRows, fixtures] = await Promise.all([
-        cachedGetData('Standings!A:J'),
-        cachedGetData('Teams!A:H'),
-        cachedGetData('Fixtures!A:J')
-    ]);
+    
 
     const normalize = str => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -169,11 +177,10 @@ async function buildLiveStandings2Image() {
         gd: Number(row[8]) || 0,
         pts: Number(row[9]) || 0,
         form: (formMap[normalize(row[1])] || []).slice(-5)
-    })).slice(0, 17); // Sliced neatly to guarantee seamless canvas proportion layout constraints
+    }));
 
     // --- 6. FLOATING CREATIVE TABLE ROW PRODUCTION ---
-    const rowHeight = 44;
-    const rowGap = 7; // Breathing gap spacing converting rows into floating card elements
+    // Breathing gap spacing converting rows into floating card elements
     const startY = subHeaderY + 55;
 
     for (let i = 0; i < dummyData.length; i++) {
