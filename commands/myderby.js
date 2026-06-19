@@ -34,7 +34,9 @@ function addPlayerStat(map, text, value = 1) {
     .map(x => x.trim())
     .filter(Boolean)
     .forEach(player => {
-      map.set(player, (map.get(player) || 0) + value);
+      const name = player.replace(/\s*\(\d+\)\s*$/g, '').trim();
+      if (!name) return;
+      map.set(name, (map.get(name) || 0) + value);
     });
 }
 
