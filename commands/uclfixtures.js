@@ -96,9 +96,15 @@ function validateUclFixtureSetup(activeUclTeams, groupNames, teamsByGroup) {
 }
 
 function formatFixtureLines(fixtures) {
-  return fixtures.slice(0, 18).map((fixture, index) => {
+  const lines = fixtures.slice(0, 12).map((fixture, index) => {
     return `**${index + 1}.** \`${clean(fixture.md)}\` • \`${clean(fixture.homeShort)}\` ${safeEmoji(E.vs, '⚔️')} \`${clean(fixture.awayShort)}\``;
-  }).join('\n') || 'No fixtures generated.';
+  });
+
+  const text = lines.join('\n') || 'No fixtures generated.';
+
+  return text.length > 1024
+    ? `${text.slice(0, 1000)}\n...`
+    : text;
 }
 
 function buildFixtureSummary(fixtures, activeTeams, groupNames) {
@@ -290,7 +296,7 @@ module.exports = {
               { name: 'Top Pairing', value: summary.topPairing, inline: true },
               {
                 name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`,
-                value: formatFixtureLines(generatedFixtures),
+                value: formatFixtureLines(generatedFixtures).slice(0, 1024),
                 inline: false
               }
             )
@@ -381,7 +387,7 @@ module.exports = {
             { name: 'Saved To', value: 'UCL_Coop_Group_Fixtures', inline: true },
             {
               name: `${safeEmoji(E.calendar, '📅')} Opening Pairings`,
-              value: formatFixtureLines(generatedFixtures),
+              value: formatFixtureLines(generatedFixtures).slice(0, 1024),
               inline: false
             }
           )
