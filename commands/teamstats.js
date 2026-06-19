@@ -138,26 +138,39 @@ function buildRecordRows(rows, teamMap) {
   }).join('\n');
 }
 
-function buildTeamStatsSummary(rows, competition, teamMap) {
-  const leaderInfo = getTeamInfo(teamMap, rows[0]?.[1]);
-  const secondInfo = getTeamInfo(teamMap, rows[1]?.[1]);
-  const thirdInfo = getTeamInfo(teamMap, rows[2]?.[1]);
+function buildTeamStatsSummary(rows, competition, teamMap, standingsRows = []) {
+  const standings = Array.isArray(standingsRows)
+    ? standingsRows.slice(1).filter(row => String(row[1] || '').trim())
+    : [];
 
-  const formatLeader = (row, info) => {
+  standings.sort((a, b) => {
+    const ptsA = Number(a[9] || 0);
+    const ptsB = Number(b[9] || 0);
+
+    if (ptsB !== ptsA) return ptsB - ptsA;
+
+    const gdA = Number(a[8] || 0);
+    const gdB = Number(b[8] || 0);
+
+    return gdB - gdA;
+  });
+
+  const formatStandingTeam = row => {
     if (!row) return 'N/A';
-    const teamName = info?.teamName || clean(row[1]) || 'N/A';
-    const shortName = info?.shortName || clean(row[1]) || 'N/A';
-    const value = clean(row[2]) || '0';
-    return `\`${shortName}\` ${teamName} • ${value}`;
+
+    const teamName = String(row[1] || '').trim();
+    const info = getTeamInfo(teamMap, teamName);
+
+    return `\`${info?.shortName || teamName}\` ${info?.teamName || teamName} • ${row[9] || 0} pts`;
   };
 
   return {
     competition: competition.label,
     records: rows.length,
     teamsLinked: Math.floor(teamMap.size / 2),
-    leader: formatLeader(rows[0], leaderInfo),
-    second: formatLeader(rows[1], secondInfo),
-    third: formatLeader(rows[2], thirdInfo)
+    leader: formatStandingTeam(standings[0]),
+    second: formatStandingTeam(standings[1]),
+    third: formatStandingTeam(standings[2])
   };
 }
 
@@ -192,9 +205,10 @@ module.exports = {
   async execute(interaction) {
     const competitionKey = interaction.options.getString('competition') || 'league';
     const competition = getCompetitionConfig(competitionKey);
-    const [data, teams] = await Promise.all([
+    const [data, teams, standings] = await Promise.all([
       getData(competition.statsRange).catch(() => []),
-      getData('Teams!A:Z')
+      getData('Teams!A:Z'),
+      getData('Standings!A:Z').catch(() => [])
     ]);
 
     const rows = Array.isArray(data)
@@ -205,14 +219,28 @@ module.exports = {
     }
 
     const teamMap = buildTeamMap(teams);
-    const summary = buildTeamStatsSummary(rows, competition, teamMap);
+    const summary = buildTeamStatsSummary(
+      rows,
+      competition,
+      teamMap,
+      standings
+    );
     const topRows = rows.slice(0, 5);
     const defensiveRows = rows.filter(row => {
       const stat = String(row[0] || '').toLowerCase();
       return stat.includes('tackle') || stat.includes('interception') || stat.includes('intercept') || stat.includes('save') || stat.includes('defense') || stat.includes('defence');
     }).slice(0, 5);
 
-    const leader = getTeamInfo(teamMap, rows[0]?.[1]);
+    const standingsLeader = Array.isArray(standings)
+      ? standings.slice(1).sort((a, b) => {
+          const ptsA = Number(a[9] || 0);
+          const ptsB = Number(b[9] || 0);
+          if (ptsB !== ptsA) return ptsB - ptsA;
+          return Number(b[8] || 0) - Number(a[8] || 0);
+        })[0]
+      : null;
+
+    const leader = getTeamInfo(teamMap, standingsLeader?.[1]);
     const embedColor = parseTeamColor(leader?.color) || 0x00ffff;
 
     const embed = new EmbedBuilder()
