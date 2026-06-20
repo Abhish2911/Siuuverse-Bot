@@ -185,7 +185,7 @@ function buildTeamHubDescription(summary) {
     `🆔 **Team ID:** ${summary.teamId || 'N/A'}\n` +
     `🔁 **Previous:** ${summary.previousShort || 'N/A'} — ${summary.previousName || 'N/A'}\n` +
     `${safeEmoji(E.rank, '🏅')} **Rank:** #${summary.position}\n` +
-    `🏟️ **Stadium:** ${summary.stadium}\n\n`
+    `🏟️ **Stadium:** ${summary.stadium}`
   );
 }
 
@@ -268,6 +268,13 @@ module.exports = {
 
     const rankingRows = Array.isArray(ranking) ? ranking.slice(2).filter(r => r && r.length) : [];
 
+    const saveRow = rankingRows.find(r =>
+      normalize(r[25]) === normalize(teamName) ||
+      normalize(r[25]) === normalize(shortName)
+    );
+
+    const teamTotalSaves = Number(saveRow?.[26]) || 0;
+
     const getStat = (colName, playerName) => {
       let nameIndex;
       let valueIndex;
@@ -284,8 +291,6 @@ module.exports = {
         nameIndex = 19; valueIndex = 20; // T:U
       } else if (colName === 'interceptions') {
         nameIndex = 22; valueIndex = 23; // W:X
-      } else if (colName === 'saves') {
-        nameIndex = 25; valueIndex = 26; // Z:AA
       } else {
         return 0;
       }
@@ -364,8 +369,7 @@ module.exports = {
       assists: getStat('assists', player),
       mvp: getStat('mvp', player),
       tackles: getStat('tackles', player),
-      interceptions: getStat('interceptions', player),
-      saves: getStat('saves', player)
+      interceptions: getStat('interceptions', player)
     }));
 
     const topScorer = [...squadStats]
@@ -382,10 +386,6 @@ module.exports = {
     const topDefender = [...squadStats]
       .sort((a, b) => (b.tackles + b.interceptions) - (a.tackles + a.interceptions) || a.player.localeCompare(b.player))[0];
 
-    const topKeeper = [...squadStats]
-      .sort((a, b) => b.saves - a.saves || a.player.localeCompare(b.player))[0];
-
-    const teamTotalSaves = squadStats.reduce((sum, player) => sum + (player.saves || 0), 0);
 
     const highlightsText =
       `${E.goldenBoot} **Top Scorer:** ${topScorer?.player || 'N/A'} (${topScorer?.goals || 0})\n` +
