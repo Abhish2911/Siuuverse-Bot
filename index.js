@@ -144,23 +144,33 @@ async function safeDeferUpdate(interaction) {
   }
 }
 
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandFolders = [
+  path.join(__dirname, 'commands'),
+  path.join(__dirname, 'eco-commands')
+];
 
-// Load commands
-for (const file of commandFiles) {
-  try {
-    const command = require(path.join(commandsPath, file));
+// Load commands from all command folders
+for (const commandsPath of commandFolders) {
+  if (!fs.existsSync(commandsPath)) continue;
 
-    if (!command.data || !command.execute) {
-      console.log(`❌ Missing command data in ${file}`);
-      continue;
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter(file => file.endsWith('.js'));
+
+  for (const file of commandFiles) {
+    try {
+      const command = require(path.join(commandsPath, file));
+
+      if (!command.data || !command.execute) {
+        console.log(`❌ Missing command data in ${file}`);
+        continue;
+      }
+
+      client.commands.set(command.data.name, command);
+      console.log(`✅ Loaded: ${file}`);
+    } catch (err) {
+      console.log(`❌ ERROR in ${file}:`, err.message);
     }
-
-    client.commands.set(command.data.name, command);
-    console.log(`✅ Loaded: ${file}`);
-  } catch (err) {
-    console.log(`❌ ERROR in ${file}:`, err.message);
   }
 }
 
@@ -453,13 +463,13 @@ client.on('interactionCreate', async interaction => {
     // Dropdowns
     // =========================
     if (interaction.isStringSelectMenu()) {
-      const deferred = await safeDeferUpdate(interaction);
-      if (!deferred) return;
-
       // stats dropdown handler
       if (interaction.customId === 'stats_select') {
         const command = client.commands.get('stats');
         if (!command || !command.selectHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const result = await command.selectHandler(interaction);
         if (result) {
@@ -471,11 +481,13 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
-
       // fixtures dropdown handler
       if (interaction.customId.startsWith('md_select_fixtures')) {
         const command = client.commands.get('fixtures');
         if (!command || !command.selectHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const result = await command.selectHandler(interaction);
         if (result) {
@@ -492,6 +504,9 @@ client.on('interactionCreate', async interaction => {
         const command = client.commands.get('removeteam');
         if (!command || !command.selectHandler) return;
 
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
         const result = await command.selectHandler(interaction);
         if (result) {
           await interaction.message.edit({
@@ -506,6 +521,9 @@ client.on('interactionCreate', async interaction => {
       if (interaction.customId === 'replaceteam_select') {
         const command = client.commands.get('replaceteam');
         if (!command || !command.selectHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const result = await command.selectHandler(interaction);
         if (result) {
@@ -522,6 +540,9 @@ client.on('interactionCreate', async interaction => {
         const command = client.commands.get('addteamlogo');
         if (!command || !command.selectHandler) return;
 
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
         const result = await command.selectHandler(interaction);
         if (result) {
           await interaction.message.edit({
@@ -537,6 +558,9 @@ client.on('interactionCreate', async interaction => {
         const command = client.commands.get('derbystats');
         if (!command || !command.selectMenuHandler) return;
 
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
         const result = await command.selectMenuHandler(interaction);
         if (result) {
           await interaction.message.edit({
@@ -551,6 +575,9 @@ client.on('interactionCreate', async interaction => {
       if (interaction.customId.startsWith('myfixtures_comp_')) {
         const command = client.commands.get('myfixtures');
         if (!command || !command.selectMenuHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const parts = interaction.customId.split('_');
         const targetType = decodeURIComponent(parts[2] || 'self');
@@ -575,6 +602,9 @@ client.on('interactionCreate', async interaction => {
       if (interaction.customId.startsWith('matchday_comp_')) {
         const command = client.commands.get('matchday');
         if (!command || !command.selectMenuHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const result = await command.selectMenuHandler(interaction);
 
