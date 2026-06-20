@@ -608,4 +608,8 @@ module.exports = {
       competitionKey
     );
   },
+
+  async selectHandler(interaction, targetType, targetValue) {
+    return this.selectMenuHandler(interaction, targetType, targetValue);
+  }
 };
