@@ -279,12 +279,20 @@ async function buildLiveStandings2Image() {
         ctx.fillText(String(team.gd), colX.gd, y + 26);
 
         // --- CREATIVE ELEMENT C: PREMIUM EMBEDDED HIGH-LIGHT SCORE CARD PILL ---
-        ctx.fillStyle = team.rank <= 4 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(15, 23, 42, 0.05)';
+        ctx.fillStyle = team.rank <= 4
+            ? 'rgba(16, 185, 129, 0.12)'
+            : team.rank >= 16
+                ? 'rgba(239, 68, 68, 0.12)'
+                : 'rgba(15, 23, 42, 0.05)';
         ctx.beginPath();
         ctx.roundRect(colX.pts - 48, y + 10, 48, 24, 6);
         ctx.fill();
 
-        ctx.fillStyle = team.rank <= 4 ? '#059669' : '#0f172a';
+        ctx.fillStyle = team.rank <= 4
+            ? '#059669'
+            : team.rank >= 16
+                ? '#ef4444'
+                : '#0f172a';
         ctx.font = 'bold 15px DejaVuSansMono';
         ctx.fillText(String(team.pts), colX.pts - 12, y + 27);
         ctx.textAlign = 'left'; // Always safely clear configuration state pointers
