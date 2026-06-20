@@ -464,7 +464,7 @@ client.on('interactionCreate', async interaction => {
     // =========================
     if (interaction.isStringSelectMenu()) {
       // stats dropdown handler
-      if (interaction.customId === 'stats_select') {
+      if (interaction.customId.startsWith('stats_select_')) {
         const command = client.commands.get('stats');
         if (!command || !command.selectHandler) return;
 
