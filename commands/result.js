@@ -126,19 +126,44 @@ function splitRawEntries(v) {
 }
 
 function getPlayerTeamInfo(player, pending) {
-  const normalized = clean(player).toLowerCase();
+  const normalizePlayer = value => {
+    const text = clean(value).toLowerCase();
+
+    // RDN-Zanetti -> zanetti
+    // RDN | Zanetti -> zanetti
+    return text
+      .replace(/^[^-|]+[-|]/, '')
+      .trim();
+  };
+
+  const target = normalizePlayer(player);
 
   const homePlayers = splitRawEntries(pending.homePlayed);
   const awayPlayers = splitRawEntries(pending.awayPlayed);
 
-  if (homePlayers.some(p => clean(p).toLowerCase() === normalized)) {
+  if (homePlayers.some(p => normalizePlayer(p) === target)) {
     return {
       teamName: pending.homeTeam,
       teamShort: ''
     };
   }
 
-  if (awayPlayers.some(p => clean(p).toLowerCase() === normalized)) {
+  if (awayPlayers.some(p => normalizePlayer(p) === target)) {
+    return {
+      teamName: pending.awayTeam,
+      teamShort: ''
+    };
+  }
+
+  // Exact fallback match before defaulting home team
+  if (homePlayers.some(p => clean(p).toLowerCase() === clean(player).toLowerCase())) {
+    return {
+      teamName: pending.homeTeam,
+      teamShort: ''
+    };
+  }
+
+  if (awayPlayers.some(p => clean(p).toLowerCase() === clean(player).toLowerCase())) {
     return {
       teamName: pending.awayTeam,
       teamShort: ''
@@ -726,6 +751,7 @@ module.exports = {
 
       if (pending.yellow) {
         for (const player of splitRawEntries(pending.yellow)) {
+          if (!player.trim()) continue;
           const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
 
           await addYellowCard({
@@ -741,6 +767,7 @@ module.exports = {
 
       if (pending.red) {
         for (const player of splitRawEntries(pending.red)) {
+          if (!player.trim()) continue;
           const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
 
           await addRedCard({
