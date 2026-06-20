@@ -165,9 +165,27 @@ function calcDerbyStats(derby, matches) {
     team2Goals = 0;
   const goals = {}, assists = {}, mvps = {};
   matches.forEach((row) => {
-    // Home Team = row[1], Away Team = row[2], HG = row[3], AG = row[4], Scorers = row[7], Assists = row[8], MVP = row[11]
-    const home = normalize(row[1]);
-    const away = normalize(row[2]);
+    if (!Array.isArray(row)) return;
+
+    const homeRaw = clean(row[1]);
+    const awayRaw = clean(row[2]);
+
+    // Skip headers, empty rows and unplayed matches
+    if (
+      !homeRaw ||
+      !awayRaw ||
+      normalize(homeRaw) === 'hometeam' ||
+      normalize(awayRaw) === 'awayteam'
+    ) {
+      return;
+    }
+
+    const scoreA = String(row[3] ?? '').trim();
+    const scoreB = String(row[4] ?? '').trim();
+    if (scoreA === '' || scoreB === '') return;
+
+    const home = normalize(homeRaw);
+    const away = normalize(awayRaw);
     if (
       (home === t1 && away === t2) ||
       (home === t2 && away === t1)
