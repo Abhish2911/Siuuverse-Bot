@@ -34,9 +34,13 @@ function addPlayerStat(map, text, value = 1) {
     .map(x => x.trim())
     .filter(Boolean)
     .forEach(player => {
-      const name = player.replace(/\s*\(\d+\)\s*$/g, '').trim();
+      const match = player.match(/^(.*?)\s*\((\d+)\)\s*$/);
+
+      const name = (match ? match[1] : player).trim();
+      const amount = match ? Number(match[2]) || 1 : value;
+
       if (!name) return;
-      map.set(name, (map.get(name) || 0) + value);
+      map.set(name, (map.get(name) || 0) + amount);
     });
 }
 
