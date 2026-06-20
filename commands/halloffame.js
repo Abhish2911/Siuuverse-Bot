@@ -280,7 +280,7 @@ function aggregateTeams(teamRows = []) {
 function formatPlayer(player, index) {
   const rankIndex = Math.max((player.rank || index + 1) - 1, 0);
   return `${MEDALS[rankIndex] || safeEmoji(E.medal, '🏅')} **#${player.rank || index + 1} ${player.name}**\n` +
-    `> ${safeEmoji(E.team, '👥')} ${player.teamLine} • 🆔 ${player.teamIdLine}\n` +
+    `> 🆔 ${player.teamIdLine}\n` +
     `> ${safeEmoji(E.trophy_animated, '🏆')} ${player.trophies} • ${safeEmoji(E.PL, '🏆')} ${player.leagueTitles} • ${safeEmoji(E.runnerUp, '🥈')} ${player.runnerUps}\n` +
     `> ${safeEmoji(E.FA, '🏆')} ${player.faCups} • ${safeEmoji(E.Carabao, '🏆')} ${player.carabaoCups} • ${safeEmoji(E.UCL, '🌍')} ${player.ucl}\n` +
     `> ${safeEmoji(E.badge, '🏅')} ${player.awards} • ${safeEmoji(E.goal, '⚽')} ${player.goals} • ${safeEmoji(E.assist, '🎯')} ${player.assists} • ${safeEmoji(E.mvp, '⭐')} ${player.mvps}\n` +
@@ -381,15 +381,30 @@ function buildHallDescription(isClubView, summary, currentPage, totalPages) {
 }
 
 function safeFieldValue(lines) {
-  const text = Array.isArray(lines) ? lines.join('\n\n') : String(lines || '');
+  const entries = Array.isArray(lines) ? lines : [String(lines || '')];
 
-  if (!text) return ['N/A'];
+  if (!entries.length) return ['N/A'];
 
   const chunks = [];
+  let current = '';
 
-  for (let i = 0; i < text.length; i += 1024) {
-    chunks.push(text.slice(i, i + 1024));
+  for (const entry of entries) {
+    const block = String(entry || '');
+
+    if (!current) {
+      current = block;
+      continue;
+    }
+
+    if ((current + '\n\n' + block).length <= 1024) {
+      current += `\n\n${block}`;
+    } else {
+      chunks.push(current);
+      current = block;
+    }
   }
+
+  if (current) chunks.push(current);
 
   return chunks.length ? chunks : ['N/A'];
 }
@@ -414,12 +429,12 @@ function createHallButtons(view = 'players', page = 0, totalPages = 1) {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`halloffame_prev_${view}_${page}`)
+        .setCustomId(`halloffame_prevpage_${view}_${page}`)
         .setEmoji('⬅️')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page <= 0),
       new ButtonBuilder()
-        .setCustomId(`halloffame_next_${view}_${page}`)
+        .setCustomId(`halloffame_nextpage_${view}_${page}`)
         .setEmoji('➡️')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page >= totalPages - 1)
@@ -521,10 +536,10 @@ module.exports = {
       } else if (action === 'refresh') {
         view = viewOrPage === 'clubs' ? 'clubs' : 'players';
         page = Number(maybePage) || 0;
-      } else if (action === 'prev' || action === 'next') {
+      } else if (action === 'prevpage' || action === 'nextpage') {
         view = viewOrPage === 'clubs' ? 'clubs' : 'players';
         page = Number(maybePage) || 0;
-        page += action === 'next' ? 1 : -1;
+        page += action === 'nextpage' ? 1 : -1;
       }
 
       return await buildHallPayload(view, page);
