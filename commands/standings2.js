@@ -208,7 +208,7 @@ async function buildLiveStandings2Image() {
         ctx.save();
         if (team.rank <= 4) {
             ctx.fillStyle = '#d1fae5'; // Flat soft mint-green background (No Gradient)
-        } else if (team.rank >= 15) {
+        } else if (team.rank >= 16) {
             ctx.fillStyle = '#fee2e2'; // Flat soft red background
         } else {
             ctx.fillStyle = '#f1f5f9'; // Flat slate fallback background
