@@ -266,6 +266,17 @@ async function buildTopFive(players, config, interaction, playerMap = new Map())
     const enteredName = stripPrefix(rawName);
     const playerInfo = playerMap.get(normalize(enteredName));
 
+    const isTeamStat = config.valueLabel === 'Saves';
+    const isCardStat = config.valueLabel === 'Cards';
+
+    if (isTeamStat) {
+      return `${index + 1}. ${rawName} - **${p.value}** ${config.icon}`;
+    }
+
+    if (isCardStat) {
+      return `${index + 1}. ${rawName} - **${p.value}** ${config.icon}`;
+    }
+
     const teamShort = playerInfo?.teamShort || 'N/A';
     const mention = playerInfo?.discordId
       ? `<@${playerInfo.discordId}>`
