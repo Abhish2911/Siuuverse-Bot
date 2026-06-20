@@ -24,9 +24,16 @@ function safeEmoji(emoji) {
 
 function addPlayerStat(map, name, val = 1) {
   if (!name) return;
-  name = clean(name);
-  if (!name) return;
-  map[name] = (map[name] || 0) + val;
+
+  const text = clean(name);
+  if (!text) return;
+
+  const match = text.match(/^(.*?)\s*\((\d+)\)\s*$/);
+  const playerName = clean(match ? match[1] : text);
+  const amount = match ? (parseInt(match[2], 10) || val) : val;
+
+  if (!playerName) return;
+  map[playerName] = (map[playerName] || 0) + amount;
 }
 
 function buildHubEmbed(derbies) {
@@ -208,29 +215,15 @@ function calcDerbyStats(derby, matches) {
       if (t1Goals > t2Goals) team1Wins++;
       else if (t2Goals > t1Goals) team2Wins++;
       else draws++;
-      // Scorers (format: "Player1 (2), Player2")
-      const scorers = (row[7] || '').split(',').map(s => clean(s));
-      scorers.forEach((entry) => {
-        if (!entry) return;
-        // Try to parse "Name (N)"
-        const m = entry.match(/^(.+?)(?:\s*\((\d+)\))?$/);
-        if (!m) return;
-        const name = clean(m[1]);
-        const count = m[2] ? parseInt(m[2], 10) : 1;
-        addPlayerStat(goals, name, count);
-      });
-      // Assists (format: "Player1 (2), Player2")
-      const assistsArr = (row[8] || '').split(',').map(s => clean(s));
-      assistsArr.forEach((entry) => {
-        if (!entry) return;
-        const m = entry.match(/^(.+?)(?:\s*\((\d+)\))?$/);
-        if (!m) return;
-        const name = clean(m[1]);
-        const count = m[2] ? parseInt(m[2], 10) : 1;
-        addPlayerStat(assists, name, count);
-      });
-      // MVP (can be multiple, comma-separated)
-      const mvpArr = (row[11] || '').split(',').map(s => clean(s));
+      // Sheet columns:
+      // 5 = Scorers, 6 = Assists, 9 = MVP
+      const scorers = (row[5] || '').split(',').map(s => clean(s));
+      scorers.forEach((entry) => addPlayerStat(goals, entry, 1));
+
+      const assistsArr = (row[6] || '').split(',').map(s => clean(s));
+      assistsArr.forEach((entry) => addPlayerStat(assists, entry, 1));
+
+      const mvpArr = (row[9] || '').split(',').map(s => clean(s));
       mvpArr.forEach((name) => addPlayerStat(mvps, name, 1));
     }
   });
