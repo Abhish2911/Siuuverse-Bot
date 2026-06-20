@@ -466,18 +466,23 @@ async function buildHallPayload(view = 'players', page = 0) {
   const entries = pageItems.map((item, index) =>
     isClubView ? formatTeam(item, index) : formatPlayer(item, index)
   );
+  const entryChunks = safeFieldValue(entries);
 
   const embed = new EmbedBuilder()
     .setColor(0xD4AF37)
     .setTitle(`${safeEmoji(E.trophy_animated, '🏆')} SiuuVerse Hall of Fame`)
     .setDescription(buildHallDescription(isClubView, summary, currentPage, totalPages))
-    .addFields({
-      name: isClubView
-        ? `${safeEmoji(E.team, '👥')} Club Ranking`
-        : `${safeEmoji(E.profile, '👤')} Player Ranking`,
-      value: entries.join('\n\n').slice(0, 1024) || 'N/A',
-      inline: false
-    })
+    .addFields(
+      ...entryChunks.map((chunk, idx) => ({
+        name: idx === 0
+          ? (isClubView
+              ? `${safeEmoji(E.team, '👥')} Club Ranking`
+              : `${safeEmoji(E.profile, '👤')} Player Ranking`)
+          : '\u200B',
+        value: chunk,
+        inline: false
+      }))
+    )
     .setFooter({ text: `Hall of Fame = overall legacy ranking • Records = category leaders • Page ${currentPage + 1}/${totalPages}` })
     .setTimestamp();
 
