@@ -444,7 +444,6 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
 
   const upcoming = rows.filter(row => !hasScore(row, config));
   const played = rows.filter(row => hasScore(row, config));
-  const current = upcoming[0] || null;
   const orderedRows = [...upcoming, ...played].sort((a, b) => {
     const aPlayed = hasScore(a, config) ? 1 : 0;
     const bPlayed = hasScore(b, config) ? 1 : 0;
@@ -465,6 +464,8 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
   const visibleRows = orderedRows.filter(
     row => !reservedMatchNos.has(normalizeMatchNo(row[config.matchNoIndex]))
   );
+
+  const current = visibleRows.find(row => !hasScore(row, config)) || null;
 
   const summary = buildFixtureSummary(team, rows, upcoming, played, reserveMatches, current, config);
 
