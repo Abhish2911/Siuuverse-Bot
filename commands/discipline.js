@@ -520,7 +520,7 @@ async function buildSuspensions(interaction, page, competitionKey = 'league') {
             : [{ name: `${safeEmoji(E.profile, '📋')} Suspended Player Cards`, value: 'No active suspensions on this page.', inline: false }])
         )
         .setColor(0xE74C3C)
-        .setFooter({ text: `${competition.footerText} • ${sourceText} • Suspended + At-risk view • QFQ supported` })
+        .setFooter({ text: `${competition.footerText} • Suspended + At-risk view • QFQ supported` })
     ],
     components: [buttons]
   };
