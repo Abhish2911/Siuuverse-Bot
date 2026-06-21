@@ -65,7 +65,7 @@ function getCompetitionConfig(key) {
     label: 'League',
     rankingYellowRange: 'Ranking!H:I',
     rankingRedRange: 'Ranking!K:L',
-    fairPlayRange: 'Fair_Play!H:L',
+    fairPlayRange: 'Fair_Play!A:E',
     footerText: 'Coop league'
   };
 }
