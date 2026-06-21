@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getData, updateData } = require('../utils/sheets');
 const { invalidateSheetCache, sendAuditLog } = require('../utils/helpers');
-const Suspension = require('../models/suspension');
 
 function isOwner(interaction) {
   const ownerIds = String(process.env.OWNER_IDS || '')
@@ -27,21 +26,6 @@ const clearFixtureResult = row => {
 
 const makeBlankRow = (length) => Array.from({ length }, () => '');
 
-async function clearMongoSuspensions(interaction) {
-  if (!interaction?.guild?.id) return 0;
-
-  try {
-    const result = await Suspension.resetForGuild(interaction.guild.id, {
-      deleteDocuments: true
-    });
-
-    return Number(result?.deletedCount || 0);
-  } catch (error) {
-    console.error('❌ Mongo suspension reset error:', error);
-    return 0;
-  }
-}
-
 function buildResetSeasonSummary(type, changed) {
   const resetLabel = type === 'results'
     ? 'Results only'
@@ -58,7 +42,7 @@ function buildResetSeasonSummary(type, changed) {
   };
 }
 
-function buildResetSeasonDescription(summary, mongoSuspensionDeleted) {
+function buildResetSeasonDescription(summary) {
   return (
     `♻️ **Season Reset Complete**\n` +
     `Selected season data was cleared successfully from the active league sheets.\n\n` +
@@ -66,8 +50,7 @@ function buildResetSeasonDescription(summary, mongoSuspensionDeleted) {
     `✅ **Changed Items:** ${summary.changedCount}\n` +
     `1️⃣ **First Change:** ${summary.firstChange}\n` +
     `2️⃣ **Second Change:** ${summary.secondChange}\n` +
-    `3️⃣ **Third Change:** ${summary.thirdChange}\n` +
-    `🗄️ **Mongo Suspensions Deleted:** ${mongoSuspensionDeleted}`
+    `3️⃣ **Third Change:** ${summary.thirdChange}\n`
   );
 }
 
@@ -104,7 +87,6 @@ module.exports = {
     }
 
     const changed = [];
-    let mongoSuspensionDeleted = 0;
 
     if (type === 'results' || type === 'all') {
       const fixtures = await getData('Fixtures!A:J');
@@ -133,26 +115,14 @@ module.exports = {
     }
 
     if (type === 'discipline' || type === 'all') {
-      const suspension = await getData('Suspension!A:G').catch(() => []);
-      const blankSuspension = Array.isArray(suspension) ? suspension.slice(1).map(() => makeBlankRow(7)) : [];
-      if (blankSuspension.length) {
-        await updateData('Suspension!A2:G', blankSuspension);
-      }
-
       const fairPlay = await getData('Fair_Play!A:S').catch(() => []);
       const blankFairPlay = Array.isArray(fairPlay) ? fairPlay.slice(1).map(() => makeBlankRow(19)) : [];
       if (blankFairPlay.length) {
         await updateData('Fair_Play!A2:S', blankFairPlay);
       }
 
-      mongoSuspensionDeleted = await clearMongoSuspensions(interaction);
-
       changed.push(
-        'Suspension sheet cleared',
-        'Fair Play sheet cleared',
-        mongoSuspensionDeleted > 0
-          ? `Mongo suspensions cleared (${mongoSuspensionDeleted})`
-          : 'Mongo suspensions already empty'
+        'Fair Play sheet cleared'
       );
     }
 
@@ -163,7 +133,6 @@ module.exports = {
       'Ranking!',
       'Standings!',
       'Fair_Play!',
-      'Suspension!',
       'Team_Stats!'
     ]);
 
@@ -174,8 +143,7 @@ module.exports = {
       description: `Season reset executed: **${summary.type}**`,
       color: 0xE67E22,
       fields: [
-        { name: 'Changed', value: changed.join('\n') || 'None', inline: false },
-        { name: 'Mongo Suspensions Deleted', value: String(mongoSuspensionDeleted), inline: true }
+        { name: 'Changed', value: changed.join('\n') || 'None', inline: false }
       ]
     });
 
@@ -183,12 +151,11 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setTitle('♻️ Season Reset Complete')
-          .setDescription(buildResetSeasonDescription(summary, mongoSuspensionDeleted))
+          .setDescription(buildResetSeasonDescription(summary))
           .addFields(
             { name: '✅ Changed', value: changed.join('\n') || 'None', inline: false },
             { name: '📌 Reset Type', value: summary.type, inline: true },
-            { name: '🧹 Total Cleared', value: String(summary.changedCount), inline: true },
-            { name: '🗄️ Mongo Suspensions Deleted', value: String(mongoSuspensionDeleted), inline: true }
+            { name: '🧹 Total Cleared', value: String(summary.changedCount), inline: true }
           )
           .setColor(0xE67E22)
           .setFooter({ text: 'Reset Season • Run /endseason before reset if you want to save the old season' })
