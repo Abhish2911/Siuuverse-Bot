@@ -416,6 +416,40 @@ module.exports = {
 
       rows.splice(targetIndex, 1);
 
+      try {
+        const competition = getCompetitionConfig(matchNo);
+        const fixtureData = await getData(
+          competition.fixturesRange,
+          { cache: false }
+        ).catch(() => []);
+
+        if (Array.isArray(fixtureData) && fixtureData.length > 1) {
+          const fixtureRows = fixtureData.slice(1);
+          const fixtureIndex = fixtureRows.findIndex(
+            row =>
+              normalizeMatchNo(
+                row[competition.matchNoIndex]
+              ) === normalizeMatchNo(matchNo)
+          );
+
+          if (fixtureIndex !== -1) {
+            const statusIndex =
+              competition.key === 'league' || competition.fixturesRange.includes('A:J')
+                ? 9
+                : 10;
+
+            fixtureRows[fixtureIndex][statusIndex] = '';
+
+            await updateData(
+              `${competition.fixturesRange.split('!')[0]}!A2:${competition.fixturesRange.split(':')[1]}`,
+              fixtureRows
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Reserve status reset failed:', err);
+      }
+
       // Rewrite the entire reserve data range so removed rows do not leave
       // stale data behind (which causes the previous last row to appear duplicated).
       const blankRows = Array.from({ length: Math.max(1, rows.length + 10) }, () => ['', '', '', '', '', '']);
@@ -581,6 +615,39 @@ module.exports = {
       pending.reservedBy,
       pending.playerName || ''
     ]]);
+
+    try {
+      const fixtureData = await getData(
+        pending.competition.fixturesRange,
+        { cache: false }
+      ).catch(() => []);
+
+      if (Array.isArray(fixtureData) && fixtureData.length > 1) {
+        const fixtureRows = fixtureData.slice(1);
+        const fixtureIndex = fixtureRows.findIndex(
+          row =>
+            normalizeMatchNo(
+              row[pending.competition.matchNoIndex]
+            ) === normalizeMatchNo(pending.matchNo)
+        );
+
+        if (fixtureIndex !== -1) {
+          const statusIndex =
+            pending.competition.key === 'league' || pending.competition.fixturesRange.includes('A:J')
+              ? 9
+              : 10;
+
+          fixtureRows[fixtureIndex][statusIndex] = 'Reserved';
+
+          await updateData(
+            `${pending.competition.fixturesRange.split('!')[0]}!A2:${pending.competition.fixturesRange.split(':')[1]}`,
+            fixtureRows
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Reserve status update failed:', err);
+    }
     invalidateSheetCache(['Reserve!']);
     pendingReserves.delete(interaction.user.id);
 
