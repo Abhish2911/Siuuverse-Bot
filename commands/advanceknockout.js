@@ -2,7 +2,6 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData, invalidateSheetCache, sendAuditLog } = require('../utils/helpers');
 const { updateData } = require('../utils/sheets');
 const { clean, toNumber } = require('../utils/competitionHelpers');
-const { resetCompetitionYellows } = require('../utils/suspensionService');
 const E = require('../utils/emojis');
 
 function safeEmoji(value, fallback = '') {
@@ -641,17 +640,6 @@ function buildAdvanceDescription(config, currentRoundLabel, nextRoundLabel, isPr
   );
 }
 
-function shouldResetYellowsOnAdvance(config, nextRound) {
-  const competitionKey = String(config?.key || '').trim().toLowerCase();
-  const next = String(nextRound || '').trim().toUpperCase();
-
-  return (competitionKey === 'fa' || competitionKey === 'carabao' || competitionKey === 'ucl') && next === 'SF';
-}
-
-function getYellowResetLabel(config, nextRoundLabel) {
-  if (!shouldResetYellowsOnAdvance(config, nextRoundLabel)) return 'No yellow-card reset';
-  return `Yellow cards reset on entry to ${nextRoundLabel}`;
-}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -934,7 +922,6 @@ module.exports = {
               { name: 'Fixtures', value: String(summary.fixtures), inline: true },
               { name: 'Top Pairing', value: summary.topPairing, inline: true },
               { name: 'Mode', value: 'Preview Only', inline: true },
-              { name: 'Yellow Reset', value: getYellowResetLabel(config, nextRound), inline: false },
               { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatFixtureLines(nextFixtures), inline: false }
             )
             .setColor(0x5865F2)
@@ -997,17 +984,6 @@ module.exports = {
 
     await updateData(config.saveRange, rowsToSave);
 
-    let yellowResetStatus = 'No yellow-card reset';
-
-    if (shouldResetYellowsOnAdvance(config, nextRound)) {
-      try {
-        await resetCompetitionYellows(interaction.guild.id, config.key);
-        yellowResetStatus = `✅ Yellow cards reset for ${config.label}`;
-      } catch (error) {
-        console.error('Yellow reset error:', error);
-        yellowResetStatus = '⚠️ Yellow-card reset failed';
-      }
-    }
 
     invalidateSheetCache([config.sheet.split('!')[0] + '!']);
 
@@ -1018,8 +994,7 @@ module.exports = {
       fields: [
         { name: 'Current Round', value: currentRoundLabel, inline: true },
         { name: 'Next Round', value: nextRoundLabel, inline: true },
-        { name: 'Fixtures', value: String(nextFixtures.length), inline: true },
-        { name: 'Yellow Reset', value: yellowResetStatus, inline: false }
+        { name: 'Fixtures', value: String(nextFixtures.length), inline: true }
       ]
     });
 
@@ -1037,7 +1012,6 @@ module.exports = {
             { name: 'Fixtures', value: String(summary.fixtures), inline: true },
             { name: 'Top Pairing', value: summary.topPairing, inline: true },
             { name: 'Saved To', value: config.sheet.split('!')[0], inline: true },
-            { name: 'Yellow Reset', value: yellowResetStatus, inline: false },
             { name: `${safeEmoji(E.calendar, '📅')} Pairings`, value: formatFixtureLines(nextFixtures), inline: false }
           )
           .setColor(0x2ECC71)
