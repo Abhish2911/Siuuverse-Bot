@@ -10,15 +10,6 @@ const {
 const { refreshLiveStandings } = require('../utils/liveStandings');
 const { refreshLiveStandings2 } = require('../utils/liveStandings2');
 
-let addYellowCard = async () => null;
-let addRedCard = async () => null;
-let assignNextBannedMatch = async () => null;
-
-try {
-  ({ addYellowCard, addRedCard, assignNextBannedMatch } = require('../utils/suspensionService'));
-} catch (error) {
-  console.warn('Suspension service unavailable:', error.message);
-}
 
 const E = require('../utils/emojis');
 
@@ -125,56 +116,6 @@ function splitRawEntries(v) {
     .filter(Boolean);
 }
 
-function getPlayerTeamInfo(player, pending) {
-  const normalizePlayer = value => {
-    const text = clean(value).toLowerCase();
-
-    // RDN-Zanetti -> zanetti
-    // RDN | Zanetti -> zanetti
-    return text
-      .replace(/^[^-|]+[-|]/, '')
-      .trim();
-  };
-
-  const target = normalizePlayer(player);
-
-  const homePlayers = splitRawEntries(pending.homePlayed);
-  const awayPlayers = splitRawEntries(pending.awayPlayed);
-
-  if (homePlayers.some(p => normalizePlayer(p) === target)) {
-    return {
-      teamName: pending.homeTeam,
-      teamShort: ''
-    };
-  }
-
-  if (awayPlayers.some(p => normalizePlayer(p) === target)) {
-    return {
-      teamName: pending.awayTeam,
-      teamShort: ''
-    };
-  }
-
-  // Exact fallback match before defaulting home team
-  if (homePlayers.some(p => clean(p).toLowerCase() === clean(player).toLowerCase())) {
-    return {
-      teamName: pending.homeTeam,
-      teamShort: ''
-    };
-  }
-
-  if (awayPlayers.some(p => clean(p).toLowerCase() === clean(player).toLowerCase())) {
-    return {
-      teamName: pending.awayTeam,
-      teamShort: ''
-    };
-  }
-
-  return {
-    teamName: pending.homeTeam,
-    teamShort: ''
-  };
-}
 
 function compactList(v, empty = 'None') {
   const text = String(v || '').trim();
@@ -736,63 +677,6 @@ module.exports = {
       console.error('Live standings refresh failed:', err);
     }
 
-    try {
-      const suspensionFixtures = (await getData(pending.competition.fixturesRange))
-        .slice(1)
-        .map(row => ({
-          matchNo: row[pending.competition.matchNoIndex ?? 0],
-          homeTeam: row[pending.competition.homeIndex ?? 2],
-          awayTeam: row[pending.competition.awayIndex ?? 3],
-          homeShort: row[pending.competition.homeShortIndex ?? 8],
-          awayShort: row[pending.competition.awayShortIndex ?? 9],
-          hg: row[4],
-          ag: row[5]
-        }));
-
-      if (pending.yellow) {
-        for (const player of splitRawEntries(pending.yellow)) {
-          if (!player.trim()) continue;
-          const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
-
-          await addYellowCard({
-            guildId: interaction.guildId,
-            competition: pending.competition.key,
-            playerName: player,
-            teamName,
-            teamShort,
-            matchNo: pending.matchNo
-          });
-        }
-      }
-
-      if (pending.red) {
-        for (const player of splitRawEntries(pending.red)) {
-          if (!player.trim()) continue;
-          const { teamName, teamShort } = getPlayerTeamInfo(player, pending);
-
-          await addRedCard({
-            guildId: interaction.guildId,
-            competition: pending.competition.key,
-            playerName: player,
-            teamName,
-            teamShort,
-            matchNo: pending.matchNo
-          });
-
-          await assignNextBannedMatch({
-            guildId: interaction.guildId,
-            competition: pending.competition.key,
-            playerName: player,
-            teamName,
-            teamShort,
-            fixtures: suspensionFixtures,
-            afterMatchNo: pending.matchNo
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Suspension update failed:', err);
-    }
 
     sendAuditLog(interaction, {
       title: '📋 Match Result Submitted',
