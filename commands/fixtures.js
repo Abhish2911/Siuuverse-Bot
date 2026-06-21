@@ -685,18 +685,25 @@ module.exports = {
     const requestedMd = clean(
       interaction.options.getString('matchday') || ''
     )
-      .replace(/\./g, '-');
+      .replace(/\./g, '-')
+      .toUpperCase();
+
+    const matchedMd =
+      matchdays.find(
+        md => String(md).toUpperCase() === requestedMd
+      ) ||
+      matchdays.find(md =>
+        String(md)
+          .toUpperCase()
+          .endsWith(`-${requestedMd}`)
+      );
 
     const filter =
       interaction.options.getString(
         'filter'
       ) || 'all';
 
-    const selectedMd =
-      requestedMd &&
-      matchdays.includes(requestedMd)
-        ? requestedMd
-        : matchdays[0];
+    const selectedMd = matchedMd || matchdays[0];
 
     return buildFixtures(
       data,
