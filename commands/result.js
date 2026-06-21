@@ -631,6 +631,7 @@ module.exports = {
           const hgIndex = 4;
           const agIndex = 5;
           const resultIndex = 6;
+          const statusIndex = 9;
 
           fixtureRows[fixtureIndex][hgIndex] = pending.hg;
           fixtureRows[fixtureIndex][agIndex] = pending.ag;
@@ -640,6 +641,8 @@ module.exports = {
             : pending.hg < pending.ag
               ? 'A'
               : 'D';
+
+          fixtureRows[fixtureIndex][statusIndex] = 'Played';
 
           if (!isLeagueOrUclGroup) {
             fixtureRows[fixtureIndex][7] = pending.decision || '';
