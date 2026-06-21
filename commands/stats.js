@@ -117,22 +117,6 @@ function getStatConfig(type, competitionKey = 'league') {
   const stat = STAT_DEFS[type] || STAT_DEFS.goals;
   const competition = getCompetitionConfig(competitionKey);
 
-  if (type === 'yellow') {
-    return {
-      ...stat,
-      competition,
-      range: 'Discipline!A:B'
-    };
-  }
-
-  if (type === 'red') {
-    return {
-      ...stat,
-      competition,
-      range: 'Discipline!A:C'
-    };
-  }
-
   return {
     ...stat,
     competition,
@@ -239,14 +223,11 @@ function buildAnsiTable(pageData, valueLabel, viewerNames) {
   const body = pageData.map(p => {
     const rankNum = Number(p.rank);
     const rank = String(p.rank).padStart(2);
-    const displayName = valueLabel === 'Cards'
-      ? cleanCardName(p.name)
-      : String(p.name || '');
-    const name = pad(displayName.slice(0, 15), 15);
+    const name = pad(String(p.name || '').slice(0, 15), 15);
     const value = String(p.value).padStart(3);
     const line = `${rank} ${name} ${value}`;
 
-    const isViewer = viewerNames.has(normalize(displayName)) || viewerNames.has(normalize(stripPrefix(displayName)));
+    const isViewer = viewerNames.has(normalize(p.name)) || viewerNames.has(normalize(stripPrefix(p.name)));
     if (isViewer) return colorLine(`${line}   ← YOU`, ansi.green);
     if (rankNum === 1) return colorLine(line, ansi.yellow);
     if (rankNum === 2) return colorLine(line, ansi.cyan);
@@ -396,46 +377,16 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
   const config = getStatConfig(type, competitionKey);
   const raw = await cachedGetData(config.range).catch(() => []);
 
-  let players = [];
-
-  if (Array.isArray(raw)) {
-    if (type === 'yellow') {
-      players = raw
-        .slice(1)
-        .filter(row => row[0] && row[1] !== '')
-        .map(row => ({
-          name: row[0],
-          value: Number(row[1]) || 0
-        }))
-        .sort((a, b) => b.value - a.value)
-        .map((row, index) => ({
-          rank: index + 1,
-          ...row
-        }));
-    } else if (type === 'red') {
-      players = raw
-        .slice(1)
-        .filter(row => row[0] && row[2] !== '')
-        .map(row => ({
-          name: row[0],
-          value: Number(row[2]) || 0
-        }))
-        .sort((a, b) => b.value - a.value)
-        .map((row, index) => ({
-          rank: index + 1,
-          ...row
-        }));
-    } else {
-      players = raw
+  const players = Array.isArray(raw)
+    ? raw
         .slice(2)
         .filter(row => row[0] && row[1] && row[2] !== '')
         .map(row => ({
           rank: row[0],
           name: row[1],
           value: row[2]
-        }));
-    }
-  }
+        }))
+    : [];
 
   const perPage = 10;
   const totalPages = Math.max(1, Math.ceil(players.length / perPage));
