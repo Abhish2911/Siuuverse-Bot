@@ -109,9 +109,9 @@ async function buildLiveStatsEmbed() {
 
   const matchesRecorded = Array.isArray(matches)
     ? matches.slice(1).filter(row => {
-        const hg = String(row?.[4] ?? '').trim();
-        const ag = String(row?.[5] ?? '').trim();
-        return hg !== '' && ag !== '';
+        const status = String(row?.[9] ?? '').trim().toLowerCase();
+
+        return status && !['pending', 'upcoming', 'scheduled', 'not played'].includes(status);
       }).length
     : 0;
   const totalGoals = cleanRows(goals).reduce((sum, row) => sum + Number(row[2] || 0), 0);
