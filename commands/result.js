@@ -621,11 +621,9 @@ module.exports = {
       if (Array.isArray(fixtureSheet) && fixtureSheet.length > 1) {
         const fixtureRows = fixtureSheet.slice(1);
 
-        const fixtureIndex = pending.fixtureIndex >= 0
-          ? pending.fixtureIndex
-          : fixtureRows.findIndex(
-              r => normalizeMatchNo(r[pending.competition.matchNoIndex ?? 0]) === pending.matchNo
-            );
+        const fixtureIndex = fixtureRows.findIndex(
+          r => normalizeMatchNo(r[pending.competition.matchNoIndex ?? 0]) === pending.matchNo
+        );
 
         if (fixtureIndex !== -1) {
           const isLeagueOrUclGroup = pending.competition.fixturesRange.includes('Fixtures!') || pending.competition.fixturesRange.includes('UCL_Coop_Group_Fixtures');
@@ -633,14 +631,6 @@ module.exports = {
           const hgIndex = 4;
           const agIndex = 5;
           const resultIndex = 6;
-
-          // Always use column 9 (J) for status
-          const statusIndex = 9;
-
-          const fixtureEndColumn = fixtureRows[fixtureIndex].length >= 10 ? 'J' : pending.competition.fixturesRange.split('!')[1].split(':')[1];
-          while (fixtureRows[fixtureIndex].length <= statusIndex) {
-            fixtureRows[fixtureIndex].push('');
-          }
 
           fixtureRows[fixtureIndex][hgIndex] = pending.hg;
           fixtureRows[fixtureIndex][agIndex] = pending.ag;
@@ -651,29 +641,18 @@ module.exports = {
               ? 'A'
               : 'D';
 
-          fixtureRows[fixtureIndex][statusIndex] = 'Played';
-
           if (!isLeagueOrUclGroup) {
             fixtureRows[fixtureIndex][7] = pending.decision || '';
           }
 
-          const fixtureSheetName = pending.competition.fixturesRange.split('!')[0];
-
           await updateData(
-            `${fixtureSheetName}!A2:${fixtureEndColumn}`,
+            `${pending.competition.fixturesRange.split('!')[0]}!A2:${pending.competition.fixturesRange.split('!')[1].split(':')[1]}`,
             fixtureRows
-          );
-
-          console.log(
-            `[RESULT] Fixture updated: ${pending.matchNo} | ${pending.homeTeam} ${pending.hg}-${pending.ag} ${pending.awayTeam}`
           );
         }
       }
     } catch (err) {
-      console.error(
-        `Fixture update failed for ${pending.matchNo} (${pending.competition.fixturesRange}):`,
-        err
-      );
+      console.error('Fixture update failed:', err);
     }
 
     invalidateSheetCache([
