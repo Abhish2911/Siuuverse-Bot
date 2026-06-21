@@ -133,24 +133,6 @@ function stripPrefix(name) {
   return text.includes('-') ? text.split('-').slice(1).join('-').trim() : text;
 }
 
-function formatPlayerWithTag(name) {
-  const text = String(name || '').trim();
-  if (!text) return 'Unknown';
-
-  if (!text.includes('-')) {
-    return text;
-  }
-
-  const [tag, ...rest] = text.split('-');
-  const player = rest.join('-').trim();
-  const cleanTag = tag.trim().toUpperCase();
-
-  if (!player) {
-    return text;
-  }
-
-  return `\`${cleanTag}\` **${player}**`;
-}
 
 async function findMemberMention(interaction, rawName, discordIdMap = new Map()) {
   const playerName = stripPrefix(rawName);
@@ -339,8 +321,18 @@ module.exports = {
     return buildStats(interaction, 'goals', 0, competitionKey);
   },
 
-  async buttonHandler(interaction, action, page, type) {
-    const parts = String(type || '').split('__');
+  async buttonHandler(interaction, action, value) {
+    const firstUnderscore = String(value || '').indexOf('_');
+
+    let page = '0';
+    let typeData = 'goals__league';
+
+    if (firstUnderscore !== -1) {
+      page = value.slice(0, firstUnderscore);
+      typeData = value.slice(firstUnderscore + 1);
+    }
+
+    const parts = String(typeData || '').split('__');
     const ownerId = parts[parts.length - 1];
 
     if (ownerId && ownerId !== interaction.user.id) {
@@ -357,6 +349,7 @@ module.exports = {
     if (action === 'next') newPage++;
 
     const [resolvedType = 'goals', competitionKey = 'league'] = parts;
+
     return buildStats(interaction, resolvedType, newPage, competitionKey);
   },
 
