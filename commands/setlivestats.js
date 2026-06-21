@@ -108,11 +108,12 @@ async function buildLiveStatsEmbed() {
   const saves = getRankingSectionRows(ranking, 24);
 
   const matchesRecorded = Array.isArray(matches)
-  ? matches.filter(row =>
-      row &&
-      row.some(cell => String(cell || '').trim() !== '')
-    ).length - 1
-  : 0;
+    ? matches.slice(1).filter(row => {
+        const hg = String(row?.[4] ?? '').trim();
+        const ag = String(row?.[5] ?? '').trim();
+        return hg !== '' && ag !== '';
+      }).length
+    : 0;
   const totalGoals = cleanRows(goals).reduce((sum, row) => sum + Number(row[2] || 0), 0);
   const totalCards =
     cleanRows(yellow).reduce((sum, row) => sum + Number(row[2] || 0), 0) +
