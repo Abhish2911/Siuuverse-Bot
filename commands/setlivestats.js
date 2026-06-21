@@ -85,7 +85,7 @@ function getRankingSectionRows(rankingRows, startIndex) {
 function top5RankingRows(rows, icon = '') {
   const list = cleanRows(rows)
     .slice(0, 5)
-    .map((row, i) => `${i + 1}. **${row[1]}** - **${row[2]}** ${icon}`)
+    .map((row, i) => `${i + 1}. **${row[1]}** - **${row[2]}**`)
     .join('\n');
 
   return list || `${safeEmoji(E.missing, '➖')} No data yet.`;
