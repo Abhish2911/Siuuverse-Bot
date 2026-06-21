@@ -139,6 +139,13 @@ function cleanCardName(name) {
     .trim();
 }
 
+function cleanDisplayName(name) {
+  return String(name || '')
+    .replace(/<a?:\w+:\d+>/g, '')
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .trim();
+}
+
 
 async function findMemberMention(interaction, rawName, discordIdMap = new Map()) {
   const playerName = stripPrefix(rawName);
@@ -243,8 +250,8 @@ async function buildTopFive(players, config, interaction, playerMap = new Map())
   if (!top.length) return 'No data';
 
   const lines = await Promise.all(top.map(async (p, index) => {
-    const rawName = String(p.name || '').trim();
-    const enteredName = stripPrefix(rawName);
+    const rawName = cleanDisplayName(String(p.name || '').trim());
+    const enteredName = cleanDisplayName(stripPrefix(rawName));
     const playerInfo = playerMap.get(normalize(enteredName));
 
     const isTeamStat = config.valueLabel === 'Saves';
@@ -383,7 +390,7 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
         .filter(row => row[0] && row[1] && row[2] !== '')
         .map(row => ({
           rank: row[0],
-          name: row[1],
+          name: cleanDisplayName(row[1]),
           value: row[2]
         }))
     : [];
