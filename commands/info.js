@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
 
-const TEAMS_SHEET_RANGE = 'Teams!A:F';
+const TEAMS_SHEET_RANGE = 'Teams!A:Z';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,7 +32,7 @@ module.exports = {
           teamName = 'Unknown Team',
           players = '',
           shortName = '-',
-          ,
+          stadiumName = '-',
           captainId = '',
           usersId = ''
         ] = row;
@@ -47,6 +47,7 @@ module.exports = {
         const section =
           `**${teamName} (${shortName})**\n` +
           `👥 Players: ${players || 'No players listed'}\n` +
+          `🏟️ Stadium: ${stadiumName || 'N/A'}\n` +
           `🏷️ Users: ${mentions || 'No users linked'}\n\n`;
 
         if (teamCount >= 9 || (current + section).length > 1900) {
