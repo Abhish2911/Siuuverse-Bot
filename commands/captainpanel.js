@@ -26,7 +26,7 @@ function getCompetitionConfig(key) {
       label: 'FA Cup',
       fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
       reserveLabel: 'FA Cup',
-      suspensionRange: 'FA_Cup_Coop_Suspension!A:G',
+      disciplineRange: 'FA_Cup_Coop_Discipline!A:G',
       matchNoIndex: 1,
       dateIndex: 2,
       homeIndex: 3,
@@ -45,7 +45,7 @@ function getCompetitionConfig(key) {
       label: 'Carabao Cup',
       fixturesRange: 'Carabao_Coop_Fixtures!A:K',
       reserveLabel: 'Carabao Cup',
-      suspensionRange: 'Carabao_Coop_Suspension!A:G',
+      disciplineRange: 'Carabao_Coop_Discipline!A:G',
       matchNoIndex: 1,
       dateIndex: 2,
       homeIndex: 3,
@@ -64,7 +64,7 @@ function getCompetitionConfig(key) {
       label: 'UCL',
       fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
       reserveLabel: 'UCL',
-      suspensionRange: 'UCL_Coop_Suspension!A:G',
+      disciplineRange: 'UCL_Coop_Discipline!A:G',
       matchNoIndex: 0,
       dateIndex: 1,
       homeIndex: 2,
@@ -82,7 +82,7 @@ function getCompetitionConfig(key) {
     label: 'League',
     fixturesRange: 'Fixtures!A:J',
     reserveLabel: 'League',
-    suspensionRange: 'Suspension!A:G',
+    disciplineRange: 'Discipline!A:G',
     matchNoIndex: 0,
     dateIndex: 1,
     homeIndex: 2,
@@ -260,19 +260,19 @@ function getTeamReservedMatches(reserveRows, teamName, shortName, competitionLab
     }));
 }
 
-function cleanSuspensionPlayer(value) {
+function cleanDisciplinePlayer(value) {
   const text = String(value || '').trim();
   return text.includes('-') ? text.split('-').slice(1).join('-').trim() : text;
 }
 
-function getTeamSuspensions(suspensionRows, teamShort, squadNames) {
+function getTeamDiscipline(disciplineRows, teamShort, squadNames) {
   const squadSet = new Set(squadNames.map(name => normalize(name)));
 
-  return suspensionRows
+  return disciplineRows
     .slice(1)
     .filter(row => String(row[0] || '').trim())
     .filter(row => {
-      const player = normalize(cleanSuspensionPlayer(row[0]));
+      const player = normalize(cleanDisciplinePlayer(row[0]));
       const rawPlayer = normalize(row[0]);
       const rowShort = normalize(row[6]);
       return squadSet.has(player) || squadSet.has(rawPlayer) || (teamShort && rowShort === normalize(teamShort));
@@ -283,7 +283,7 @@ function getTeamSuspensions(suspensionRows, teamShort, squadNames) {
       return banned !== '' && !status.includes('served') && !status.includes('done');
     })
     .map(row => ({
-      player: cleanSuspensionPlayer(row[0]),
+      player: cleanDisciplinePlayer(row[0]),
       reason: String(row[5] || '').trim() || 'Suspended',
       bannedMatch: String(row[4] || '').trim() || 'N/A'
     }));
@@ -292,10 +292,10 @@ function getTeamSuspensions(suspensionRows, teamShort, squadNames) {
 async function buildCaptainPanelPayload(interaction, competitionKey = 'league') {
   const config = getCompetitionConfig(competitionKey);
 
-  const [teams, fixtures, suspension, reserveRows] = await Promise.all([
+  const [teams, fixtures, discipline, reserveRows] = await Promise.all([
     cachedGetData(TEAMS_SHEET_RANGE),
     cachedGetData(config.fixturesRange),
-    cachedGetData(config.suspensionRange).catch(() => []),
+    cachedGetData(config.disciplineRange).catch(() => []),
     cachedGetData(RESERVE_SHEET_RANGE).catch(() => [])
   ]);
 
@@ -328,8 +328,8 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
     ? getNextMatch(fixtures, teamName, shortName, config)
     : null;
 
-  const suspensions = Array.isArray(suspension) && suspension.length > 1
-    ? getTeamSuspensions(suspension, shortName, squadNames)
+  const disciplineRecords = Array.isArray(discipline) && discipline.length > 1
+    ? getTeamDiscipline(discipline, shortName, squadNames)
     : [];
 
   const reservedMatches = Array.isArray(reserveRows) && reserveRows.length > 1
@@ -348,9 +348,9 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
 
   const squadText = buildSquadMembersText(captainTeam);
 
-  const suspensionsText = suspensions.length
-    ? truncateField(suspensions.map(s => `${E.suspend} **${s.player}** — ${s.reason} (Match ${s.bannedMatch})`).join('\n'))
-    : `${E.correct} No active suspensions.`;
+  const disciplineText = disciplineRecords.length
+    ? truncateField(disciplineRecords.map(s => `${E.suspend} **${s.player}** — ${s.reason} (Match ${s.bannedMatch})`).join('\n'))
+    : `${E.correct} No active discipline records.`;
 
   const reservedText = reservedMatches.length
     ? truncateField(reservedMatches.map(match =>
@@ -365,14 +365,14 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
       `${E.Badge} **Short:** ${shortName || 'N/A'}\n` +
       `${E.trophy_animated || '🏆'} **Competition:** ${config.label}\n` +
       `🏟️ **Stadium:** ${stadium}` +
-      `\n📊 **Status:** ${suspensions.length} suspension(s) • ${reservedMatches.length} reserve(s)`
+      `\n📊 **Status:** ${disciplineRecords.length} discipline record(s) • ${reservedMatches.length} reserve(s)`
     )
     .addFields(
       { name: `${E.calendar} Your Next Match`, value: nextMatchText, inline: false },
       { name: `${E.info || '📌'} Result Entry Guide`, value: buildResultEntryGuide(), inline: false },
       { name: `${E.reserve || '📌'} Reserved Matches`, value: reservedText, inline: false },
       { name: `${E.profile} Squad (${squadNames.length})`, value: squadText, inline: false },
-      { name: `${E.suspend} Suspensions`, value: suspensionsText, inline: false }
+      { name: `${E.suspend} Discipline`, value: disciplineText, inline: false }
     )
     .setColor(getTeamColor(teams, teamName, 0x3498DB))
     .setFooter({ text: `${config.label} captain dashboard • Squad, fixture and reserve control` });
@@ -390,7 +390,7 @@ async function buildCaptainPanelPayload(interaction, competitionKey = 'league') 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('captainpanel')
-    .setDescription('COOP captain view: next match, reserves, squad and suspensions')
+    .setDescription('COOP captain view: next match, reserves, squad and discipline')
     .addStringOption(option =>
       option
         .setName('competition')
