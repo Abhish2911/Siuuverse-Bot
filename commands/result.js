@@ -631,6 +631,11 @@ module.exports = {
           const hgIndex = 4;
           const agIndex = 5;
           const resultIndex = 6;
+          const statusIndex = 9;
+
+          while (fixtureRows[fixtureIndex].length <= statusIndex) {
+            fixtureRows[fixtureIndex].push('');
+          }
 
           fixtureRows[fixtureIndex][hgIndex] = pending.hg;
           fixtureRows[fixtureIndex][agIndex] = pending.ag;
@@ -641,12 +646,16 @@ module.exports = {
               ? 'A'
               : 'D';
 
+          fixtureRows[fixtureIndex][statusIndex] = 'Played';
+
           if (!isLeagueOrUclGroup) {
             fixtureRows[fixtureIndex][7] = pending.decision || '';
           }
 
+          const fixtureSheetName = pending.competition.fixturesRange.split('!')[0];
+
           await updateData(
-            `${pending.competition.fixturesRange.split('!')[0]}!A2:${pending.competition.fixturesRange.split('!')[1].split(':')[1]}`,
+            `${fixtureSheetName}!A2:J`,
             fixtureRows
           );
         }
