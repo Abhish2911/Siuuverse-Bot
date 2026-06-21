@@ -33,7 +33,7 @@ function getCompetitionConfig(key) {
       label: 'FA Cup',
       rankingYellowRange: 'FA_Cup_Coop_Ranking!H:I',
       rankingRedRange: 'FA_Cup_Coop_Ranking!K:L',
-      fairPlayRange: 'Fair_Play!H:K',
+      fairPlayRange: 'Fair_Play!H:L',
       footerText: 'FA Cup'
     };
   }
@@ -44,7 +44,7 @@ function getCompetitionConfig(key) {
       label: 'Carabao Cup',
       rankingYellowRange: 'Carabao_Coop_Ranking!H:I',
       rankingRedRange: 'Carabao_Coop_Ranking!K:L',
-      fairPlayRange: 'Fair_Play!H:K',
+      fairPlayRange: 'Fair_Play!H:L',
       footerText: 'Carabao Cup'
     };
   }
@@ -55,7 +55,7 @@ function getCompetitionConfig(key) {
       label: 'UCL',
       rankingYellowRange: 'UCL_Coop_Ranking!H:I',
       rankingRedRange: 'UCL_Coop_Ranking!K:L',
-      fairPlayRange: 'Fair_Play!H:K',
+      fairPlayRange: 'Fair_Play!H:L',
       footerText: 'UCL'
     };
   }
@@ -65,7 +65,7 @@ function getCompetitionConfig(key) {
     label: 'League',
     rankingYellowRange: 'Ranking!H:I',
     rankingRedRange: 'Ranking!K:L',
-    fairPlayRange: 'Fair_Play!H:K',
+    fairPlayRange: 'Fair_Play!H:L',
     footerText: 'Coop league'
   };
 }
@@ -210,7 +210,7 @@ async function buildFairPlay(competitionKey = 'league', userId = null) {
   const fairplay = await cachedGetData(competition.fairPlayRange).catch(() => []);
   const teams = await cachedGetData('Teams!A:C');
 
-  if (!fairplay || fairplay.length <= 1) {
+  if (!Array.isArray(fairplay) || fairplay.length === 0) {
     return { content: `❌ No ${competition.label} fair play data found` };
   }
 
@@ -225,14 +225,14 @@ async function buildFairPlay(competitionKey = 'league', userId = null) {
 
   const rows = fairplay
     .slice(1)
-    .filter(r => r[0]);
+    .filter(r => r[0] && String(r[0]).trim().toLowerCase() !== 'teams');
 
   const table = rows.map((r, i) => {
     const fullTeam = String(r[0] || '').trim().toLowerCase();
     const tm = padEnd(shortMap[fullTeam] || String(r[0] || '').slice(0, 6).toUpperCase() || 'N/A', 6);
     const yc = padStart(r[1] || 0, 2);
     const rc = padStart(r[2] || 0, 2);
-    const pts = padStart(r[4] || 0, 3);
+    const pts = padStart(r[4] ?? r[3] ?? 0, 3);
 
     const line = `${padStart(i + 1, 2)} ${tm} ${yc} ${rc} ${pts}`;
 
