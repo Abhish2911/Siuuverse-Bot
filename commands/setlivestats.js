@@ -72,6 +72,16 @@ function cleanRows(rows) {
     : [];
 }
 
+function getRankingSectionRows(rankingRows, startIndex) {
+  if (!Array.isArray(rankingRows)) return [];
+
+  return rankingRows.map(row => [
+    row[startIndex] || '',
+    row[startIndex + 1] || '',
+    row[startIndex + 2] || ''
+  ]);
+}
+
 function top5RankingRows(rows, icon = '') {
   const list = cleanRows(rows)
     .slice(0, 5)
@@ -82,20 +92,27 @@ function top5RankingRows(rows, icon = '') {
 }
 
 async function buildLiveStatsEmbed() {
-  const [goals, assists, yellow, red, mvp, ga, tackles, interceptions, saves, matches] = await Promise.all([
-    cachedGetData('Ranking!A:C'),
-    cachedGetData('Ranking!D:F'),
-    cachedGetData('Ranking!G:I'),
-    cachedGetData('Ranking!J:L'),
-    cachedGetData('Ranking!M:O'),
-    cachedGetData('Ranking!P:R'),
-    cachedGetData('Ranking!S:U'),
-    cachedGetData('Ranking!V:X'),
-    cachedGetData('Ranking!Y:AA'),
+  const [ranking, matches] = await Promise.all([
+    cachedGetData('Ranking!A:AA'),
     cachedGetData('Matches!A:Z').catch(() => [])
   ]);
 
-  const matchesRecorded = Array.isArray(matches) ? Math.max(0, matches.length - 1) : 0;
+  const goals = getRankingSectionRows(ranking, 0);
+  const assists = getRankingSectionRows(ranking, 3);
+  const yellow = getRankingSectionRows(ranking, 6);
+  const red = getRankingSectionRows(ranking, 9);
+  const mvp = getRankingSectionRows(ranking, 12);
+  const ga = getRankingSectionRows(ranking, 15);
+  const tackles = getRankingSectionRows(ranking, 18);
+  const interceptions = getRankingSectionRows(ranking, 21);
+  const saves = getRankingSectionRows(ranking, 24);
+
+  const matchesRecorded = Array.isArray(matches)
+  ? matches.filter(row =>
+      row &&
+      row.some(cell => String(cell || '').trim() !== '')
+    ).length - 1
+  : 0;
   const totalGoals = cleanRows(goals).reduce((sum, row) => sum + Number(row[2] || 0), 0);
   const totalCards =
     cleanRows(yellow).reduce((sum, row) => sum + Number(row[2] || 0), 0) +
@@ -151,7 +168,7 @@ async function startLiveStats(client, config) {
     } catch (error) {
       console.error('❌ live stats auto-update error:', error);
     }
-  }, 60 * 1000);
+  }, Number(process.env.LIVE_STATS_REFRESH_MS || 180000));
 
   await updateLiveStatsMessage(message);
   return true;
@@ -199,7 +216,7 @@ module.exports = {
       } catch (error) {
         console.error('❌ live stats auto-update error:', error);
       }
-    }, 60 * 1000);
+    }, Number(process.env.LIVE_STATS_REFRESH_MS || 180000));
 
     return finishInteraction(interaction, {
       embeds: [
