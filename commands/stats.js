@@ -133,6 +133,12 @@ function stripPrefix(name) {
   return text.includes('-') ? text.split('-').slice(1).join('-').trim() : text;
 }
 
+function cleanCardName(name) {
+  return String(name || '')
+    .replace(/\(\d+\)/g, '')
+    .trim();
+}
+
 
 async function findMemberMention(interaction, rawName, discordIdMap = new Map()) {
   const playerName = stripPrefix(rawName);
@@ -200,13 +206,6 @@ function getViewerNames(interaction) {
   ].filter(Boolean));
 }
 
-function medal(rank) {
-  if (Number(rank) === 1) return '🥇';
-  if (Number(rank) === 2) return '🥈';
-  if (Number(rank) === 3) return '🥉';
-  return '▫️';
-}
-
 function buildAnsiTable(pageData, valueLabel, viewerNames) {
   const ansi = {
     reset: '\u001b[0m',
@@ -252,19 +251,19 @@ async function buildTopFive(players, config, interaction, playerMap = new Map())
     const isCardStat = config.valueLabel === 'Cards';
 
     if (isTeamStat) {
-      return `${index + 1}. ${rawName} - **${p.value}** ${config.icon}`;
+      return `${index + 1}. ${rawName} - **${p.value}**`;
     }
 
     if (isCardStat) {
-      return `${index + 1}. ${rawName} - **${p.value}** ${config.icon}`;
+      return `${index + 1}. ${cleanCardName(rawName)} - **${p.value}**`;
     }
 
-    const teamShort = playerInfo?.teamShort || 'N/A';
+    const teamShort = playerInfo?.teamShort || '';
     const mention = playerInfo?.discordId
       ? `<@${playerInfo.discordId}>`
       : await findMemberMention(interaction, rawName);
 
-    return `${index + 1}. ${teamShort}-${enteredName.toUpperCase()} ${mention} - **${p.value}** ${config.icon}`;
+    return `${index + 1}. ${teamShort ? `${teamShort}-` : ''}${enteredName.toUpperCase()} ${mention} - **${p.value}**`;
   }));
 
   return lines.join('\n');
@@ -349,6 +348,10 @@ module.exports = {
     if (action === 'next') newPage++;
 
     const [resolvedType = 'goals', competitionKey = 'league'] = parts;
+
+    if (action === 'refresh') {
+      return buildStats(interaction, resolvedType, newPage, competitionKey);
+    }
 
     return buildStats(interaction, resolvedType, newPage, competitionKey);
   },
