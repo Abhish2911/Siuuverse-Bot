@@ -32,9 +32,10 @@ module.exports = {
           teamName = 'Unknown Team',
           players = '',
           shortName = '-',
-          stadiumName = '-',
+          , // Logo
           captainId = '',
-          usersId = ''
+          usersId = '',
+          stadiumName = '-'
         ] = row;
 
         const mentions = [captainId, usersId]
