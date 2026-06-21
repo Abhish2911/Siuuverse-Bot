@@ -110,41 +110,6 @@ function getTeamForm(fixtures, teamName, shortName) {
   }).join('\n');
 }
 
-function formatSuspensions(suspensionRows, shortName) {
-  const teamShort = normalize(shortName);
-
-  if (!Array.isArray(suspensionRows)) {
-    return '```ini\nNone\n```';
-  }
-
-  const rows = suspensionRows
-    .slice(1)
-    .filter(r => r[0] && r[5] && String(r[5]).toLowerCase().includes('suspend'))
-    .filter(r => normalize(r[0] || '').startsWith(`${teamShort}-`));
-
-  if (!rows.length) {
-    return '```ini\nNone\n```';
-  }
-
-  const text = rows.map((r, i) => {
-    const rawPlayer = String(r[0] || '-');
-    const player = rawPlayer.includes('-') ? rawPlayer.split('-').slice(1).join('-') : rawPlayer;
-    const yellowCards = r[1] || 0;
-    const redMatch = r[2] || '-';
-    const yellowBan = r[3] || '-';
-    const banMatch = r[4] || '-';
-
-    return `**${i + 1}. ${player}**\n` +
-      `${E.ban} **Ban Match:** ${banMatch}`;
-  }).join('\n\n');
-
-  if (text.length > 1000) {
-    return `${text.slice(0, 980).trim()}\n\n+ more suspended players...`;
-  }
-
-  return text;
-}
-
 // --- UI UPGRADE HELPERS ---
 function buildTeamHubSummary(teamName, shortName, teamId, previousName, previousShort, stadium, pos, p, w, d, l, gd, pts, fairRank, fp, squadStats) {
   const topScorer = [...squadStats]
@@ -204,12 +169,11 @@ module.exports = {
     const userId = interaction.user.id;
     const teamInput = interaction.options.getString('team');
 
-    const [teams, teamIdRows, standings, fairPlay, suspension, fixtures, ranking] = await Promise.all([
+    const [teams, teamIdRows, standings, fairPlay, fixtures, ranking] = await Promise.all([
       cachedGetData('Teams!A:H'),
       cachedGetData('Team_ID_Map!A:E'),
       cachedGetData('Standings!A:J'),
-      cachedGetData('Fair_Play!H:K'),
-      cachedGetData('Suspension!A:G'),
+      cachedGetData('Fair_Play!A:E'),
       cachedGetData('Fixtures!A:I'),
       cachedGetData('Ranking!A:AA')
     ]);
@@ -317,13 +281,21 @@ module.exports = {
     const pts = standingRow?.[9] || 0;
 
     const fairRows = Array.isArray(fairPlay) ? fairPlay.slice(1).filter(r => r[0]) : [];
-    const fairIndex = fairRows.findIndex(r => normalize(r[0]) === normalize(teamName));
-    const fairRow = fairIndex !== -1 ? fairRows[fairIndex] : null;
 
-    const fairRank = fairIndex !== -1 ? fairIndex + 1 : '-';
-    const yc = fairRow?.[1] || 0;
-    const rc = fairRow?.[2] || 0;
-    const fp = fairRow?.[3] || 0;
+    const fairRow = fairRows.find(r =>
+      normalize(r[0]) === normalize(teamName) ||
+      normalize(r[0]) === normalize(shortName)
+    );
+
+    const fairRank = fairRow
+      ? [...fairRows]
+          .sort((a, b) => Number(b[4] || 0) - Number(a[4] || 0))
+          .findIndex(r => r === fairRow) + 1
+      : '-';
+
+    const yc = Number(fairRow?.[1]) || 0;
+    const rc = Number(fairRow?.[2]) || 0;
+    const fp = Number(fairRow?.[4]) || 0;
 
     const captainGoals = getStat('goals', captainPlayer);
     const captainAssists = getStat('assists', captainPlayer);
@@ -443,11 +415,6 @@ module.exports = {
           value: formText,
           inline: true
         },
-        {
-          name: `${E.suspend} Suspensions`,
-          value: formatSuspensions(suspension, shortName),
-          inline: false
-        }
       )
       .setColor(parseHexColor(teamColor, 0x5865F2))
       .setFooter({ text: `Myteam • Team ID: ${teamId} • Captain: ${captainId || 'Unknown'} • ${shortName}` })
