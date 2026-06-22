@@ -299,7 +299,7 @@ function buildStatsDescription(summary) {
     `${safeEmoji(E.trophy_animated || E.calendar, '🏆')} **Competition:** ${summary.competition}\n` +
     `${safeEmoji(E.played, '🎮')} **Entries:** ${summary.entries}\n` +
     `${safeEmoji(E.page || E.calendar, '📄')} **Page:** ${summary.page}\n\n` +
-    `${safeEmoji(E.winner || E.goal, '🥇')} **Leader:** ${summary.leader}\n` +
+    `${safeEmoji(E.winner_medal || E.goal, '🥇')} **Leader:** ${summary.leader}\n` +
     `${safeEmoji(E.runnerUp || E.medal, '🥈')} **2nd:** ${summary.second}\n` +
     `${safeEmoji(E.medal, '🥉')} **3rd:** ${summary.third}`
   );
