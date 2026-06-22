@@ -299,7 +299,7 @@ function buildStatsDescription(summary) {
     `${safeEmoji(E.trophy_animated || E.calendar, '🏆')} **Competition:** ${summary.competition}\n` +
     `${safeEmoji(E.played, '🎮')} **Entries:** ${summary.entries}\n` +
     `${safeEmoji(E.page || E.calendar, '📄')} **Page:** ${summary.page}\n\n` +
-    `${safeEmoji(E.goldenBoot || E.goal, '🥇')} **Leader:** ${summary.leader}\n` +
+    `${safeEmoji(E.winner || E.goal, '🥇')} **Leader:** ${summary.leader}\n` +
     `${safeEmoji(E.runnerUp || E.medal, '🥈')} **2nd:** ${summary.second}\n` +
     `${safeEmoji(E.medal, '🥉')} **3rd:** ${summary.third}`
   );
@@ -436,8 +436,8 @@ async function buildStats(interaction, type, page, competitionKey = 'league') {
       { name: `${safeEmoji(E.fire, '🔥')} Top 5`, value: topFiveText, inline: false },
       { name: `${safeEmoji(E.calendar, '📅')} Page`, value: `${page + 1}/${totalPages}`, inline: true },
       { name: `${safeEmoji(E.played, '🎮')} Entries`, value: String(players.length), inline: true },
-      { name: '📊 Category', value: cleanTitle(config.title), inline: true },
-      { name: '🏆 Competition', value: config.competition.label, inline: true }
+      { name: `${safeEmoji(E.league || E.stats, '📊')} Category`, value: cleanTitle(config.title), inline: true },
+      { name: `${safeEmoji(E.trophy_animated, '🏆')} Competition`, value: config.competition.label, inline: true }
     )
     .setFooter({ text: `${config.competition.label} Stats • Only ${interaction.user.username} can use this menu` })
     .setColor(config.color);
