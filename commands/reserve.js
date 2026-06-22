@@ -509,7 +509,8 @@ module.exports = {
     }
 
     const activeCount = countActiveReservesByUser(rows, reservedBy);
-    if (activeCount >= MAX_ACTIVE_RESERVES_PER_CAPTAIN) {
+
+    if (!isOwner(interaction) && activeCount >= MAX_ACTIVE_RESERVES_PER_CAPTAIN) {
       return `${safeEmoji(E.wrong || E.error, '❌')} You already have **${MAX_ACTIVE_RESERVES_PER_CAPTAIN}** active reserves. Play one of them first so it gets removed, then reserve another.`;
     }
 
