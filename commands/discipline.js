@@ -122,22 +122,25 @@ module.exports = {
 
     let newPage = 0;
     let competitionKey = 'league';
-    let direction = 'next';
 
-    const raw = String(action || '');
-    const match = raw.match(/^__([^_]+)_(prev|next)_(\d+)/);
+    const customId = String(interaction.customId || '');
+    const match = customId.match(/^discipline_cards_([^_]+)_(prev|next)_(\d+)$/);
 
     if (match) {
       competitionKey = match[1];
-      direction = match[2];
-      newPage = parseInt(match[3], 10) || 0;
+      const currentPage = parseInt(match[3], 10) || 0;
+      newPage = match[2] === 'next'
+        ? currentPage + 1
+        : currentPage - 1;
+    } else {
+      return {
+        content: '❌ Invalid discipline button data.',
+        ephemeral: true
+      };
     }
 
-    if (direction === 'prev') newPage--;
-    if (direction === 'next') newPage++;
-
     if (section === 'cards') {
-      return buildCardsPage(newPage, competitionKey);
+      return buildCardsPage(newPage, competitionKey, interaction.user.id);
     }
 
     return { content: '❌ Invalid discipline action.', components: [] };
@@ -172,13 +175,13 @@ async function buildCardsPage(page, competitionKey = 'league', userId = null) {
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`discipline_cards__${competitionKey}_prev_${page}_${userId || '0'}`)
+      .setCustomId(`discipline_cards_${competitionKey}_prev_${page}`)
       .setLabel('◀ Prev')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page === 0),
 
     new ButtonBuilder()
-      .setCustomId(`discipline_cards__${competitionKey}_next_${page}_${userId || '0'}`)
+      .setCustomId(`discipline_cards_${competitionKey}_next_${page}`)
       .setLabel('Next ▶')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page >= totalPages - 1)
