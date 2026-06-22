@@ -53,7 +53,7 @@ function buildStandingsDescription(summary) {
     `${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} **League Table Overview**\n` +
     `Current coop league standings sorted by points, goal difference and goals scored.\n\n` +
     `${safeEmoji(E.team, '👥')} **Teams:** ${summary.teams}\n` +
-    `${safeEmoji(E.goldenBoot, '👑')} **Leader:** ${summary.leader}\n` +
+    `${safeEmoji(E.winner_medal, '👑')} **Leader:** ${summary.leader}\n` +
     `${safeEmoji(E.runnerUp, '🥈')} **2nd:** ${summary.second}\n` +
     `${safeEmoji(E.medal, '🥉')} **3rd:** ${summary.third}\n` +
     `🔻 **Bottom:** ${summary.bottom}`
