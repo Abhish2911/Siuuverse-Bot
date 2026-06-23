@@ -17,17 +17,35 @@ module.exports = {
         .setDescription('User to pay')
         .setRequired(true)
     )
-    .addIntegerOption(option =>
+    .addStringOption(option =>
       option
         .setName('amount')
-        .setDescription('Amount of SiuuCoins')
+        .setDescription('Amount of SiuuCoins (e.g. 5000, 300k, 10m, 10e6)')
         .setRequired(true)
-        .setMinValue(1)
     ),
 
   async execute(interaction) {
     const target = interaction.options.getUser('user');
-    const amount = interaction.options.getInteger('amount');
+
+    const amountInput = interaction.options.getString('amount').trim().toLowerCase();
+
+    let amount;
+
+    if (/^\d+(?:\.\d+)?k$/.test(amountInput)) {
+      amount = Math.floor(parseFloat(amountInput) * 1_000);
+    } else if (/^\d+(?:\.\d+)?m$/.test(amountInput)) {
+      amount = Math.floor(parseFloat(amountInput) * 1_000_000);
+    } else if (/^\d+(?:\.\d+)?e6$/.test(amountInput)) {
+      amount = Math.floor(parseFloat(amountInput) * 1_000_000);
+    } else if (/^\d+$/.test(amountInput)) {
+      amount = parseInt(amountInput, 10);
+    }
+
+    if (!amount || amount < 1) {
+      return {
+        content: `${E.error} Invalid amount. Examples: **5000**, **300k**, **10m**, **10e6**`
+      };
+    }
 
     if (target.id === interaction.user.id) {
       return {
