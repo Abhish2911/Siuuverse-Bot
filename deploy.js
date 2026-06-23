@@ -5,7 +5,10 @@ const path = require('path');
 const { REST, Routes } = require('discord.js');
 
 const commands = [];
-const commandsPath = path.join(__dirname, 'commands');
+const commandFolders = [
+  path.join(__dirname, 'commands'),
+  path.join(__dirname, 'eco-commands')
+];
 
 const guildIds = String(process.env.GUILD_IDS || process.env.GUILD_ID || '')
   .split(',')
@@ -17,44 +20,43 @@ if (!process.env.TOKEN || !process.env.CLIENT_ID) {
   return;
 }
 
-if (!fs.existsSync(commandsPath)) {
-  console.error('❌ commands folder not found');
-  return;
-}
-
-const commandFiles = fs
-  .readdirSync(commandsPath)
-  .filter(file => file.endsWith('.js'));
-
 const loaded = new Set();
 
-for (const file of commandFiles) {
-  try {
-    const filePath = path.join(commandsPath, file);
+for (const commandsPath of commandFolders) {
+  if (!fs.existsSync(commandsPath)) continue;
 
-    delete require.cache[require.resolve(filePath)];
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter(file => file.endsWith('.js'));
 
-    const command = require(filePath);
+  for (const file of commandFiles) {
+    try {
+      const filePath = path.join(commandsPath, file);
 
-    if (!command.data || !command.execute) {
-      console.log(`⚠️ Skipped ${file}`);
-      continue;
+      delete require.cache[require.resolve(filePath)];
+
+      const command = require(filePath);
+
+      if (!command.data || !command.execute) {
+        console.log(`⚠️ Skipped ${file}`);
+        continue;
+      }
+
+      const json = command.data.toJSON();
+
+      if (loaded.has(json.name)) {
+        console.log(`⚠️ Duplicate skipped: ${json.name}`);
+        continue;
+      }
+
+      loaded.add(json.name);
+      commands.push(json);
+
+      console.log(`✅ Loaded: /${json.name}`);
+    } catch (err) {
+      console.error(`❌ Error in ${file}`);
+      console.error(err);
     }
-
-    const json = command.data.toJSON();
-
-    if (loaded.has(json.name)) {
-      console.log(`⚠️ Duplicate skipped: ${json.name}`);
-      continue;
-    }
-
-    loaded.add(json.name);
-    commands.push(json);
-
-    console.log(`✅ Loaded: /${json.name}`);
-  } catch (err) {
-    console.error(`❌ Error in ${file}`);
-    console.error(err);
   }
 }
 
