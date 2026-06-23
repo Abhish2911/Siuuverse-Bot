@@ -17,25 +17,17 @@ module.exports = {
         .setDescription('User to pay')
         .setRequired(true)
     )
-    .addIntegerOption(option =>
+    .addStringOption(option =>
       option
         .setName('amount')
-        .setDescription('Amount of SiuuCoins to transfer')
+        .setDescription('Amount of SiuuCoins (e.g. 5000, 300k, 10m, 10e6)')
         .setRequired(true)
     ),
 
   async execute(interaction) {
     const target = interaction.options.getUser('user');
 
-    const amountOption = interaction.options.get('amount');
-
-    let amountInput;
-
-    if (amountOption?.value !== undefined) {
-      amountInput = String(amountOption.value).trim().toLowerCase();
-    } else {
-      amountInput = '0';
-    }
+    const amountInput = interaction.options.getString('amount').trim().toLowerCase();
 
     let amount;
 
