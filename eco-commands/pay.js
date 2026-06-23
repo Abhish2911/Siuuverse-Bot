@@ -27,18 +27,33 @@ module.exports = {
   async execute(interaction) {
     const target = interaction.options.getUser('user');
 
-    const amountInput = interaction.options.getString('amount').trim().toLowerCase();
+    const amountInput = String(interaction.options.getString('amount') || '')
+      .trim()
+      .replace(/,/g, '')
+      .toLowerCase();
 
     let amount;
 
-    if (/^\d+(?:\.\d+)?k$/.test(amountInput)) {
-      amount = Math.floor(parseFloat(amountInput) * 1_000);
-    } else if (/^\d+(?:\.\d+)?m$/.test(amountInput)) {
-      amount = Math.floor(parseFloat(amountInput) * 1_000_000);
-    } else if (/^\d+(?:\.\d+)?e6$/.test(amountInput)) {
-      amount = Math.floor(parseFloat(amountInput) * 1_000_000);
-    } else if (/^\d+$/.test(amountInput)) {
-      amount = parseInt(amountInput, 10);
+    const match = amountInput.match(/^(\d+(?:\.\d+)?)(k|m|b|e6)?$/i);
+
+    if (match) {
+      const value = parseFloat(match[1]);
+      const suffix = (match[2] || '').toLowerCase();
+
+      switch (suffix) {
+        case 'k':
+          amount = Math.floor(value * 1_000);
+          break;
+        case 'm':
+        case 'e6':
+          amount = Math.floor(value * 1_000_000);
+          break;
+        case 'b':
+          amount = Math.floor(value * 1_000_000_000);
+          break;
+        default:
+          amount = Math.floor(value);
+      }
     }
 
     if (!amount || amount < 1) {
