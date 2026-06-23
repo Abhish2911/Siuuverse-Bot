@@ -22,9 +22,14 @@ module.exports = {
         .setDescription('Mention users separated by spaces')
         .setRequired(true)
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
   async execute(interaction) {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return interaction.editReply({
+        content: `${E.wrong} Manage Roles permission required.`
+      }).catch(() => null);
+    }
     const role = interaction.options.getRole('role');
 
     const usersInput = interaction.options.getString('users');
