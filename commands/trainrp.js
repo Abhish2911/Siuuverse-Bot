@@ -19,8 +19,8 @@ const COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const ATTRIBUTE_COLUMNS = {
   'Shooting': 6,
   'Passing': 7,
-  'Dexterity': 8,
-  'Dribbling': 9,
+  'Dexterity': 9,
+  'Dribbling': 8,
   'Lower Body Strength': 10,
   'Aerial Strength': 11,
   'Defending': 12,
