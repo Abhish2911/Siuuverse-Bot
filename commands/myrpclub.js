@@ -5,9 +5,16 @@ const emojis = require('../utils/emojis');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('myrpclub')
-    .setDescription('Shows your RP club profile and roster.'),
+    .setDescription('Shows an RP club profile and roster.')
+    .addStringOption(option =>
+      option
+        .setName('club')
+        .setDescription('Search for a club by name')
+        .setRequired(false)
+    ),
   async execute(interaction) {
     const userId = interaction.user.id;
+    const clubSearch = interaction.options.getString('club');
     let managerRows;
     let rows;
     try {
@@ -33,7 +40,35 @@ module.exports = {
 
     let clubName;
 
-    if (playerRow) {
+    if (clubSearch) {
+      const search = clubSearch.trim().toLowerCase();
+
+      const matchedPlayer = rows.slice(1).find(row => {
+        const club = String(row[5] || '').trim().toLowerCase();
+
+        return (
+          club === search ||
+          club.includes(search) ||
+          search.includes(club)
+        );
+      });
+
+      const matchedManager = managerRows.slice(1).find(row => {
+        const club = String(row[2] || '').trim().toLowerCase();
+
+        return (
+          club === search ||
+          club.includes(search) ||
+          search.includes(club)
+        );
+      });
+
+      clubName = matchedPlayer?.[5] || matchedManager?.[2];
+
+      if (!clubName) {
+        return interaction.editReply('❌ Club not found.');
+      }
+    } else if (playerRow) {
       clubName = playerRow[5];
     } else if (managerAccessRow) {
       clubName = managerAccessRow[2];

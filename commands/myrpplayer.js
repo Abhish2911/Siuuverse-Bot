@@ -34,12 +34,19 @@ module.exports = {
     let playerRow;
 
     if (playerNameSearch) {
+      const search = playerNameSearch.trim().toLowerCase();
+
       playerRow = rows
         .slice(1)
-        .find(row =>
-          String(row[1] || '').trim().toLowerCase() ===
-          playerNameSearch.trim().toLowerCase()
-        );
+        .find(row => {
+          const playerName = String(row[1] || '').trim().toLowerCase();
+
+          return (
+            playerName === search ||
+            playerName.includes(search) ||
+            search.includes(playerName)
+          );
+        });
     } else {
       const lookupUser = targetUser || interaction.user;
 
