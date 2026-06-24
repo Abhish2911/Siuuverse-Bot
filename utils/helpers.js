@@ -108,18 +108,35 @@ function buildMixedPrefixList(input, homePlayers, awayPlayers, homeShort, awaySh
   }).join(', ');
 }
 
-async function cachedGetData(range, ttlMs = 15000) {
+async function cachedGetData(range, options = {}) {
+  const ttlMs = typeof options === 'number'
+    ? options
+    : Number(options.ttlMs || 15000);
+
+  const spreadsheetId = typeof options === 'object'
+    ? options.spreadsheetId
+    : undefined;
+
+  const key = `${spreadsheetId || 'default'}:${range}`;
   const now = Date.now();
-  const hit = sheetCache.get(range);
+  const hit = sheetCache.get(key);
 
   if (hit && now - hit.ts < ttlMs) {
     return cloneSheetValues(hit.data);
   }
 
-  const data = await getData(range, { cache: false });
+  const data = await getData(range, {
+    cache: false,
+    spreadsheetId
+  });
+
   const snapshot = cloneSheetValues(data);
 
-  sheetCache.set(range, { data: snapshot, ts: now });
+  sheetCache.set(key, {
+    data: snapshot,
+    ts: now
+  });
+
   return cloneSheetValues(snapshot);
 }
 
