@@ -24,7 +24,7 @@ module.exports = {
 
   async execute(interaction) {
     const rows = await getData(
-      'Player_Data!A:F',
+      'Player_Data!A:P',
       { spreadsheetId: process.env.RP_SHEET_ID }
     );
 
@@ -67,20 +67,24 @@ module.exports = {
       ovr: playerRow[2] || '0',
       marketValue: playerRow[3] || '0',
       positions: playerRow[4] || 'N/A',
-      club: playerRow[5] || 'Free Agent'
+      club: playerRow[5] || 'Free Agent',
+      shooting: Number(playerRow[6] || 0),
+      passing: Number(playerRow[7] || 0),
+      dexterity: Number(playerRow[8] || 0),
+      dribbling: Number(playerRow[9] || 0),
+      lowerBody: Number(playerRow[10] || 0),
+      aerial: Number(playerRow[11] || 0),
+      defending: Number(playerRow[12] || 0),
+      gk1: Number(playerRow[13] || 0),
+      gk2: Number(playerRow[14] || 0),
+      gk3: Number(playerRow[15] || 0)
     };
 
     const embed = new EmbedBuilder()
       .setTitle(`${emojis.profile} ${player.playerName}`)
-      .setDescription([
-        `${emojis.rank} **OVR:** ${player.ovr}`,
-        `${emojis.trophy} **Market Value:** ${player.marketValue}`,
-        `${emojis.team} **Club:** ${player.club}`,
-        `${emojis.defense} **Positions:** ${player.positions}`
-      ].join('\n'))
       .addFields(
         {
-          name: `${emojis.profile} Player` ,
+          name: `${emojis.profile} Player`,
           value: player.playerName,
           inline: true
         },
@@ -105,9 +109,20 @@ module.exports = {
           inline: true
         },
         {
-          name: '👤 Discord User',
-          value: `<@${player.discordId}>`,
-          inline: true
+          name: `${emojis.Stats} Training Points`,
+          value: [
+            `SHT: ${player.shooting}`,
+            `PAS: ${player.passing}`,
+            `DEX: ${player.dexterity}`,
+            `DRI: ${player.dribbling}`,
+            `LBS: ${player.lowerBody}`,
+            `AER: ${player.aerial}`,
+            `DEF: ${player.defending}`,
+            `GK1: ${player.gk1}`,
+            `GK2: ${player.gk2}`,
+            `GK3: ${player.gk3}`
+          ].join(' • '),
+          inline: false
         }
       )
       .setFooter({ text: `Roleplay Player Profile • Requested by ${interaction.user.username}` })
