@@ -68,7 +68,9 @@ module.exports = {
       };
     }
 
-    const economyData = await cachedGetData('Economy!A:D');
+    const economyData = await cachedGetData('Economy!A:D', {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
     const economy = economyData.slice(1); // skip header row
 
     const senderIndex = economy.findIndex(
@@ -122,8 +124,13 @@ module.exports = {
     const senderRow = senderIndex + 2; // +1 for zero-based index, +1 for sheet header row
     const receiverRow = receiverIndex + 2;
 
-    await updateData(`Economy!D${senderRow}`, [[newSenderBalance]]);
-    await updateData(`Economy!D${receiverRow}`, [[newReceiverBalance]]);
+    await updateData(`Economy!D${senderRow}`, [[newSenderBalance]], {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
+
+    await updateData(`Economy!D${receiverRow}`, [[newReceiverBalance]], {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
 
     try {
       const dmEmbed = new EmbedBuilder()

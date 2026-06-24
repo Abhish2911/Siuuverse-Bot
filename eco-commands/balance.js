@@ -16,7 +16,9 @@ module.exports = {
   async execute(interaction) {
     const target = interaction.options.getUser('user') || interaction.user;
 
-    const economy = await cachedGetData('Economy!A:D');
+    const economy = await cachedGetData('Economy!A:D', {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
 
     const row = economy
       .slice(1)
