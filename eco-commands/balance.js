@@ -37,15 +37,16 @@ module.exports = {
     }
 
     const clubName = String(row[0] || 'Unknown Club');
-    const ownerName = String(row[2] || target.username);
+    const playerName = String(row[2] || target.username);
     const balance = Number(String(row[3] || '0').replace(/,/g, '')) || 0;
 
     const embed = new EmbedBuilder()
       .setColor(0xF1C40F)
-      .setTitle(`${E.money || '💰'} Club Balance`)
+      .setTitle(`${E.money || '💰'} Player Balance`)
       .setDescription(
-        `${E.team} Club: **${clubName}**\n` +
-        `${E.profile} Owner: **${ownerName}**\n` +
+        `${E.profile} User: **${target.tag}**\n` +
+        `${E.profile} Player: **${playerName}**\n` +
+        `${E.team} Club: **${clubName}**\n\n` +
         `${E.money || '💰'} Balance: **${balance.toLocaleString()} SiuuCoins**`
       )
       .setFooter({ text: 'SiuuVerse Economy' });
