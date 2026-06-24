@@ -81,7 +81,6 @@ module.exports = {
     };
 
     const embed = new EmbedBuilder()
-      .setTitle(`${emojis.profile} ${player.playerName}`)
       .addFields(
         {
           name: `${emojis.profile} Player`,
@@ -109,20 +108,31 @@ module.exports = {
           inline: true
         },
         {
-          name: `${emojis.Stats} Training Points`,
+          name: '‎',
+          value: '‎',
+          inline: true
+        },
+        {
+          name: `${emojis.Stats} Training Points (1/2)`,
           value: [
             `SHT: ${player.shooting}`,
             `PAS: ${player.passing}`,
             `DEX: ${player.dexterity}`,
             `DRI: ${player.dribbling}`,
-            `LBS: ${player.lowerBody}`,
+            `LBS: ${player.lowerBody}`
+          ].join('\n'),
+          inline: true
+        },
+        {
+          name: `${emojis.Stats} Training Points (2/2)`,
+          value: [
             `AER: ${player.aerial}`,
             `DEF: ${player.defending}`,
             `GK1: ${player.gk1}`,
             `GK2: ${player.gk2}`,
             `GK3: ${player.gk3}`
-          ].join(' • '),
-          inline: false
+          ].join('\n'),
+          inline: true
         }
       )
       .setFooter({ text: `Roleplay Player Profile • Requested by ${interaction.user.username}` })
