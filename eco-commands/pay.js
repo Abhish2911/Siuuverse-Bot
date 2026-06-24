@@ -116,6 +116,9 @@ module.exports = {
     const senderClubName = String(economy[senderIndex][0] || 'Unknown Club');
     const receiverClubName = String(economy[receiverIndex][0] || 'Unknown Club');
 
+    const senderPlayerName = String(economy[senderIndex][2] || interaction.user.username);
+    const receiverPlayerName = String(economy[receiverIndex][2] || target.username);
+
     const senderRow = senderIndex + 2; // +1 for zero-based index, +1 for sheet header row
     const receiverRow = receiverIndex + 2;
 
@@ -127,10 +130,12 @@ module.exports = {
         .setColor(0x2ECC71)
         .setTitle(`${E.money || '💰'} Payment Received`)
         .setDescription(
-          `${E.team} From Club: **${senderClubName}**\n` +
-          `${E.team} To Club: **${receiverClubName}**\n` +
-          `${E.money || '💰'} Amount: **${amount.toLocaleString()} SiuuCoins**\n\n` +
-          `${E.correct} New Club Balance: **${newReceiverBalance.toLocaleString()} SiuuCoins**`
+          `${E.profile} From: **${interaction.user.tag}**\n` +
+          `${E.profile} Player: **${senderPlayerName}**\n\n` +
+          `${E.profile} To: **${target.tag}**\n` +
+          `${E.profile} Player: **${receiverPlayerName}**\n\n` +
+          `${E.money || '💰'} Amount: **${amount.toLocaleString()} SiuuCoins**\n` +
+          `${E.correct} New Balance: **${newReceiverBalance.toLocaleString()} SiuuCoins**`
         );
 
       await target.send({
@@ -142,11 +147,13 @@ module.exports = {
       .setColor(0x2ECC71)
       .setTitle(`${E.success} Payment Successful`)
       .setDescription(
-        `${E.team} From Club: **${senderClubName}**\n` +
-        `${E.team} To Club: **${receiverClubName}**\n` +
+        `${E.profile} Sender: **${interaction.user.tag}**\n` +
+        `${E.profile} Player: **${senderPlayerName}**\n\n` +
+        `${E.profile} Receiver: **${target.tag}**\n` +
+        `${E.profile} Player: **${receiverPlayerName}**\n\n` +
         `${E.money || '💰'} Amount: **${amount.toLocaleString()} SiuuCoins**\n\n` +
-        `${E.profile} Your Club Balance: **${newSenderBalance.toLocaleString()} SiuuCoins**\n` +
-        `${E.profile} Recipient Club Balance: **${newReceiverBalance.toLocaleString()} SiuuCoins**`
+        `${E.money || '💰'} Your Balance: **${newSenderBalance.toLocaleString()} SiuuCoins**\n` +
+        `${E.money || '💰'} Recipient Balance: **${newReceiverBalance.toLocaleString()} SiuuCoins**`
       );
 
     return {
