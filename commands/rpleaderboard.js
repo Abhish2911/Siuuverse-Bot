@@ -2,13 +2,37 @@
 
 const {
   SlashCommandBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const { cachedGetData } = require('../utils/helpers');
 const E = require('../utils/emojis');
 
 const PER_PAGE = 10;
+
+function buildButtons(page, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rplb_prev_${page}`)
+      .setEmoji(E.leftArrow || '⬅️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 1),
+
+    new ButtonBuilder()
+      .setCustomId(`rplb_refresh_${page}`)
+      .setEmoji('🔄')
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId(`rplb_next_${page}`)
+      .setEmoji(E.rightArrow || '➡️')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(page >= totalPages)
+  );
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -72,7 +96,26 @@ module.exports = {
       });
 
     return {
-      embeds: [embed]
+      embeds: [embed],
+      components: [buildButtons(currentPage, totalPages)]
     };
   }
+};
+
+module.exports.handleButton = async interaction => {
+  const parts = interaction.customId.split('_');
+  const action = parts[1];
+  const currentPage = Number(parts[2]) || 1;
+
+  let page = currentPage;
+
+  if (action === 'prev') page--;
+  if (action === 'next') page++;
+
+  interaction.options = {
+    getInteger: () => page
+  };
+
+  const result = await module.exports.execute(interaction);
+  return interaction.update(result);
 };
