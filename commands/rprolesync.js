@@ -73,11 +73,17 @@ module.exports = {
       clubStats.get(clubName).total++;
     }
 
-    const progressLines = [...clubStats.entries()]
-      .map(([club, stats]) => `${emojis.loading || '⏳'} ${club} — 0/${stats.total}`);
+    const progressEmbed = new EmbedBuilder()
+      .setTitle(`${emojis.loading || '⏳'} RP Role Sync In Progress`)
+      .setDescription(
+        [...clubStats.entries()]
+          .map(([club, stats]) => `${emojis.loading || '⏳'} ${club} — **0/${stats.total}**`)
+          .join('\n')
+      )
+      .setTimestamp();
 
     await interaction.editReply({
-      content: progressLines.join('\n').slice(0, 1900)
+      embeds: [progressEmbed]
     }).catch(() => null);
 
     for (const row of rows.slice(1)) {
@@ -106,14 +112,43 @@ module.exports = {
         continue;
       }
 
-      if (!member.roles.cache.has(role.id)) {
-        await member.roles.add(role).catch(() => null);
-        updated++;
+      let syncedSuccessfully = member.roles.cache.has(role.id);
+
+      if (!syncedSuccessfully) {
+        try {
+          await member.roles.add(role);
+          updated++;
+          syncedSuccessfully = true;
+        } catch {
+          syncedSuccessfully = false;
+        }
       }
 
-      const stat = clubStats.get(clubName);
-      if (stat) {
-        stat.synced++;
+      if (syncedSuccessfully) {
+        const stat = clubStats.get(clubName);
+        if (stat) {
+          stat.synced++;
+        }
+      }
+
+      const totalProcessed = [...clubStats.values()]
+        .reduce((sum, s) => sum + s.synced, 0);
+
+      if (totalProcessed % 3 === 0) {
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle(`${emojis.loading || '⏳'} RP Role Sync In Progress`)
+              .setDescription(
+                [...clubStats.entries()]
+                  .map(([club, stats]) =>
+                    `${stats.synced >= stats.total ? (emojis.correct || '✅') : (emojis.loading || '⏳')} ${club} — **${stats.synced}/${stats.total}**`
+                  )
+                  .join('\n')
+              )
+              .setTimestamp()
+          ]
+        }).catch(() => null);
       }
     }
 
@@ -134,6 +169,7 @@ module.exports = {
       .setTimestamp();
 
     await interaction.editReply({
+      content: null,
       embeds: [embed]
     });
   }
