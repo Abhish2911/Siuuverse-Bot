@@ -77,6 +77,8 @@ module.exports = {
     }
 
     const playerRow = [...rows[playerIndex]];
+    // Only keep columns A:P when writing back.
+    const updateRow = playerRow.slice(0, 16);
     const statColumn = ATTRIBUTE_COLUMNS[attribute];
     const currentValue = Number(playerRow[statColumn] || 0);
     const newValue = currentValue + 1;
@@ -98,7 +100,7 @@ module.exports = {
       }
     }
 
-    playerRow[statColumn] = String(newValue);
+    updateRow[statColumn] = String(newValue);
 
     const totalTPBefore = Number(playerRow[16] || 0); // Current Total TP from Q (before Sheets recalculates)
     const totalTP = totalTPBefore + 1;
@@ -113,13 +115,13 @@ module.exports = {
     let levelUp = false;
     if (newOVR > oldOVR) {
       levelUp = true;
-      playerRow[2] = String(newOVR);
-      playerRow[3] = MARKET_VALUES[newOVR];
+      updateRow[2] = String(newOVR);
+      updateRow[3] = MARKET_VALUES[newOVR];
     }
 
     await updateData(
       `Player_Data!A${playerIndex + 1}:P${playerIndex + 1}`,
-      [playerRow],
+      [updateRow],
       { spreadsheetId: process.env.RP_SHEET_ID }
     );
     // Google Sheets now recalculates column Q automatically using the ARRAYFORMULA.
