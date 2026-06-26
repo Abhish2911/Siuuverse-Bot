@@ -136,7 +136,7 @@ module.exports = {
       `${emojis.correct} Training session completed.`,
       "",
       `${emojis.profile} Player: **${playerRow[1]}**`,
-      `${emojis.stats} Trained: **${attribute}**`,
+      `${emojis.Stats} Trained: **${attribute}**`,
       `${emojis.up} ${currentValue} → ${newValue}`,
       "",
       `${emojis.Stats} Total TP: **${totalTP}**`
