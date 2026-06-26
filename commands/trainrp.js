@@ -100,7 +100,7 @@ module.exports = {
 
     playerRow[statColumn] = String(newValue);
 
-    const totalTPBefore = Number(playerRow[16] || 0); // Q column before update
+    const totalTPBefore = Number(playerRow[16] || 0); // Current Total TP from Q (before Sheets recalculates)
     const totalTP = totalTPBefore + 1;
     const oldOVR = Number(playerRow[2]);
     const oldMV = playerRow[3];
@@ -122,6 +122,7 @@ module.exports = {
       [playerRow],
       { spreadsheetId: process.env.RP_SHEET_ID }
     );
+    // Google Sheets now recalculates column Q automatically using the ARRAYFORMULA.
 
     await TrainCooldown.findOneAndUpdate(
       { userId: interaction.user.id },
