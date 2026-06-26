@@ -10,6 +10,10 @@ function safeEmoji(value, fallback = '') {
   return value || fallback;
 }
 
+function isAdmin(interaction) {
+  return interaction.member?.permissions?.has('Administrator');
+}
+
 function saveConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify({ ...config, type: 'league' }, null, 2));
 }
@@ -188,6 +192,12 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    if (!isAdmin(interaction)) {
+      return finishInteraction(interaction, {
+        content: '🚫 Administrator only command.',
+        ephemeral: true
+      });
+    }
     const channel = interaction.options.getChannel('channel') || interaction.channel;
 
     if (!channel || !channel.isTextBased()) {
