@@ -62,7 +62,7 @@ module.exports = {
   async execute(interaction) {
     const attribute = interaction.options.getString('attribute');
 
-    const rows = await getData('Player_Data!A:P', {
+    const rows = await getData('Player_Data!A:Q', {
       spreadsheetId: process.env.RP_SHEET_ID
     });
 
