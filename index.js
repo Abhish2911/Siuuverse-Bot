@@ -593,9 +593,10 @@ client.on('interactionCreate', async interaction => {
         const deferred = await safeDeferUpdate(interaction);
         if (!deferred) return;
 
-        const parts = interaction.customId.split('_');
-        const targetType = decodeURIComponent(parts[2] || 'self');
-        const targetValue = decodeURIComponent(parts[3] || interaction.user.id);
+        const [, , ...parts] = interaction.customId.split('_');
+        const ownerId = parts.pop();
+        const targetValue = decodeURIComponent(parts.pop() || interaction.user.id);
+        const targetType = decodeURIComponent(parts.join('_') || 'self');
 
         const result = await command.selectMenuHandler(
           interaction,
