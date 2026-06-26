@@ -24,9 +24,8 @@ module.exports = {
       });
 
       if (!rows || !Array.isArray(rows) || rows.length === 0) {
-        return await interaction.reply({
+        return await interaction.editReply({
           content: 'No player data found.',
-          ephemeral: true,
         });
       }
 
@@ -80,12 +79,11 @@ module.exports = {
         .setColor('Green')
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('Error in refreshrp:', err);
-      await interaction.reply({
+      await interaction.editReply({
         content: '❌ An error occurred while refreshing RP data. Please try again later.',
-        ephemeral: true,
       });
     }
   },
