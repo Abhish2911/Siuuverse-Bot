@@ -144,6 +144,20 @@ async function safeDeferUpdate(interaction) {
   }
 }
 
+async function safeEditMessage(message, payload) {
+  try {
+    const freshMessage = await message.fetch().catch(() => null);
+    if (!freshMessage) return null;
+    return await freshMessage.edit(payload);
+  } catch (error) {
+    if (error?.code === 10008) {
+      console.warn('⚠️ Message edit skipped: message no longer exists.');
+      return null;
+    }
+    throw error;
+  }
+}
+
 const commandFolders = [
   path.join(__dirname, 'commands'),
   path.join(__dirname, 'eco-commands')
@@ -319,7 +333,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -337,7 +351,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.buttonHandler(interaction, action, value, extra);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -364,7 +378,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -383,7 +397,7 @@ client.on('interactionCreate', async interaction => {
         const result = await command.buttonHandler(interaction, action, value, extra);
 
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -412,7 +426,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -434,7 +448,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -473,7 +487,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -490,12 +504,12 @@ client.on('interactionCreate', async interaction => {
         if (!deferred) return;
 
         const result = await command.selectHandler(interaction);
-        if (result) {
-          await interaction.message.edit({
-            content: null,
-            ...result
-          });
-        }
+      if (result) {
+        await safeEditMessage(interaction.message, {
+          content: null,
+          ...result
+        });
+      }
         return;
       }
 
@@ -509,7 +523,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -527,7 +541,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -545,7 +559,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectHandler(interaction);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -563,7 +577,7 @@ client.on('interactionCreate', async interaction => {
 
         const result = await command.selectMenuHandler(interaction);
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
@@ -590,7 +604,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         if (result) {
-          await interaction.message.edit({
+          await safeEditMessage(interaction.message, {
             content: null,
             ...result
           });
