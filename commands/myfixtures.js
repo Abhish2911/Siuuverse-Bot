@@ -55,7 +55,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'fa',
       label: 'FA Cup',
-      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:L',
       reserveLabel: 'FA Cup',
       matchNoIndex: 1,
       dateIndex: 2,
@@ -74,7 +74,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
-      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:L',
       reserveLabel: 'Carabao Cup',
       matchNoIndex: 1,
       dateIndex: 2,
@@ -437,6 +437,10 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
         .slice(1)
         .filter(row => normalize(row[config.homeIndex]) === teamKey || normalize(row[config.awayIndex]) === teamKey || normalize(row[config.homeIndex]) === shortKey || normalize(row[config.awayIndex]) === shortKey)
     : [];
+
+  if (!rows.length) {
+    console.log('[myfixtures]', config.key, 'team=', team.teamName, 'sample fixture=', fixtures?.[1]);
+  }
 
   if (!rows.length) {
     return { content: `${safeEmoji(E.wrong, '❌')} No fixtures found for **${team.teamName}**.` };
