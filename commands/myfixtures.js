@@ -577,7 +577,9 @@ module.exports = {
         ? currentPage - 1
         : currentPage;
     const rawType = String(targetType || 'self|league');
-    const [resolvedTargetType = 'self', competitionKey = 'league'] = rawType.split('|');
+    const separatorIndex = rawType.lastIndexOf('|');
+    const resolvedTargetType = separatorIndex === -1 ? 'self' : rawType.slice(0, separatorIndex);
+    const competitionKey = separatorIndex === -1 ? 'league' : rawType.slice(separatorIndex + 1);
     const value = decodeURIComponent(targetValue || interaction.user.id);
     return buildMyFixtures(
       interaction,
@@ -597,7 +599,7 @@ module.exports = {
         ephemeral: true
       };
     }
-    const competitionKey = interaction.values[0] || 'league';
+    const competitionKey = clean(interaction.values[0] || 'league').toLowerCase();
     const value = decodeURIComponent(targetValue || interaction.user.id);
 
     return buildMyFixtures(
