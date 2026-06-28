@@ -303,27 +303,14 @@ module.exports = {
         .setName('user')
         .setDescription('Mention a user to show their linked player stats')
         .setRequired(false)
-    )
-    .addStringOption(opt =>
-      opt
-        .setName('competition')
-        .setDescription('Competition to view stats for')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Overall', value: 'overall' },
-          { name: 'League', value: 'league' },
-          { name: 'FA Cup', value: 'fa' },
-          { name: 'Carabao Cup', value: 'carabao' },
-          { name: 'UCL', value: 'ucl' }
-        )
     ),
 
   async execute(interaction) {
     const [
-      rankingLeague,
-      rankingFA,
-      rankingCarabao,
-      rankingUCL,
+      ranking,
+      faRanking,
+      carabaoRanking,
+      uclRanking,
       teams,
       standings,
       matchesEntry
@@ -336,18 +323,6 @@ module.exports = {
       cachedGetData('Standings!A:J'),
       cachedGetData('Matches_Entry!A:P')
     ]);
-
-    // Read competition option
-    const competition = interaction.options.getString('competition') || 'overall';
-    // Map for footer/label
-    const competitionLabelMap = {
-      overall: 'Overall Career',
-      league: 'League',
-      fa: 'FA Cup',
-      carabao: 'Carabao Cup',
-      ucl: 'UCL'
-    };
-    const competitionLabel = competitionLabelMap[competition] || 'Overall Career';
 
     let inputName = interaction.options.getString('name');
     const targetUser = interaction.options.getUser('user');
@@ -379,71 +354,126 @@ module.exports = {
 
     const name = normalize(inputName);
 
-    // Competition sheet selection
-    const rankingSheet =
-      competition === 'league' ? rankingLeague
-      : competition === 'fa' ? rankingFA
-      : competition === 'carabao' ? rankingCarabao
-      : competition === 'ucl' ? rankingUCL
-      : null;
+    const rankingRows = Array.isArray(ranking)
+      ? ranking.slice(2).filter(r => r && r.length)
+      : [];
 
-    // Helper to build overall rows by aggregating all competitions
-    function buildOverallRows() {
-      const sheets = [rankingLeague, rankingFA, rankingCarabao, rankingUCL];
-      const playerMap = {};
-      for (const sheet of sheets) {
-        if (!Array.isArray(sheet)) continue;
-        for (const row of sheet.slice(1)) {
-          const rawName = row[1] || '';
-          const normName = normalize(stripTeamPrefix(rawName));
-          if (!normName) continue;
-          if (!playerMap[normName]) {
-            // Create row array with all columns for compatibility
-            playerMap[normName] = Array(30).fill(0);
-            playerMap[normName][1] = rawName;
-          }
-          playerMap[normName][2] += toNumber(row[2]);
-          playerMap[normName][5] += toNumber(row[5]);
-          playerMap[normName][14] += toNumber(row[14]);
-          playerMap[normName][17] += toNumber(row[17]);
-          playerMap[normName][20] += toNumber(row[20]);
-          playerMap[normName][23] += toNumber(row[23]);
+    // Combine all competition ranking sheets for stat totals
+    const rankingSources = [ranking, faRanking, carabaoRanking, uclRanking];
+
+    const getCombinedStat = (type) => {
+      let nameIndex;
+      let valueIndex;
+
+      if (type === 'goals') {
+        nameIndex = 1;
+        valueIndex = 2;
+      } else if (type === 'assists') {
+        nameIndex = 4;
+        valueIndex = 5;
+      } else if (type === 'mvp') {
+        nameIndex = 13;
+        valueIndex = 14;
+      } else if (type === 'ga') {
+        nameIndex = 16;
+        valueIndex = 17;
+      } else if (type === 'tackles') {
+        nameIndex = 19;
+        valueIndex = 20;
+      } else if (type === 'interceptions') {
+        nameIndex = 22;
+        valueIndex = 23;
+      } else {
+        return { rank: '-', value: 0 };
+      }
+
+      let total = 0;
+
+      for (const sheet of rankingSources) {
+        const rows = Array.isArray(sheet)
+          ? sheet.slice(2).filter(r => r && r.length)
+          : [];
+
+        const row = rows.find(r => {
+          const sheetName = String(r[nameIndex] || '').trim();
+          return normalize(sheetName) === name || normalize(stripTeamPrefix(sheetName)) === name;
+        });
+
+        if (row) {
+          total += toNumber(row[valueIndex]);
         }
       }
-      return Object.values(playerMap);
-    }
 
-    // Build activeRows: either overall aggregated or from the selected ranking sheet
-    const activeRows = competition === 'overall'
-      ? buildOverallRows()
-      : (Array.isArray(rankingSheet) ? rankingSheet.slice(1).filter(r => String(r[1] || '').trim()) : []);
+      return { rank: '-', value: total };
+    };
 
-    // getStat always works from activeRows
-    function getStat(type) {
-      const statIndexes = { goals: 2, assists: 5, mvp: 14, ga: 17, tackles: 20, interceptions: 23 };
-      const idx = statIndexes[type];
-      if (!idx) return { rank: '-', value: 0 };
-      // Sort a copy of activeRows descending by stat
-      const rows = [...activeRows].sort((a, b) => toNumber(b[idx]) - toNumber(a[idx]));
-      // Find player by name (column 1), matching stripped prefix too
-      const playerIdx = rows.findIndex(r =>
-        normalize(r[1]) === name ||
-        normalize(stripTeamPrefix(r[1])) === name
+    const getStat = (type) => {
+      let nameIndex;
+      let valueIndex;
+
+      if (type === 'goals') {
+        nameIndex = 1;
+        valueIndex = 2;
+      } else if (type === 'assists') {
+        nameIndex = 4;
+        valueIndex = 5;
+      } else if (type === 'mvp') {
+        nameIndex = 13;
+        valueIndex = 14;
+      } else if (type === 'ga') {
+        nameIndex = 16;
+        valueIndex = 17;
+      } else if (type === 'tackles') {
+        nameIndex = 19;
+        valueIndex = 20;
+      } else if (type === 'interceptions') {
+        nameIndex = 22;
+        valueIndex = 23;
+      } else {
+        return { rank: '-', value: 0 };
+      }
+
+      const cleanRows = rankingRows.filter(r =>
+        r[nameIndex] && r[valueIndex] !== undefined && r[valueIndex] !== ''
       );
-      if (playerIdx === -1) return { rank: '-', value: 0 };
-      const value = toNumber(rows[playerIdx][idx]);
-      return { rank: playerIdx + 1, value };
-    }
 
-    const goals = getStat('goals');
-    const assists = getStat('assists');
-    const mvp = getStat('mvp');
-    const ga = getStat('ga');
+      const rowIndex = cleanRows.findIndex(r => {
+        const sheetName = String(r[nameIndex] || '').trim();
+        return normalize(sheetName) === name || normalize(stripTeamPrefix(sheetName)) === name;
+      });
+
+      if (rowIndex === -1) return { rank: '-', value: 0 };
+
+      return {
+        rank: rowIndex + 1,
+        value: toNumber(cleanRows[rowIndex][valueIndex])
+      };
+    };
+
+    const goalRank = getStat('goals');
+    const assistRank = getStat('assists');
+    const mvpRank = getStat('mvp');
+    const gaRank = getStat('ga');
+
+    const goals = { ...goalRank, value: getCombinedStat('goals').value };
+    const assists = { ...assistRank, value: getCombinedStat('assists').value };
+    const mvp = { ...mvpRank, value: getCombinedStat('mvp').value };
+    const ga = { ...gaRank, value: getCombinedStat('ga').value };
 
     if (!teamData) teamData = getTeamDataFromPlayer(teams, inputName);
 
-    const tackleStats = getStat('tackles');
-    const interceptionStats = getStat('interceptions');
+    const tackleRank = getStat('tackles');
+    const interceptionRank = getStat('interceptions');
+
+    const tackleStats = {
+      ...tackleRank,
+      value: getCombinedStat('tackles').value
+    };
+
+    const interceptionStats = {
+      ...interceptionRank,
+      value: getCombinedStat('interceptions').value
+    };
 
     const extraStats = {
       tackles: tackleStats.value,
@@ -466,22 +496,9 @@ module.exports = {
     const winContribution = goals.value * 3 + assists.value * 2 + mvp.value * 3;
     const totalGA = goals.value + assists.value;
 
-    // Build description to include the selected competition label
-    function buildMystatsDescriptionWithCompetition(summary, mention, stadium, competitionLabel) {
-      return (
-        `# ${summary.player}\n` +
-        `${safeEmoji(E.profile, '👤')} **Coop League Profile**\n` +
-        `**Competition:** ${competitionLabel}\n` +
-        `${safeEmoji(E.blueIcon, '🔵')} **User:** ${mention}\n` +
-        `${safeEmoji(E.team, '👥')} **Team:** ${summary.teamName} • **${summary.shortName}**\n` +
-        `🏟️ **Stadium:** ${stadium}\n` +
-        `${safeEmoji(E.fire, '🔥')} **Win Rate:** ${summary.winRate}%\n\n`
-      );
-    }
-
     const embed = new EmbedBuilder()
       .setTitle(`${safeEmoji(E.played, '🎮')} Coop Player Card`)
-      .setDescription(buildMystatsDescriptionWithCompetition(summary, mention, stadium, competitionLabel))
+      .setDescription(buildMystatsDescription(summary, mention, stadium))
       .addFields(
         {
           name: `${safeEmoji(E.played, '🎮')} League Record`,
@@ -533,7 +550,7 @@ module.exports = {
         }
       )
       .setColor(parseTeamColor(teamColor) || 0x5865F2)
-      .setFooter({ text: `Mystats • ${competitionLabel}` })
+      .setFooter({ text: `Mystats • SiuuVerse Coop Player Card • ${shortName}` })
       .setTimestamp();
 
     if (logo && /^https?:\/\//i.test(logo)) {
