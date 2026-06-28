@@ -379,8 +379,9 @@ module.exports = {
 
     const name = normalize(inputName);
 
-    // Helper: build competition rows
+    // Helper: build competition rows and overall aggregates
     function buildCompetitionRows(competition, rankingLeague, rankingFA, rankingCarabao, rankingUCL) {
+      // For individual competitions, just return the raw rows (skip headers)
       if (competition === 'league') {
         return Array.isArray(rankingLeague) ? rankingLeague.slice(2).filter(r => r && r.length) : [];
       }
@@ -393,24 +394,23 @@ module.exports = {
       if (competition === 'ucl') {
         return Array.isArray(rankingUCL) ? rankingUCL.slice(2).filter(r => r && r.length) : [];
       }
-      // overall - aggregate all
-      // First, collect all rows from all 4 sheets
+      // For "overall", aggregate stats by player using correct value columns from each ranking sheet
+      // Columns: 1=name, 2=goals, 5=assists, 14=mvp, 17=ga, 20=tackles, 23=interceptions
       const sheets = [
-        { rows: Array.isArray(rankingLeague) ? rankingLeague.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingLeague) ? rankingLeague[1] : [] },
-        { rows: Array.isArray(rankingFA) ? rankingFA.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingFA) ? rankingFA[1] : [] },
-        { rows: Array.isArray(rankingCarabao) ? rankingCarabao.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingCarabao) ? rankingCarabao[1] : [] },
-        { rows: Array.isArray(rankingUCL) ? rankingUCL.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingUCL) ? rankingUCL[1] : [] }
+        Array.isArray(rankingLeague) ? rankingLeague.slice(2).filter(r => r && r.length) : [],
+        Array.isArray(rankingFA) ? rankingFA.slice(2).filter(r => r && r.length) : [],
+        Array.isArray(rankingCarabao) ? rankingCarabao.slice(2).filter(r => r && r.length) : [],
+        Array.isArray(rankingUCL) ? rankingUCL.slice(2).filter(r => r && r.length) : []
       ];
-      // Map playerName (normalized, without team prefix) -> { displayName, goals, assists, mvp, ga, tackles, interceptions }
-      const playerMap = new Map();
-      for (const { rows } of sheets) {
+      // Object keyed by normalized player name (without team prefix)
+      const playerMap = {};
+      for (const rows of sheets) {
         for (const row of rows) {
-          // columns: 1=name, 2=goals, 4=assists, 13=mvp, 16=ga, 19=tackles, 22=interceptions
           const rawName = row[1] || '';
           const normName = normalize(stripTeamPrefix(rawName));
           if (!normName) continue;
-          if (!playerMap.has(normName)) {
-            playerMap.set(normName, {
+          if (!playerMap[normName]) {
+            playerMap[normName] = {
               displayName: rawName,
               goals: 0,
               assists: 0,
@@ -418,84 +418,94 @@ module.exports = {
               ga: 0,
               tackles: 0,
               interceptions: 0
-            });
+            };
           }
-          const entry = playerMap.get(normName);
-          entry.goals += toNumber(row[2]);
-          entry.assists += toNumber(row[5]);
-          entry.mvp += toNumber(row[14]);
-          entry.ga += toNumber(row[17]);
-          entry.tackles += toNumber(row[20]);
-          entry.interceptions += toNumber(row[23]);
+          playerMap[normName].goals += toNumber(row[2]);
+          playerMap[normName].assists += toNumber(row[5]);
+          playerMap[normName].mvp += toNumber(row[14]);
+          playerMap[normName].ga += toNumber(row[17]);
+          playerMap[normName].tackles += toNumber(row[20]);
+          playerMap[normName].interceptions += toNumber(row[23]);
         }
       }
-      // Now build array of synthetic rows, matching the Ranking sheet layout
-      // We'll fill only the relevant columns, others as empty string
-      // We'll sort by ga descending (for ranking)
-      const allPlayers = Array.from(playerMap.values());
-      allPlayers.sort((a, b) => b.ga - a.ga);
-      // Build rows: [index, displayName, goals, '', assists, '', ... mvp, '', ga, '', tackles, '', interceptions, ...]
-      const rows = allPlayers.map((entry, i) => {
-        const row = [];
-        row[0] = i + 1;
-        row[1] = entry.displayName;
-        row[2] = entry.goals;
-        row[4] = entry.assists;
-        row[13] = entry.mvp;
-        row[16] = entry.ga;
-        row[19] = entry.tackles;
-        row[22] = entry.interceptions;
-        return row;
-      });
-      return rows;
+      // Now create six independently sorted arrays (goals, assists, mvp, ga, tackles, interceptions)
+      const allPlayers = Object.values(playerMap);
+      // Each array is [{displayName, value, ...}], sorted descending by stat
+      const goals = [...allPlayers].sort((a, b) => b.goals - a.goals);
+      const assists = [...allPlayers].sort((a, b) => b.assists - a.assists);
+      const mvp = [...allPlayers].sort((a, b) => b.mvp - a.mvp);
+      const ga = [...allPlayers].sort((a, b) => b.ga - a.ga);
+      const tackles = [...allPlayers].sort((a, b) => b.tackles - a.tackles);
+      const interceptions = [...allPlayers].sort((a, b) => b.interceptions - a.interceptions);
+      // Return as object for "overall"
+      return {
+        overall: {
+          goals,
+          assists,
+          mvp,
+          ga,
+          tackles,
+          interceptions
+        }
+      };
     }
 
-    // Use the helper to get rankingRows for the selected competition
-    const rankingRows = buildCompetitionRows(competition, rankingLeague, rankingFA, rankingCarabao, rankingUCL);
+    // Use the helper to get rankingRows or overall aggregates for the selected competition
+    const rankingRowsOrObj = buildCompetitionRows(competition, rankingLeague, rankingFA, rankingCarabao, rankingUCL);
 
-    // getStat now uses rankingRows for the selected competition
-    const getStat = (type) => {
-      let nameIndex;
-      let valueIndex;
-
-      if (type === 'goals') {
-        nameIndex = 1;
-        valueIndex = 2;
-      } else if (type === 'assists') {
-        nameIndex = 4;
-        valueIndex = 5;
-      } else if (type === 'mvp') {
-        nameIndex = 13;
-        valueIndex = 14;
-      } else if (type === 'ga') {
-        nameIndex = 16;
-        valueIndex = 17;
-      } else if (type === 'tackles') {
-        nameIndex = 19;
-        valueIndex = 20;
-      } else if (type === 'interceptions') {
-        nameIndex = 22;
-        valueIndex = 23;
-      } else {
-        return { rank: '-', value: 0 };
+    // getStat: for overall, use the stat-specific sorted arrays; for other competitions, use raw rows
+    function getStat(type) {
+      // For "overall", use the six separate sorted arrays for each stat
+      if (competition === 'overall' && rankingRowsOrObj && rankingRowsOrObj.overall) {
+        const statMap = {
+          goals: 'goals',
+          assists: 'assists',
+          mvp: 'mvp',
+          ga: 'ga',
+          tackles: 'tackles',
+          interceptions: 'interceptions'
+        };
+        const arr = rankingRowsOrObj.overall[statMap[type]];
+        if (!Array.isArray(arr)) return { rank: '-', value: 0 };
+        // Find index by displayName, or by stripped team prefix
+        const idx = arr.findIndex(entry =>
+          normalize(entry.displayName) === name ||
+          normalize(stripTeamPrefix(entry.displayName)) === name
+        );
+        if (idx === -1) return { rank: '-', value: 0 };
+        return {
+          rank: idx + 1,
+          value: arr[idx][type]
+        };
       }
-
-      const cleanRows = rankingRows.filter(r =>
-        r[nameIndex] && r[valueIndex] !== undefined && r[valueIndex] !== ''
+      // For specific competitions, search only column 1 for player name, read value from correct stat column
+      let valueIndex;
+      if (type === 'goals') valueIndex = 2;
+      else if (type === 'assists') valueIndex = 5;
+      else if (type === 'mvp') valueIndex = 14;
+      else if (type === 'ga') valueIndex = 17;
+      else if (type === 'tackles') valueIndex = 20;
+      else if (type === 'interceptions') valueIndex = 23;
+      else return { rank: '-', value: 0 };
+      // rankingRowsOrObj is an array in this case
+      const rows = Array.isArray(rankingRowsOrObj) ? rankingRowsOrObj : [];
+      // Build sorted array for this stat
+      const filtered = rows.filter(r =>
+        r[1] && r[valueIndex] !== undefined && r[valueIndex] !== ''
       );
-
-      const rowIndex = cleanRows.findIndex(r => {
-        const sheetName = String(r[nameIndex] || '').trim();
-        return normalize(sheetName) === name || normalize(stripTeamPrefix(sheetName)) === name;
-      });
-
-      if (rowIndex === -1) return { rank: '-', value: 0 };
-
+      // Sort descending by value
+      filtered.sort((a, b) => toNumber(b[valueIndex]) - toNumber(a[valueIndex]));
+      // Find player by name in column 1, or by stripped team prefix
+      const idx = filtered.findIndex(r =>
+        normalize(r[1]) === name ||
+        normalize(stripTeamPrefix(r[1])) === name
+      );
+      if (idx === -1) return { rank: '-', value: 0 };
       return {
-        rank: rowIndex + 1,
-        value: toNumber(cleanRows[rowIndex][valueIndex])
+        rank: idx + 1,
+        value: toNumber(filtered[idx][valueIndex])
       };
-    };
+    }
 
     const goals = getStat('goals');
     const assists = getStat('assists');
