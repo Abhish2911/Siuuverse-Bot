@@ -169,13 +169,20 @@ module.exports = {
     const userId = interaction.user.id;
     const teamInput = interaction.options.getString('team');
 
-    const [teams, teamIdRows, standings, fairPlay, fixtures, ranking] = await Promise.all([
+    const [teams, teamIdRows, standings, fairPlay, fixtures, faFixtures, carabaoFixtures, uclGroupFixtures, uclKnockoutFixtures, ranking, faRanking, carabaoRanking, uclRanking] = await Promise.all([
       cachedGetData('Teams!A:H'),
       cachedGetData('Team_ID_Map!A:E'),
       cachedGetData('Standings!A:J'),
       cachedGetData('Fair_Play!A:E'),
       cachedGetData('Fixtures!A:I'),
-      cachedGetData('Ranking!A:AA')
+      cachedGetData('FA_Cup_Coop_Fixtures!A:L'),
+      cachedGetData('Carabao_Coop_Fixtures!A:L'),
+      cachedGetData('UCL_Coop_Group_Fixtures!A:J'),
+      cachedGetData('UCL_Coop_Knockout_Fixtures!A:L'),
+      cachedGetData('Ranking!A:AA'),
+      cachedGetData('FA_Cup_Coop_Ranking!A:AA'),
+      cachedGetData('Carabao_Coop_Ranking!A:AA'),
+      cachedGetData('UCL_Coop_Ranking!A:AA')
     ]);
 
     if (!teams || teams.length <= 1) {
@@ -231,6 +238,7 @@ module.exports = {
     const otherPlayers = playerList.slice(1);
 
     const rankingRows = Array.isArray(ranking) ? ranking.slice(2).filter(r => r && r.length) : [];
+    const rankingSources = [ranking, faRanking, carabaoRanking, uclRanking];
 
     const saveRow = rankingRows.find(r =>
       normalize(r[25]) === normalize(teamName) ||
@@ -244,28 +252,37 @@ module.exports = {
       let valueIndex;
 
       if (colName === 'goals') {
-        nameIndex = 1; valueIndex = 2;   // B:C
+        nameIndex = 1; valueIndex = 2;
       } else if (colName === 'assists') {
-        nameIndex = 4; valueIndex = 5;   // E:F
+        nameIndex = 4; valueIndex = 5;
       } else if (colName === 'mvp') {
-        nameIndex = 13; valueIndex = 14; // N:O
+        nameIndex = 13; valueIndex = 14;
       } else if (colName === 'ga') {
-        nameIndex = 16; valueIndex = 17; // Q:R
+        nameIndex = 16; valueIndex = 17;
       } else if (colName === 'tackles') {
-        nameIndex = 19; valueIndex = 20; // T:U
+        nameIndex = 19; valueIndex = 20;
       } else if (colName === 'interceptions') {
-        nameIndex = 22; valueIndex = 23; // W:X
+        nameIndex = 22; valueIndex = 23;
       } else {
         return 0;
       }
 
-      const row = rankingRows.find(r => {
-        const sheetName = String(r[nameIndex] || '').trim();
-        return normalize(sheetName) === normalize(playerName) ||
-          normalize(stripTeamPrefix(sheetName)) === normalize(playerName) ||
-          normalize(sheetName) === normalize(`${shortName}-${playerName}`);
-      });
-      return row ? Number(row[valueIndex]) || 0 : 0;
+      let total = 0;
+      for (const sheet of rankingSources) {
+        const rows = Array.isArray(sheet)
+          ? sheet.slice(2).filter(r => r && r.length)
+          : [];
+        const row = rows.find(r => {
+          const sheetName = String(r[nameIndex] || '').trim();
+          return normalize(sheetName) === normalize(playerName) ||
+            normalize(stripTeamPrefix(sheetName)) === normalize(playerName) ||
+            normalize(sheetName) === normalize(`${shortName}-${playerName}`);
+        });
+        if (row) {
+          total += Number(row[valueIndex]) || 0;
+        }
+      }
+      return total;
     };
 
     const standingRow = Array.isArray(standings)
@@ -366,7 +383,61 @@ module.exports = {
       `${E.defense || E.tackle} **Best Defender:** ${topDefender?.player || 'N/A'} (${(topDefender?.tackles || 0) + (topDefender?.interceptions || 0)})\n` +
       `${E.save} **Team Saves:** ${teamTotalSaves}`;
 
-    const formText = getTeamForm(fixtures, teamName, shortName);
+    // Merge all fixtures for all competitions
+    const allFixtures = [
+      ...(Array.isArray(fixtures) ? fixtures.slice(1).map(r => ({
+        md: r[0],
+        home: r[2],
+        away: r[3],
+        hg: r[4],
+        ag: r[5],
+        homeShort: r[7],
+        awayShort: r[8]
+      })) : []),
+      ...(Array.isArray(faFixtures) ? faFixtures.slice(1).map(r => ({
+        md: r[0],
+        home: r[2],
+        away: r[3],
+        hg: r[4],
+        ag: r[5],
+        homeShort: r[8],
+        awayShort: r[9]
+      })) : []),
+      ...(Array.isArray(carabaoFixtures) ? carabaoFixtures.slice(1).map(r => ({
+        md: r[0],
+        home: r[2],
+        away: r[3],
+        hg: r[4],
+        ag: r[5],
+        homeShort: r[8],
+        awayShort: r[9]
+      })) : []),
+      ...(Array.isArray(uclGroupFixtures) ? uclGroupFixtures.slice(1).map(r => ({
+        md: r[0],
+        home: r[2],
+        away: r[3],
+        hg: r[4],
+        ag: r[5],
+        homeShort: r[7],
+        awayShort: r[8]
+      })) : []),
+      ...(Array.isArray(uclKnockoutFixtures) ? uclKnockoutFixtures.slice(1).map(r => ({
+        md: r[0],
+        home: r[2],
+        away: r[3],
+        hg: r[4],
+        ag: r[5],
+        homeShort: r[8],
+        awayShort: r[9]
+      })) : [])
+    ];
+
+    const formText = getTeamForm(
+      [['MD','','Home Team','Away Team','HG','AG','','Home-Short','Away-Short'],
+       ...allFixtures.map(f => [f.md,'',f.home,f.away,f.hg,f.ag,'',f.homeShort,f.awayShort])],
+      teamName,
+      shortName
+    );
 
     const embed = new EmbedBuilder()
       .setTitle(`${E.team} TEAM HUB: ${teamName.toUpperCase()}`)
