@@ -303,15 +303,51 @@ module.exports = {
         .setName('user')
         .setDescription('Mention a user to show their linked player stats')
         .setRequired(false)
+    )
+    .addStringOption(opt =>
+      opt
+        .setName('competition')
+        .setDescription('Competition to view stats for')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Overall', value: 'overall' },
+          { name: 'League', value: 'league' },
+          { name: 'FA Cup', value: 'fa' },
+          { name: 'Carabao Cup', value: 'carabao' },
+          { name: 'UCL', value: 'ucl' }
+        )
     ),
 
   async execute(interaction) {
-    const [ranking, teams, standings, matchesEntry] = await Promise.all([
+    const [
+      rankingLeague,
+      rankingFA,
+      rankingCarabao,
+      rankingUCL,
+      teams,
+      standings,
+      matchesEntry
+    ] = await Promise.all([
       cachedGetData('Ranking!A:AA'),
+      cachedGetData('FA_Cup_Coop_Ranking!A:AA'),
+      cachedGetData('Carabao_Coop_Ranking!A:AA'),
+      cachedGetData('UCL_Coop_Ranking!A:AA'),
       cachedGetData('Teams!A:Z'),
       cachedGetData('Standings!A:J'),
       cachedGetData('Matches_Entry!A:P')
     ]);
+
+    // Read competition option
+    const competition = interaction.options.getString('competition') || 'overall';
+    // Map for footer/label
+    const competitionLabelMap = {
+      overall: 'Overall Career',
+      league: 'League',
+      fa: 'FA Cup',
+      carabao: 'Carabao Cup',
+      ucl: 'UCL'
+    };
+    const competitionLabel = competitionLabelMap[competition] || 'Overall Career';
 
     let inputName = interaction.options.getString('name');
     const targetUser = interaction.options.getUser('user');
@@ -343,10 +379,81 @@ module.exports = {
 
     const name = normalize(inputName);
 
-    const rankingRows = Array.isArray(ranking)
-      ? ranking.slice(2).filter(r => r && r.length)
-      : [];
+    // Helper: build competition rows
+    function buildCompetitionRows(competition, rankingLeague, rankingFA, rankingCarabao, rankingUCL) {
+      if (competition === 'league') {
+        return Array.isArray(rankingLeague) ? rankingLeague.slice(2).filter(r => r && r.length) : [];
+      }
+      if (competition === 'fa') {
+        return Array.isArray(rankingFA) ? rankingFA.slice(2).filter(r => r && r.length) : [];
+      }
+      if (competition === 'carabao') {
+        return Array.isArray(rankingCarabao) ? rankingCarabao.slice(2).filter(r => r && r.length) : [];
+      }
+      if (competition === 'ucl') {
+        return Array.isArray(rankingUCL) ? rankingUCL.slice(2).filter(r => r && r.length) : [];
+      }
+      // overall - aggregate all
+      // First, collect all rows from all 4 sheets
+      const sheets = [
+        { rows: Array.isArray(rankingLeague) ? rankingLeague.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingLeague) ? rankingLeague[1] : [] },
+        { rows: Array.isArray(rankingFA) ? rankingFA.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingFA) ? rankingFA[1] : [] },
+        { rows: Array.isArray(rankingCarabao) ? rankingCarabao.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingCarabao) ? rankingCarabao[1] : [] },
+        { rows: Array.isArray(rankingUCL) ? rankingUCL.slice(2).filter(r => r && r.length) : [], header: Array.isArray(rankingUCL) ? rankingUCL[1] : [] }
+      ];
+      // Map playerName (normalized, without team prefix) -> { displayName, goals, assists, mvp, ga, tackles, interceptions }
+      const playerMap = new Map();
+      for (const { rows } of sheets) {
+        for (const row of rows) {
+          // columns: 1=name, 2=goals, 4=assists, 13=mvp, 16=ga, 19=tackles, 22=interceptions
+          const rawName = row[1] || '';
+          const normName = normalize(stripTeamPrefix(rawName));
+          if (!normName) continue;
+          if (!playerMap.has(normName)) {
+            playerMap.set(normName, {
+              displayName: rawName,
+              goals: 0,
+              assists: 0,
+              mvp: 0,
+              ga: 0,
+              tackles: 0,
+              interceptions: 0
+            });
+          }
+          const entry = playerMap.get(normName);
+          entry.goals += toNumber(row[2]);
+          entry.assists += toNumber(row[5]);
+          entry.mvp += toNumber(row[14]);
+          entry.ga += toNumber(row[17]);
+          entry.tackles += toNumber(row[20]);
+          entry.interceptions += toNumber(row[23]);
+        }
+      }
+      // Now build array of synthetic rows, matching the Ranking sheet layout
+      // We'll fill only the relevant columns, others as empty string
+      // We'll sort by ga descending (for ranking)
+      const allPlayers = Array.from(playerMap.values());
+      allPlayers.sort((a, b) => b.ga - a.ga);
+      // Build rows: [index, displayName, goals, '', assists, '', ... mvp, '', ga, '', tackles, '', interceptions, ...]
+      const rows = allPlayers.map((entry, i) => {
+        const row = [];
+        row[0] = i + 1;
+        row[1] = entry.displayName;
+        row[2] = entry.goals;
+        row[4] = entry.assists;
+        row[13] = entry.mvp;
+        row[16] = entry.ga;
+        row[19] = entry.tackles;
+        row[22] = entry.interceptions;
+        return row;
+      });
+      return rows;
+    }
 
+    // Use the helper to get rankingRows for the selected competition
+    const rankingRows = buildCompetitionRows(competition, rankingLeague, rankingFA, rankingCarabao, rankingUCL);
+
+    // getStat now uses rankingRows for the selected competition
     const getStat = (type) => {
       let nameIndex;
       let valueIndex;
@@ -421,9 +528,22 @@ module.exports = {
     const winContribution = goals.value * 3 + assists.value * 2 + mvp.value * 3;
     const totalGA = goals.value + assists.value;
 
+    // Build description to include the selected competition label
+    function buildMystatsDescriptionWithCompetition(summary, mention, stadium, competitionLabel) {
+      return (
+        `# ${summary.player}\n` +
+        `${safeEmoji(E.profile, '👤')} **Coop League Profile**\n` +
+        `**Competition:** ${competitionLabel}\n` +
+        `${safeEmoji(E.blueIcon, '🔵')} **User:** ${mention}\n` +
+        `${safeEmoji(E.team, '👥')} **Team:** ${summary.teamName} • **${summary.shortName}**\n` +
+        `🏟️ **Stadium:** ${stadium}\n` +
+        `${safeEmoji(E.fire, '🔥')} **Win Rate:** ${summary.winRate}%\n\n`
+      );
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(`${safeEmoji(E.played, '🎮')} Coop Player Card`)
-      .setDescription(buildMystatsDescription(summary, mention, stadium))
+      .setDescription(buildMystatsDescriptionWithCompetition(summary, mention, stadium, competitionLabel))
       .addFields(
         {
           name: `${safeEmoji(E.played, '🎮')} League Record`,
@@ -475,7 +595,7 @@ module.exports = {
         }
       )
       .setColor(parseTeamColor(teamColor) || 0x5865F2)
-      .setFooter({ text: `Mystats • SiuuVerse Coop Player Card • ${shortName}` })
+      .setFooter({ text: `Mystats • ${competitionLabel}` })
       .setTimestamp();
 
     if (logo && /^https?:\/\//i.test(logo)) {
