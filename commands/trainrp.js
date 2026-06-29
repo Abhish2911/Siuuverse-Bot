@@ -86,6 +86,7 @@ module.exports = {
       if (remaining > 0) {
         const hours = Math.floor(remaining / 3600000);
         const minutes = Math.floor((remaining % 3600000) / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
 
         const cooldownEmbed = new EmbedBuilder()
           .setColor(0xF1C40F)
@@ -96,7 +97,7 @@ module.exports = {
             'You have already completed a training session.',
             '',
             `${emojis.calendar} **Time Remaining**`,
-            `**${hours}h ${minutes}m**`,
+            `**${hours}h ${minutes}m ${seconds}s**`,
             '',
             'Come back when your cooldown expires to earn more Training Points.'
           ].join('\n'))
