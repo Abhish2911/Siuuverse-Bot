@@ -8,6 +8,7 @@ const path = require('path');
 const express = require('express');
 const { sendAuditLog } = require('./utils/helpers');
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
+const TrainCooldown = require('./models/TrainCooldown');
 
 function startHealthServer() {
   const app = express();
@@ -92,6 +93,7 @@ async function connectMongo() {
 }
 
 client.commands = new Collection();
+client.scheduleTrainReminder = scheduleTrainReminder;
 
 async function safeReply(interaction, payload) {
   try {
@@ -156,6 +158,71 @@ async function safeEditMessage(message, payload) {
     }
     throw error;
   }
+}
+
+const trainReminderTimers = new Map();
+
+function scheduleTrainReminder(userId) {
+  const existingTimer = trainReminderTimers.get(userId);
+
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    trainReminderTimers.delete(userId);
+  }
+
+  (async () => {
+    try {
+      const cooldown = await TrainCooldown.findOne({ userId });
+
+      if (!cooldown || !cooldown.lastTrain) {
+        return;
+      }
+
+      const reminderTime = new Date(cooldown.lastTrain).getTime() + (6 * 60 * 60 * 1000);
+      const delay = reminderTime - Date.now();
+
+      const runReminder = async () => {
+        try {
+          const freshCooldown = await TrainCooldown.findOne({ userId });
+
+          if (!freshCooldown || freshCooldown.notified) {
+            trainReminderTimers.delete(userId);
+            return;
+          }
+
+          try {
+            const user = await client.users.fetch(userId);
+
+            if (user) {
+              await user.send('🏋️ Your /trainrp cooldown has ended. You can train again now!');
+            }
+          } catch (dmError) {
+            console.error(`❌ Failed to send training reminder to ${userId}:`, dmError);
+          }
+
+          freshCooldown.notified = true;
+          await freshCooldown.save();
+        } catch (error) {
+          console.error('❌ Train reminder error:', error);
+        } finally {
+          trainReminderTimers.delete(userId);
+        }
+      };
+
+      if (delay <= 0) {
+        await runReminder();
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        runReminder();
+      }, delay);
+
+      trainReminderTimers.set(userId, timer);
+    } catch (error) {
+      console.error('❌ Failed to schedule train reminder:', error);
+    }
+  })();
 }
 
 const commandFolders = [
@@ -259,6 +326,22 @@ client.once('clientReady', async () => {
     console.log('✅ Role cooldown states restored');
   } catch (error) {
     console.error('❌ Failed to restore role cooldowns:', error);
+  }
+
+  try {
+    const pendingReminders = await TrainCooldown.find({
+      notified: { $ne: true }
+    });
+
+    for (const cooldown of pendingReminders) {
+      if (cooldown.userId) {
+        scheduleTrainReminder(cooldown.userId);
+      }
+    }
+
+    console.log(`✅ Restored ${pendingReminders.length} train reminders`);
+  } catch (error) {
+    console.error('❌ Failed to restore train reminders:', error);
   }
 });
 
