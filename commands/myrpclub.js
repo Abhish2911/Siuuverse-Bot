@@ -1,6 +1,71 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require('discord.js');
 const { getData } = require('../utils/sheets');
 const emojis = require('../utils/emojis');
+
+function buildEmbed({
+  clubName,
+  managerMention,
+  managerName,
+  clubPlayers,
+  avgOVR,
+  rosterPages,
+  page,
+  emojis
+}) {
+  return new EmbedBuilder()
+    .setColor(0x00AE86)
+    .setTitle(`${emojis.team} ${clubName}`)
+    .setDescription([
+      `${emojis.captain} **Manager:** ${managerMention}`,
+      `${emojis.league} **Club:** ${clubName}`
+    ].join('\n'))
+    .addFields(
+      {
+        name: '📊 Club Stats',
+        value: [
+          `**Squad Size:** ${clubPlayers.length}`,
+          `**Average OVR:** ${avgOVR}`
+        ].join('\n'),
+        inline: true
+      },
+      {
+        name: `${emojis.captain} Manager Name`,
+        value: `**${managerName}**`,
+        inline: true
+      },
+      {
+        name: `${emojis.profile} Squad Roster (Page ${page + 1}/${rosterPages.length})`,
+        value: rosterPages[page] || 'No Players Found'
+      }
+    )
+    .setFooter({
+      text: `Roleplay Club Profile • ${clubPlayers.length} Players`
+    })
+    .setTimestamp();
+}
+
+function buildButtons(page, totalPages) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`myrpclub_prev_${page}`)
+        .setLabel('◀ Previous')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`myrpclub_next_${page}`)
+        .setLabel('Next ▶')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages - 1)
+    )
+  ];
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -130,7 +195,7 @@ module.exports = {
       ? (totalOVR / clubPlayers.length).toFixed(1)
       : '0';
 
-    const playerMentions = clubPlayers
+    const rosterLines = clubPlayers
       .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0))
       .map(row => {
         const name = row[1] || 'Unknown';
@@ -139,39 +204,90 @@ module.exports = {
         const tp = row[16] || '0';
 
         return `• **${name}** (<@${row[0]}>)\n   OVR: **${ovr}** • MV: **${marketValue}** • TP: **${tp}**`;
-      })
-      .join('\n\n');
+      });
 
-    const embed = new EmbedBuilder()
-      .setColor(0x00AE86)
-      .setTitle(`${emojis.team} ${clubName}`)
-      .setDescription([
-        `${emojis.captain} **Manager:** ${managerMention}`,
-        `${emojis.league} **Club:** ${clubName}`
-      ].join('\n'))
-      .addFields(
-        {
-          name: '📊 Club Stats',
-          value: [
-            `**Squad Size:** ${clubPlayers.length}`,
-            `**Average OVR:** ${avgOVR}`
-          ].join('\n'),
-          inline: true
-        },
-        {
-          name: `${emojis.captain} Manager Name`,
-          value: `**${managerName}**`,
-          inline: true
-        },
-        {
-          name: `${emojis.profile} Squad Roster`,
-          value: playerMentions || 'No Players Found'
-        }
-      )
-      .setFooter({
-        text: `Roleplay Club Profile • ${clubPlayers.length} Players`
-      })
-      .setTimestamp();
-    await interaction.editReply({ embeds: [embed] });
+    const rosterPages = [];
+    for (let i = 0; i < rosterLines.length; i += 15) {
+      rosterPages.push(rosterLines.slice(i, i + 15).join('\n\n'));
+    }
+
+    const page = 0;
+
+    const embed = buildEmbed({
+      clubName,
+      managerMention,
+      managerName,
+      clubPlayers,
+      avgOVR,
+      rosterPages,
+      page,
+      emojis
+    });
+
+    await interaction.editReply({
+      embeds: [embed],
+      components: buildButtons(page, rosterPages.length)
+    });
   },
+
+  async buttonHandler(interaction, action, value) {
+    const data = interaction.message.embeds?.[0];
+    if (!data) return;
+
+    const title = data.title?.replace(`${emojis.team} `, '') || '';
+
+    const rows = await getData(
+      'Player_Data!A:Q',
+      { spreadsheetId: process.env.RP_SHEET_ID }
+    );
+
+    const normalizeClubName = value => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[._-]/g, '');
+
+    const clubPlayers = rows.slice(1).filter(row => {
+      const playerClub = normalizeClubName(row[5]);
+      const targetClub = normalizeClubName(title);
+      return playerClub === targetClub;
+    });
+
+    const totalOVR = clubPlayers.reduce((sum, row) => sum + Number(row[2] || 0), 0);
+    const avgOVR = clubPlayers.length
+      ? (totalOVR / clubPlayers.length).toFixed(1)
+      : '0';
+
+    const rosterLines = clubPlayers
+      .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0))
+      .map(row => `• **${row[1]}** (<@${row[0]}>)\n   OVR: **${row[2] || 0}** • MV: **${row[3] || 0}** • TP: **${row[16] || 0}**`);
+
+    const rosterPages = [];
+    for (let i = 0; i < rosterLines.length; i += 15) {
+      rosterPages.push(rosterLines.slice(i, i + 15).join('\n\n'));
+    }
+
+    let page = Number(value || 0);
+    if (action === 'next') page++;
+    if (action === 'prev') page--;
+
+    page = Math.max(0, Math.min(page, rosterPages.length - 1));
+
+    const managerMention = data.description?.match(/<@(\d+)>/)?.[0] || 'Unknown';
+    const managerName = data.fields?.[1]?.value?.replace(/\*/g, '') || 'Unknown';
+
+    return {
+      embeds: [buildEmbed({
+        clubName: title,
+        managerMention,
+        managerName,
+        clubPlayers,
+        avgOVR,
+        rosterPages,
+        page,
+        emojis
+      })],
+      components: buildButtons(page, rosterPages.length)
+    };
+  }
 };
