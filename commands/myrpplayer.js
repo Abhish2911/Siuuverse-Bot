@@ -24,7 +24,7 @@ module.exports = {
 
   async execute(interaction) {
     const rows = await getData(
-      'Player_Data!A:P',
+      'Player_Data!A:Q',
       { spreadsheetId: process.env.RP_SHEET_ID }
     );
 
@@ -77,34 +77,37 @@ module.exports = {
       defending: Number(playerRow[12] || 0),
       gk1: Number(playerRow[13] || 0),
       gk2: Number(playerRow[14] || 0),
-      gk3: Number(playerRow[15] || 0)
+      gk3: Number(playerRow[15] || 0),
+      tp: Number(playerRow[16] || 0)
     };
 
+    let discordUsername = 'Unknown User';
+
+    try {
+      const discordUser = await interaction.client.users.fetch(player.discordId);
+      discordUsername = discordUser.username;
+    } catch {
+      discordUsername = 'Unknown User';
+    }
+
     const embed = new EmbedBuilder()
+      .setColor(0x00AE86)
+      .setTitle(`⚽ ${player.playerName}`)
+      .setDescription([
+        `**OVR:** ${player.ovr} • **MV:** ${player.marketValue}`,
+        `**Club:** ${player.club}`,
+        `**Positions:** ${player.positions}`,
+        `**Total TP:** ${player.tp}`
+      ].join('\n'))
       .addFields(
         {
           name: `${emojis.profile} Player`,
-          value: player.playerName,
+          value: `**${player.playerName}**`,
           inline: true
         },
         {
-          name: `${emojis.rank} Rating`,
-          value: String(player.ovr),
-          inline: true
-        },
-        {
-          name: `${emojis.trophy} Value`,
-          value: player.marketValue,
-          inline: true
-        },
-        {
-          name: `${emojis.team} Club`,
-          value: player.club,
-          inline: true
-        },
-        {
-          name: `${emojis.defense} Positions`,
-          value: player.positions,
+          name: 'Discord Username',
+          value: `**${discordUsername}**`,
           inline: true
         },
         {
@@ -115,29 +118,29 @@ module.exports = {
         {
           name: `${emojis.Stats} Training Points (1/2)`,
           value: [
-            `SHT: ${player.shooting}`,
-            `PAS: ${player.passing}`,
-            `DEX: ${player.dexterity}`,
-            `DRI: ${player.dribbling}`,
-            `LBS: ${player.lowerBody}`
+            `**SHT:** ${player.shooting}`,
+            `**PAS:** ${player.passing}`,
+            `**DEX:** ${player.dexterity}`,
+            `**DRI:** ${player.dribbling}`,
+            `**LBS:** ${player.lowerBody}`
           ].join('\n'),
           inline: true
         },
         {
           name: `${emojis.Stats} Training Points (2/2)`,
           value: [
-            `AER: ${player.aerial}`,
-            `DEF: ${player.defending}`,
-            `GK1: ${player.gk1}`,
-            `GK2: ${player.gk2}`,
-            `GK3: ${player.gk3}`
+            `**AER:** ${player.aerial}`,
+            `**DEF:** ${player.defending}`,
+            `**GK1:** ${player.gk1}`,
+            `**GK2:** ${player.gk2}`,
+            `**GK3:** ${player.gk3}`
           ].join('\n'),
           inline: true
         }
       )
       .setFooter({ text: `Roleplay Player Profile • Requested by ${interaction.user.username}` })
       .setAuthor({
-        name: player.playerName
+        name: `${player.playerName} Profile`
       })
       .setTimestamp();
 

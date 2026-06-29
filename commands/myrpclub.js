@@ -19,7 +19,7 @@ module.exports = {
     let rows;
     try {
       rows = await getData(
-        'Player_Data!A:F',
+        'Player_Data!A:Q',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
       managerRows = await getData(
@@ -125,31 +125,46 @@ module.exports = {
 
     const managerName = managerRow?.[1] || 'Unknown';
 
+    const totalOVR = clubPlayers.reduce((sum, row) => sum + Number(row[2] || 0), 0);
+    const avgOVR = clubPlayers.length
+      ? (totalOVR / clubPlayers.length).toFixed(1)
+      : '0';
+
     const playerMentions = clubPlayers
-      .map(row => `• ${row[1] || 'Unknown'} (<@${row[0]}>)`)
-      .join('\n');
+      .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0))
+      .map(row => {
+        const name = row[1] || 'Unknown';
+        const ovr = row[2] || '0';
+        const marketValue = row[3] || '0';
+        const tp = row[16] || '0';
+
+        return `• **${name}** (<@${row[0]}>)\n   OVR: **${ovr}** • MV: **${marketValue}** • TP: **${tp}**`;
+      })
+      .join('\n\n');
 
     const embed = new EmbedBuilder()
-      .setColor(0x2B2D31)
+      .setColor(0x00AE86)
       .setTitle(`${emojis.team} ${clubName}`)
       .setDescription([
         `${emojis.captain} **Manager:** ${managerMention}`,
-        `${emojis.coop} **Squad Size:** ${clubPlayers.length} Players`,
         `${emojis.league} **Club:** ${clubName}`
       ].join('\n'))
       .addFields(
         {
+          name: '📊 Club Stats',
+          value: [
+            `**Squad Size:** ${clubPlayers.length}`,
+            `**Average OVR:** ${avgOVR}`
+          ].join('\n'),
+          inline: true
+        },
+        {
           name: `${emojis.captain} Manager Name`,
-          value: managerName,
+          value: `**${managerName}**`,
           inline: true
         },
         {
-          name: `${emojis.team} Club`,
-          value: clubName,
-          inline: true
-        },
-        {
-          name: `${emojis.profile} Squad List`,
+          name: `${emojis.profile} Squad Roster`,
           value: playerMentions || 'No Players Found'
         }
       )
