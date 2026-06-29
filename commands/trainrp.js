@@ -2,17 +2,10 @@ const {
   SlashCommandBuilder,
   EmbedBuilder
 } = require('discord.js');
-const mongoose = require('mongoose');
 const emojis = require('../utils/emojis');
 const { getData, updateData } = require('../utils/sheets');
 
-const TrainCooldown = mongoose.models.TrainCooldown || mongoose.model(
-  'TrainCooldown',
-  new mongoose.Schema({
-    userId: { type: String, required: true, unique: true },
-    lastTrain: { type: Date, default: null }
-  })
-);
+const TrainCooldown = require('../models/TrainCooldown');
 
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -128,9 +121,16 @@ module.exports = {
 
     await TrainCooldown.findOneAndUpdate(
       { userId: interaction.user.id },
-      { lastTrain: new Date() },
+      {
+        lastTrain: new Date(),
+        notified: false
+      },
       { upsert: true }
     );
+
+    if (interaction.client.scheduleTrainReminder) {
+      interaction.client.scheduleTrainReminder(interaction.user.id);
+    }
 
     const lines = [
       `${emojis.correct} Training session completed.`,
