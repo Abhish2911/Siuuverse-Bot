@@ -7,7 +7,6 @@ module.exports = {
     .setDescription('Snapshot Player_Data into Training_Data'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
 
     const rows = await getData(
       'Player_Data!A:Q',
