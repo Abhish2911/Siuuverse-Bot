@@ -87,8 +87,26 @@ module.exports = {
         const hours = Math.floor(remaining / 3600000);
         const minutes = Math.floor((remaining % 3600000) / 60000);
 
+        const cooldownEmbed = new EmbedBuilder()
+          .setColor(0xF1C40F)
+          .setTitle('⏳ Training Cooldown')
+          .setDescription([
+            `${emojis.profile} **Player:** ${playerRow[1]}`,
+            '',
+            'You have already completed a training session.',
+            '',
+            `${emojis.calendar} **Time Remaining**`,
+            `**${hours}h ${minutes}m**`,
+            '',
+            'Come back when your cooldown expires to earn more Training Points.'
+          ].join('\n'))
+          .setFooter({
+            text: 'RP Training System'
+          })
+          .setTimestamp();
+
         return interaction.editReply({
-          content: `⏳ You have already trained. Try again in ${hours}h ${minutes}m.`
+          embeds: [cooldownEmbed]
         });
       }
     }
