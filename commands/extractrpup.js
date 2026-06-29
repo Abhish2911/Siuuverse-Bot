@@ -7,6 +7,12 @@ module.exports = {
     .setDescription('Snapshot Player_Data into Training_Data'),
 
   async execute(interaction) {
+    if (interaction.user.id !== process.env.OWNER_ID) {
+      return interaction.reply({
+        content: '❌ This command can only be used by the bot owner.',
+        ephemeral: true
+      });
+    }
 
     const rows = await getData(
       'Player_Data!A:Q',
