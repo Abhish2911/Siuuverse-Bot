@@ -132,30 +132,32 @@ module.exports = {
 
     const playerMentions = clubPlayers
       .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0))
-      .map(row => {
+      .map((row, index) => {
         const name = row[1] || 'Unknown';
         const ovr = row[2] || '0';
+        const mv = row[3] || '0';
+        const tp = row[16] || '0';
 
-        return `• **${name}** (<@${row[0]}>)\n   OVR: **${ovr}**`;
+        return `\`${index + 1}.\` **${name}** • OVR **${ovr}** • MV **${mv}** • TP **${tp}**`;
       })
-      .join('\n\n');
+      .join('\n');
 
     const embed = new EmbedBuilder()
       .setColor(0x00AE86)
       .setTitle(`${emojis.team} ${clubName}`)
       .setDescription([
         `${emojis.captain} **Manager:** ${managerMention}`,
-        `${emojis.league} **Club:** ${clubName}`,
+        `${emojis.league} **Club:** **${clubName}**`,
         '',
-        `**${emojis.profile} Squad Roster**`,
+        `### ${emojis.profile} Squad Roster`,
         playerMentions || 'No Players Found'
       ].join('\n'))
       .addFields(
         {
           name: '📊 Club Stats',
           value: [
-            `**Squad Size:** ${clubPlayers.length}`,
-            `**Average OVR:** ${avgOVR}`
+            `👥 **Squad Size:** ${clubPlayers.length}`,
+            `⭐ **Average OVR:** ${avgOVR}`
           ].join('\n'),
           inline: true
         },
