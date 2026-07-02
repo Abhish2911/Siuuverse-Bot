@@ -82,17 +82,26 @@ module.exports = {
     };
 
     let discordUsername = 'Unknown User';
+let avatarURL = interaction.client.user.displayAvatarURL({
+  extension: 'png',
+  size: 512
+});
 
-    try {
-      const discordUser = await interaction.client.users.fetch(player.discordId);
-      discordUsername = discordUser.username;
-    } catch {
-      discordUsername = 'Unknown User';
-    }
+try {
+  const discordUser = await interaction.client.users.fetch(player.discordId);
+  discordUsername = discordUser.username;
+  avatarURL = discordUser.displayAvatarURL({
+    extension: 'png',
+    size: 512
+  });
+} catch {
+  discordUsername = 'Unknown User';
+}
 
     const embed = new EmbedBuilder()
       .setColor(0x00AE86)
       .setTitle(`⚽ ${player.playerName}`)
+      .setThumbnail(avatarURL)
       .setDescription([
         `**OVR:** ${player.ovr} • **MV:** ${player.marketValue}`,
         `**Club:** ${player.club}`,
