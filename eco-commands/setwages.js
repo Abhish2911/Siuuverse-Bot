@@ -1,5 +1,3 @@
-
-
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
 const { updateData } = require('../utils/sheets');

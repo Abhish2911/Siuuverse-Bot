@@ -53,7 +53,11 @@ module.exports = {
     }
 
     // Calculate totalWages by summing column D
-    const totalWages = clubPlayers.reduce((sum, row) => sum + Number(row[3]), 0);
+    const totalWages = clubPlayers.reduce(
+      (sum, row) =>
+        sum + (Number(String(row[3] || '0').replace(/,/g, '')) || 0),
+      0
+    );
 
     // Read Economy!A:D
     const economyDataRaw = await cachedGetData(`${ECONOMY_SHEET}!A:D`, {
@@ -84,7 +88,8 @@ module.exports = {
     // For each player in clubPlayers, find their Economy row by UserID (column B)
     for (const player of clubPlayers) {
       const playerUserId = player[1];
-      const playerWage = Number(player[3]);
+      const playerWage =
+        Number(String(player[3] || '0').replace(/,/g, '')) || 0;
       const playerEconomyIndex = economyData.findIndex(row => row[1] === playerUserId);
       if (playerEconomyIndex === -1) {
         // Player not found in Economy sheet, skip
