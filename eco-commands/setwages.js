@@ -17,18 +17,18 @@ module.exports = {
         .setDescription('Select the player')
         .setRequired(true)
     )
-    .addStringOption(option =>
-      option
-        .setName('player')
-        .setDescription('The name of the player')
-        .setRequired(false)
-    )
     .addIntegerOption(option =>
       option
         .setName('wages')
         .setDescription('The new weekly wage')
         .setRequired(true)
         .setMinValue(0)
+    )
+    .addStringOption(option =>
+      option
+        .setName('player')
+        .setDescription('The name of the player')
+        .setRequired(false)
     ),
 
   async execute(interaction) {
