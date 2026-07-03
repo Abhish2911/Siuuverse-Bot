@@ -21,7 +21,7 @@ module.exports = {
       option
         .setName('player')
         .setDescription('The name of the player')
-        .setRequired(true)
+        .setRequired(false)
     )
     .addIntegerOption(option =>
       option
@@ -34,7 +34,7 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
     const targetUser = interaction.options.getUser('user');
-    const playerNameInput = interaction.options.getString('player').trim();
+    const playerNameInput = interaction.options.getString('player')?.trim();
     const newWages = interaction.options.getInteger('wages');
 
     // 1. Read Managers sheet (A:C)
@@ -80,6 +80,14 @@ module.exports = {
       return { content: '❌ That player is not in your club.' };
     }
     const playerRow = wagesRows[playerRowIndex];
+    if (
+      playerNameInput &&
+      normalize(playerRow[2]) !== normalize(playerNameInput)
+    ) {
+      return {
+        content: '❌ The provided player name does not match the selected user.'
+      };
+    }
 
     // 7. Update only the Wages column for that row
     try {
