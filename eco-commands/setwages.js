@@ -81,14 +81,19 @@ module.exports = {
     // 5. Find row matching club and player
     // Columns: Club Name | UserID | Player Name | Wages
     const normalize = val => String(val || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const playerRowIndex = wagesRows.findIndex(row =>
-      normalize(row[0]) === normalize(managerClub) &&
-      String(row[1]).trim() === targetUser.id
-    );
+    const isOwner = interaction.user.id === process.env.OWNER_ID;
+
+    const playerRowIndex = isOwner
+      ? wagesRows.findIndex(row => String(row[1]).trim() === targetUser.id)
+      : wagesRows.findIndex(row =>
+          normalize(row[0]) === normalize(managerClub) &&
+          String(row[1]).trim() === targetUser.id
+        );
     if (playerRowIndex === -1) {
       return { content: '❌ That player is not in your club.' };
     }
     const playerRow = wagesRows[playerRowIndex];
+    const playerClub = playerRow[0];
     if (
       playerNameInput &&
       normalize(playerRow[2]) !== normalize(playerNameInput)
@@ -115,7 +120,7 @@ module.exports = {
       .addFields(
         {
           name: `${E.team} Club`,
-          value: `**${managerClub}**`,
+          value: `**${playerClub}**`,
           inline: true
         },
         {
