@@ -100,12 +100,25 @@ module.exports = {
 
     // 8. Return embed
     const embed = new EmbedBuilder()
-      .setTitle(`${E.success} Wages Updated`)
       .setColor(0x2ECC71)
+      .setTitle(`${E.success} Weekly Wages Updated`)
+      .setDescription(`${E.team} Successfully updated a player's weekly wages.`)
       .addFields(
-        { name: 'Club', value: managerClub, inline: true },
-        { name: 'Player', value: `${playerRow[2]} (${targetUser})`, inline: true },
-        { name: 'New Weekly Wage', value: newWages.toLocaleString(), inline: true }
+        {
+          name: `${E.team} Club`,
+          value: `**${managerClub}**`,
+          inline: true
+        },
+        {
+          name: `${E.profile} Player`,
+          value: `${targetUser}\n**${playerRow[2]}**`,
+          inline: true
+        },
+        {
+          name: `${E.trophy} Weekly Wage`,
+          value: `$${newWages.toLocaleString()}`,
+          inline: true
+        }
       )
       .setTimestamp();
 

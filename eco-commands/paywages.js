@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
 const { updateData } = require('../utils/sheets');
+const E = require('../utils/emojis');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -110,19 +111,29 @@ module.exports = {
       spreadsheetId: process.env.RP_SHEET_ID
     });
 
-    // Build an EmbedBuilder titled Weekly Wage Summary
+    // Build an EmbedBuilder titled Weekly Wage Summary using emojis and value formatting
     const embed = new EmbedBuilder()
-      .setTitle('Weekly Wage Summary')
+      .setColor(0x2ECC71)
+      .setTitle(`${E.success} Weekly Wage Summary`)
+      .setDescription(`${E.team} **${club}** wage distribution completed successfully.`)
       .addFields(
-        { name: 'Club', value: club, inline: true },
-        { name: 'Players Paid', value: clubPlayers.length.toString(), inline: true },
-        { name: 'Total Wages', value: `$${totalWages}`, inline: true }
+        { name: `${E.team} Club`, value: club, inline: true },
+        { name: `${E.profile} Players Paid`, value: `${clubPlayers.length}`, inline: true },
+        { name: `${E.trophy} Total Wages`, value: `$${totalWages.toLocaleString()}`, inline: true },
+        {
+          name: `${E.correct} Payments`,
+          value: clubPlayers.map(row => {
+            const wage = row[3] && String(row[3]).trim() !== '' ? `$${Number(String(row[3]).replace(/,/g,'')).toLocaleString()}` : 'Wages Not Set';
+            return `${E.doubleArrow} **${row[2]}** • ${wage}`;
+          }).join('\n')
+        },
+        {
+          name: `${E.greenIcon} Remaining Club Balance`,
+          value: `$${newClubBalance.toLocaleString()}`,
+          inline: false
+        }
       )
-      .setDescription(
-        clubPlayers.map(row => `• ${row[2]} — $${row[3]}`).join('\n') +
-        `\n\nRemaining Club Balance: $${newClubBalance}`
-      )
-      .setFooter({ text: 'Balance transfers are now implemented.' });
+      .setTimestamp();
 
     return { embeds: [embed] };
   },
