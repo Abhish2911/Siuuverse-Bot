@@ -78,7 +78,9 @@ module.exports = {
     const faClubRow = economy[faRowIndex];
 
     // Check FA balance (column D, index 3)
-    let faBalance = Number(faClubRow[3] || 0);
+    let faBalance = Number(String(faClubRow[3] || '0').replace(/,/g, '')) || 0;
+    console.log('[FAPAY] FA Row:', faClubRow);
+    console.log('[FAPAY] Parsed FA Balance:', faBalance);
     if (isNaN(faBalance)) faBalance = 0;
     if (faBalance < amount) {
       return { content: `${E.error} The FA club does not have enough balance for this payment.` };
@@ -86,7 +88,7 @@ module.exports = {
 
     // Update balances (column D, index 3)
     const newFaBalance = faBalance - amount;
-    let playerBalance = Number(playerRow[3] || 0);
+    let playerBalance = Number(String(playerRow[3] || '0').replace(/,/g, '')) || 0;
     if (isNaN(playerBalance)) playerBalance = 0;
     const newPlayerBalance = playerBalance + amount;
 
