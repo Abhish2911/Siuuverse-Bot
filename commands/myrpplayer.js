@@ -23,10 +23,14 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const rows = await getData(
-      'Player_Data!A:Q',
-      { spreadsheetId: process.env.RP_SHEET_ID }
-    );
+    const [rows, wagesRows] = await Promise.all([
+      getData('Player_Data!A:Q', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('Wages!A:D', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      })
+    ]);
 
     const targetUser = interaction.options.getUser('user');
     const playerNameSearch = interaction.options.getString('player');
@@ -81,6 +85,14 @@ module.exports = {
       tp: Number(playerRow[16] || 0)
     };
 
+    const wageRow = wagesRows
+      .slice(1)
+      .find(row => String(row[1] || '').trim() === player.discordId);
+
+    const wages = wageRow && String(wageRow[3] || '').trim() !== ''
+      ? `$${Number(String(wageRow[3]).replace(/,/g, '')).toLocaleString()}`
+      : 'Not Set';
+
     let discordUsername = 'Unknown User';
 let avatarURL = interaction.client.user.displayAvatarURL({
   extension: 'png',
@@ -106,7 +118,8 @@ try {
         `**OVR:** ${player.ovr} • **MV:** ${player.marketValue}`,
         `**Club:** ${player.club}`,
         `**Positions:** ${player.positions}`,
-        `**Total TP:** ${player.tp}`
+        `**Total TP:** ${player.tp}`,
+        `**Weekly Wages:** ${wages}`
       ].join('\n'))
       .addFields(
         {
