@@ -32,6 +32,7 @@ module.exports = {
 
   async execute(interaction) {
     const userId = interaction.user.id;
+    const isOwner = userId === process.env.OWNER_ID;
     const targetUser = interaction.options.getUser('user');
     const playerNameInput = interaction.options.getString('player')?.trim();
     const wageInput = interaction.options.getString('wages').trim().toLowerCase();
@@ -56,16 +57,15 @@ module.exports = {
       return { content: '❌ Could not access Managers sheet.' };
     }
     const managers = managersDataRaw.slice(1);
-    // 2. Verify user is a manager
+    // 2. Verify user is a manager or owner
     const managerRow = managers.find(row => row[0] === userId);
-    if (!managerRow) {
+
+    if (!isOwner && !managerRow) {
       return { content: '❌ Only club managers can use this command.' };
     }
+
     // 3. Determine manager's club (column C)
-    const managerClub = managerRow[2];
-    if (!managerClub) {
-      return { content: '❌ Could not determine your club.' };
-    }
+    const managerClub = managerRow?.[2] ?? null;
 
     // 4. Read Wages sheet (A:D)
     let wagesRowsRaw;
@@ -81,7 +81,6 @@ module.exports = {
     // 5. Find row matching club and player
     // Columns: Club Name | UserID | Player Name | Wages
     const normalize = val => String(val || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const isOwner = interaction.user.id === process.env.OWNER_ID;
 
     const playerRowIndex = isOwner
       ? wagesRows.findIndex(row => String(row[1]).trim() === targetUser.id)
