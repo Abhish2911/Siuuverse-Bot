@@ -17,12 +17,11 @@ module.exports = {
         .setDescription('Select the player')
         .setRequired(true)
     )
-    .addIntegerOption(option =>
+    .addStringOption(option =>
       option
         .setName('wages')
-        .setDescription('The new weekly wage')
+        .setDescription('Weekly wage (examples: 8000, 8k, 300k, 8m)')
         .setRequired(true)
-        .setMinValue(0)
     )
     .addStringOption(option =>
       option
@@ -35,7 +34,17 @@ module.exports = {
     const userId = interaction.user.id;
     const targetUser = interaction.options.getUser('user');
     const playerNameInput = interaction.options.getString('player')?.trim();
-    const newWages = interaction.options.getInteger('wages');
+    const wageInput = interaction.options.getString('wages').trim().toLowerCase();
+
+    const match = wageInput.match(/^(\d+(?:\.\d+)?)([km]?)$/);
+    if (!match) {
+      return { content: '❌ Invalid wage. Examples: `8000`, `8k`, `300k`, `8m`.' };
+    }
+
+    let newWages = Number(match[1]);
+    if (match[2] === 'k') newWages *= 1_000;
+    if (match[2] === 'm') newWages *= 1_000_000;
+    newWages = Math.round(newWages);
 
     // 1. Read Managers sheet (A:C)
     let managersDataRaw;
