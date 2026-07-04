@@ -26,7 +26,7 @@ module.exports = {
     // Owner check
     const OWNER_IDS = (process.env.OWNER_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
     if (!OWNER_IDS.includes(interaction.user.id)) {
-      return interaction.reply({ content: '❌ Only bot owners can use this command.', ephemeral: true });
+      return { content: '❌ Only bot owners can use this command.' };
     }
 
     // Parse options
@@ -48,38 +48,40 @@ module.exports = {
         throw new Error('Invalid amount format');
       }
     } catch (e) {
-      return interaction.reply({ content: '❌ Invalid amount format. Use e.g. `50000`, `50k`, `2m`.', ephemeral: true });
+      return { content: '❌ Invalid amount format. Use e.g. `50000`, `50k`, `2m`.' };
     }
     if (amount <= 0) {
-      return interaction.reply({ content: '❌ Amount must be greater than zero.', ephemeral: true });
+      return { content: '❌ Amount must be greater than zero.' };
     }
 
     // Get economy data
-    const economySheet = 'Economy';
-    const economyData = await cachedGetData(economySheet);
+    const economyData = await cachedGetData('Economy!A:D', {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
+    const economy = economyData.slice(1);
 
     // Find player row by UserID in column B (index 1)
-    const playerRowIndex = economyData.findIndex(row => String(row[1]).trim() === targetUser.id);
+    const playerRowIndex = economy.findIndex(row => String(row[1]).trim() === targetUser.id);
     if (playerRowIndex === -1) {
-      return interaction.reply({ content: `${E.error} Could not find that player in the database.`, ephemeral: true });
+      return { content: `${E.error} Could not find that player in the database.` };
     }
-    const playerRow = economyData[playerRowIndex];
+    const playerRow = economy[playerRowIndex];
 
     // Find FA row by Club Name 'The FA' in column A (index 0) OR UserID '844445906845433906' in column B (index 1)
-    const faRowIndex = economyData.findIndex(row =>
+    const faRowIndex = economy.findIndex(row =>
       String(row[0]).trim() === 'The FA' ||
       String(row[1]).trim() === '844445906845433906'
     );
     if (faRowIndex === -1) {
-      return interaction.reply({ content: `${E.error} Could not find the FA club in the database.`, ephemeral: true });
+      return { content: `${E.error} Could not find the FA club in the database.` };
     }
-    const faClubRow = economyData[faRowIndex];
+    const faClubRow = economy[faRowIndex];
 
     // Check FA balance (column D, index 3)
     let faBalance = Number(faClubRow[3] || 0);
     if (isNaN(faBalance)) faBalance = 0;
     if (faBalance < amount) {
-      return interaction.reply({ content: `${E.error} The FA club does not have enough balance for this payment.`, ephemeral: true });
+      return { content: `${E.error} The FA club does not have enough balance for this payment.` };
     }
 
     // Update balances (column D, index 3)
@@ -88,11 +90,28 @@ module.exports = {
     if (isNaN(playerBalance)) playerBalance = 0;
     const newPlayerBalance = playerBalance + amount;
 
-    faClubRow[3] = newFaBalance;
-    playerRow[3] = newPlayerBalance;
+    const faRow = faRowIndex + 2;
+    const playerRowNumber = playerRowIndex + 2;
 
-    // Save economy sheet once
-    await updateData(economySheet, 'A2:D', economyData);
+    await updateData(`Economy!D${faRow}`, [[newFaBalance]], {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
+
+    await updateData(`Economy!D${playerRowNumber}`, [[newPlayerBalance]], {
+      spreadsheetId: process.env.RP_SHEET_ID
+    });
+
+    // DM the recipient
+    try {
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle('💰 FA Reward Received')
+        .setDescription(`**From:** The FA\n**Amount:** $${amount.toLocaleString('en-US')}\n**Reason:** ${reason}\n**New Balance:** $${newPlayerBalance.toLocaleString('en-US')}`)
+        .setTimestamp();
+      await targetUser.send({ embeds: [dmEmbed] });
+    } catch (err) {
+      // Ignore DM errors
+    }
 
     // Format numbers with commas
     const formatNum = n => n.toLocaleString('en-US');
@@ -126,6 +145,6 @@ module.exports = {
       )
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed] };
   }
 };
