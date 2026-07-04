@@ -106,43 +106,51 @@ module.exports = {
     // DM the recipient
     try {
       const dmEmbed = new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setTitle('💰 FA Reward Received')
-        .setDescription(`**From:** The FA\n**Amount:** $${amount.toLocaleString('en-US')}\n**Reason:** ${reason}\n**New Balance:** $${newPlayerBalance.toLocaleString('en-US')}`)
+        .setColor(0x2ECC71)
+        .setTitle(`${E.success} FA Reward Received`)
+        .setDescription(
+          `${E.FA} **The FA** has rewarded you.\n\n` +
+          `${E.profile} **Player:** ${playerRow[2]}\n` +
+          `${E.trophy} **Reason:** ${reason}\n\n` +
+          `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
+          `${E.trophy} **New Balance:** ${newPlayerBalance.toLocaleString()} SiuuCoins`
+        )
         .setTimestamp();
       await targetUser.send({ embeds: [dmEmbed] });
     } catch (err) {
       // Ignore DM errors
     }
 
-    // Format numbers with commas
-    const formatNum = n => n.toLocaleString('en-US');
-
-    // Reply with success embed
+    // Reply with improved success embed
     const embed = new EmbedBuilder()
-      .setColor(0x2ecc71)
-      .setTitle(`${E.success} FA Payment Complete`)
-      .setDescription(`${E.trophy} Funds transferred from **The FA**.`)
+      .setColor(0x2ECC71)
+      .setTitle(`${E.success} FA Payment Successful`)
+      .setDescription(`${E.FA} Reward issued successfully from **The FA**.`)
       .addFields(
         {
-          name: 'Recipient',
+          name: `${E.profile} Recipient`,
           value: `${targetUser}\n**${playerRow[2]}**`,
           inline: true
         },
         {
-          name: 'Amount',
-          value: `**$${formatNum(amount)}**`,
+          name: `${E.greenIcon} Reward`,
+          value: `**${amount.toLocaleString()} SiuuCoins**`,
           inline: true
         },
         {
-          name: 'Reason',
+          name: `${E.trophy} Reason`,
           value: reason,
           inline: false
         },
         {
-          name: 'Remaining FA Balance',
-          value: `$${formatNum(newFaBalance)}`,
-          inline: false
+          name: `${E.money || '💰'} Recipient Balance`,
+          value: `**${newPlayerBalance.toLocaleString()} SiuuCoins**`,
+          inline: true
+        },
+        {
+          name: `${E.FA} FA Balance`,
+          value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
+          inline: true
         }
       )
       .setTimestamp();
