@@ -32,7 +32,16 @@ module.exports = {
 
   async execute(interaction) {
     const userId = interaction.user.id;
-    const isOwner = userId === process.env.OWNER_ID;
+    const ownerIds = (process.env.OWNER_IDS ?? '')
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+
+    const isOwner = ownerIds.includes(userId);
+
+    console.log('[setwages] userId:', userId);
+    console.log('[setwages] OWNER_IDS:', ownerIds);
+    console.log('[setwages] isOwner:', isOwner);
     const targetUser = interaction.options.getUser('user');
     const playerNameInput = interaction.options.getString('player')?.trim();
     const wageInput = interaction.options.getString('wages').trim().toLowerCase();
