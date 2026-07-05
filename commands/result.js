@@ -494,6 +494,11 @@ module.exports = {
               inline: false
             },
             {
+              name: `${safeEmoji(E.flag, '🏁')} Match Decision`,
+              value: decision || 'Regular Time',
+              inline: true
+            },
+            {
               name: `${safeEmoji(E.goal, '⚽')} Goalscorers`,
               value: compactCountList(scorers),
               inline: true
@@ -632,14 +637,12 @@ module.exports = {
           const agIndex = pending.competition.agIndex ?? 5;
           const resultIndex = pending.competition.resultIndex ?? 6;
           const decisionIndex = pending.competition.decisionIndex ?? 7;
-          const statusIndex = pending.competition.statusIndex;
 
           const maxIndex = Math.max(
             hgIndex,
             agIndex,
             resultIndex,
-            decisionIndex,
-            statusIndex ?? -1
+            decisionIndex
           );
 
           while (fixtureRows[fixtureIndex].length <= maxIndex) {
@@ -762,6 +765,11 @@ module.exports = {
               name: `${safeEmoji(E.mvp, '⭐')} Player of the Match`,
               value: pending.mvp ? `${safeEmoji(E.mvp, '⭐')} **${pending.mvp}**` : 'Not selected',
               inline: false
+            },
+            {
+              name: `${safeEmoji(E.flag, '🏁')} Match Decision`,
+              value: pending.decision || 'Regular Time',
+              inline: true
             },
             {
               name: `${safeEmoji(E.goal, '⚽')} Goalscorers`,
