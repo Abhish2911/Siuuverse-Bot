@@ -324,8 +324,34 @@ function getWinnersFromFixtures(fixtures) {
 
     const sorted = [...teamTotals.values()].sort((a, b) => b.goals - a.goals);
 
-    if (!sorted.length || sorted[0].goals === sorted[1]?.goals) {
-      return { ok: false, reason: `${tieKey} is tied on aggregate. Enter final winning score before advancing.` };
+    if (!sorted.length) {
+      return { ok: false, reason: `${tieKey} could not determine a winner.` };
+    }
+
+    if (sorted[0].goals === sorted[1]?.goals) {
+      const secondLeg = legs.find(l => /B$/i.test(clean(l.md))) || legs[legs.length - 1];
+      const decision = clean(secondLeg.decision).toUpperCase();
+
+      if (decision === 'ET H' || decision === 'PENS H') {
+        winners.push({
+          teamName: secondLeg.homeTeam,
+          shortName: secondLeg.homeShort
+        });
+        continue;
+      }
+
+      if (decision === 'ET A' || decision === 'PENS A') {
+        winners.push({
+          teamName: secondLeg.awayTeam,
+          shortName: secondLeg.awayShort
+        });
+        continue;
+      }
+
+      return {
+        ok: false,
+        reason: `${tieKey} is tied on aggregate. Enter ET/PENS decision before advancing.`
+      };
     }
 
     winners.push({
