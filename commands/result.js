@@ -616,7 +616,7 @@ module.exports = {
 
     // Update fixture sheet scores as well
     try {
-      const fixtureSheet = await getData(pending.competition.fixturesRange);
+      const fixtureSheet = await getData(pending.competition.fixturesRange, { cache: false });
 
       if (Array.isArray(fixtureSheet) && fixtureSheet.length > 1) {
         const fixtureRows = fixtureSheet.slice(1);
@@ -628,34 +628,42 @@ module.exports = {
         if (fixtureIndex !== -1) {
           const isLeagueOrUclGroup = pending.competition.fixturesRange.includes('Fixtures!') || pending.competition.fixturesRange.includes('UCL_Coop_Group_Fixtures');
 
-          const hgIndex = 4;
-          const agIndex = 5;
-          const resultIndex = 6;
-          const statusIndex = 9;
+          const hgIndex = pending.competition.hgIndex ?? 4;
+          const agIndex = pending.competition.agIndex ?? 5;
+          const resultIndex = pending.competition.resultIndex ?? 6;
+          const decisionIndex = pending.competition.decisionIndex ?? 7;
+          const statusIndex = pending.competition.statusIndex;
 
-          while (fixtureRows[fixtureIndex].length <= statusIndex) {
+          const maxIndex = Math.max(
+            hgIndex,
+            agIndex,
+            resultIndex,
+            decisionIndex,
+            statusIndex ?? -1
+          );
+
+          while (fixtureRows[fixtureIndex].length <= maxIndex) {
             fixtureRows[fixtureIndex].push('');
           }
 
           fixtureRows[fixtureIndex][hgIndex] = pending.hg;
           fixtureRows[fixtureIndex][agIndex] = pending.ag;
-
           fixtureRows[fixtureIndex][resultIndex] = pending.hg > pending.ag
             ? 'H'
             : pending.hg < pending.ag
               ? 'A'
               : 'D';
 
-          fixtureRows[fixtureIndex][statusIndex] = 'Played';
-
-          if (!isLeagueOrUclGroup) {
-            fixtureRows[fixtureIndex][7] = pending.decision || '';
+          if (decisionIndex != null) {
+            fixtureRows[fixtureIndex][decisionIndex] = pending.decision || '';
           }
 
-          const fixtureSheetName = pending.competition.fixturesRange.split('!')[0];
 
+          const fixtureSheetName = pending.competition.fixturesRange.split('!')[0];
+          const longestRow = Math.max(...fixtureRows.map(r => r.length));
+          const lastColumn = String.fromCharCode(64 + longestRow);
           await updateData(
-            `${fixtureSheetName}!A2:J`,
+            `${fixtureSheetName}!A2:${lastColumn}`,
             fixtureRows
           );
         }

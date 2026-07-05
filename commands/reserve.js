@@ -46,9 +46,9 @@ function getCompetitionConfig(matchNo) {
       label: 'FA Cup',
       reserveLabel: 'FA Cup',
       fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
-      matchNoIndex: 1,
-      homeIndex: 3,
-      awayIndex: 4
+      matchNoIndex: 0,
+      homeIndex: 2,
+      awayIndex: 3
     };
   }
 
@@ -58,9 +58,9 @@ function getCompetitionConfig(matchNo) {
       label: 'Carabao Cup',
       reserveLabel: 'Carabao Cup',
       fixturesRange: 'Carabao_Coop_Fixtures!A:K',
-      matchNoIndex: 1,
-      homeIndex: 3,
-      awayIndex: 4
+      matchNoIndex: 0,
+      homeIndex: 2,
+      awayIndex: 3
     };
   }
 
