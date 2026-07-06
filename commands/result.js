@@ -636,13 +636,13 @@ module.exports = {
           const hgIndex = pending.competition.hgIndex ?? 4;
           const agIndex = pending.competition.agIndex ?? 5;
           const resultIndex = pending.competition.resultIndex ?? 6;
-          const decisionIndex = pending.competition.decisionIndex ?? 7;
+          const decisionIndex = pending.competition.decisionIndex;
 
           const maxIndex = Math.max(
             hgIndex,
             agIndex,
             resultIndex,
-            decisionIndex
+            ...(decisionIndex != null ? [decisionIndex] : [])
           );
 
           while (fixtureRows[fixtureIndex].length <= maxIndex) {
@@ -657,7 +657,7 @@ module.exports = {
               ? 'A'
               : 'D';
 
-          if (decisionIndex != null) {
+          if (decisionIndex !== undefined && decisionIndex !== null) {
             fixtureRows[fixtureIndex][decisionIndex] = pending.decision || '';
           }
 
