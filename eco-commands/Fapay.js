@@ -10,7 +10,12 @@ module.exports = {
     .addUserOption(opt =>
       opt.setName('user')
         .setDescription('The user to pay')
-        .setRequired(true)
+        .setRequired(false)
+    )
+    .addStringOption(opt =>
+      opt.setName('club')
+        .setDescription('Pay every player in a club')
+        .setRequired(false)
     )
     .addStringOption(opt =>
       opt.setName('amount')
@@ -31,8 +36,15 @@ module.exports = {
 
     // Parse options
     const targetUser = interaction.options.getUser('user');
+    const clubName = interaction.options.getString('club');
     const rawAmount = interaction.options.getString('amount');
     const reason = interaction.options.getString('reason') || 'No reason provided';
+
+    if ((targetUser && clubName) || (!targetUser && !clubName)) {
+      return {
+        content: '❌ Please specify either a user or a club (not both).'
+      };
+    }
 
     // Parse amount (support k/m suffixes)
     let amount;
@@ -60,13 +72,6 @@ module.exports = {
     });
     const economy = economyData.slice(1);
 
-    // Find player row by UserID in column B (index 1)
-    const playerRowIndex = economy.findIndex(row => String(row[1]).trim() === targetUser.id);
-    if (playerRowIndex === -1) {
-      return { content: `${E.error} Could not find that player in the database.` };
-    }
-    const playerRow = economy[playerRowIndex];
-
     // Find FA row by Club Name 'The FA' in column A (index 0) OR UserID '844445906845433906' in column B (index 1)
     const faRowIndex = economy.findIndex(row =>
       String(row[0]).trim() === 'The FA' ||
@@ -82,79 +87,188 @@ module.exports = {
     console.log('[FAPAY] FA Row:', faClubRow);
     console.log('[FAPAY] Parsed FA Balance:', faBalance);
     if (isNaN(faBalance)) faBalance = 0;
-    if (faBalance < amount) {
-      return { content: `${E.error} The FA club does not have enough balance for this payment.` };
-    }
 
-    // Update balances (column D, index 3)
-    const newFaBalance = faBalance - amount;
-    let playerBalance = Number(String(playerRow[3] || '0').replace(/,/g, '')) || 0;
-    if (isNaN(playerBalance)) playerBalance = 0;
-    const newPlayerBalance = playerBalance + amount;
+    if (targetUser) {
+      // Single user payment logic
+      // Find player row by UserID in column B (index 1)
+      const playerRowIndex = economy.findIndex(row => String(row[1]).trim() === targetUser.id);
+      if (playerRowIndex === -1) {
+        return { content: `${E.error} Could not find that player in the database.` };
+      }
+      const playerRow = economy[playerRowIndex];
 
-    const faRow = faRowIndex + 2;
-    const playerRowNumber = playerRowIndex + 2;
+      if (faBalance < amount) {
+        return { content: `${E.error} The FA club does not have enough balance for this payment.` };
+      }
 
-    await updateData(`Economy!D${faRow}`, [[newFaBalance]], {
-      spreadsheetId: process.env.RP_SHEET_ID
-    });
+      // Update balances (column D, index 3)
+      const newFaBalance = faBalance - amount;
+      let playerBalance = Number(String(playerRow[3] || '0').replace(/,/g, '')) || 0;
+      if (isNaN(playerBalance)) playerBalance = 0;
+      const newPlayerBalance = playerBalance + amount;
 
-    await updateData(`Economy!D${playerRowNumber}`, [[newPlayerBalance]], {
-      spreadsheetId: process.env.RP_SHEET_ID
-    });
+      const faRow = faRowIndex + 2;
+      const playerRowNumber = playerRowIndex + 2;
 
-    // DM the recipient
-    try {
-      const dmEmbed = new EmbedBuilder()
+      await updateData(`Economy!D${faRow}`, [[newFaBalance]], {
+        spreadsheetId: process.env.RP_SHEET_ID
+      });
+
+      await updateData(`Economy!D${playerRowNumber}`, [[newPlayerBalance]], {
+        spreadsheetId: process.env.RP_SHEET_ID
+      });
+
+      // DM the recipient
+      try {
+        const dmEmbed = new EmbedBuilder()
+          .setColor(0x2ECC71)
+          .setTitle(`${E.success} FA Reward Received`)
+          .setDescription(
+            `${E.FA} **The FA** has rewarded you.\n\n` +
+            `${E.profile} **Player:** ${playerRow[2]}\n` +
+            `${E.trophy} **Reason:** ${reason}\n\n` +
+            `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
+            `${E.trophy} **New Balance:** ${newPlayerBalance.toLocaleString()} SiuuCoins`
+          )
+          .setTimestamp();
+        await targetUser.send({ embeds: [dmEmbed] });
+      } catch (err) {
+        // Ignore DM errors
+      }
+
+      // Reply with improved success embed
+      const embed = new EmbedBuilder()
         .setColor(0x2ECC71)
-        .setTitle(`${E.success} FA Reward Received`)
-        .setDescription(
-          `${E.FA} **The FA** has rewarded you.\n\n` +
-          `${E.profile} **Player:** ${playerRow[2]}\n` +
-          `${E.trophy} **Reason:** ${reason}\n\n` +
-          `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
-          `${E.trophy} **New Balance:** ${newPlayerBalance.toLocaleString()} SiuuCoins`
+        .setTitle(`${E.success} FA Payment Successful`)
+        .setDescription(`${E.FA} Reward issued successfully from **The FA**.`)
+        .addFields(
+          {
+            name: `${E.profile} Recipient`,
+            value: `${targetUser}\n**${playerRow[2]}**`,
+            inline: true
+          },
+          {
+            name: `${E.greenIcon} Reward`,
+            value: `**${amount.toLocaleString()} SiuuCoins**`,
+            inline: true
+          },
+          {
+            name: `${E.trophy} Reason`,
+            value: reason,
+            inline: false
+          },
+          {
+            name: `${E.money || '💰'} Recipient Balance`,
+            value: `**${newPlayerBalance.toLocaleString()} SiuuCoins**`,
+            inline: true
+          },
+          {
+            name: `${E.FA} FA Balance`,
+            value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
+            inline: true
+          }
         )
         .setTimestamp();
-      await targetUser.send({ embeds: [dmEmbed] });
-    } catch (err) {
-      // Ignore DM errors
-    }
 
-    // Reply with improved success embed
-    const embed = new EmbedBuilder()
-      .setColor(0x2ECC71)
-      .setTitle(`${E.success} FA Payment Successful`)
-      .setDescription(`${E.FA} Reward issued successfully from **The FA**.`)
-      .addFields(
-        {
-          name: `${E.profile} Recipient`,
-          value: `${targetUser}\n**${playerRow[2]}**`,
-          inline: true
-        },
-        {
-          name: `${E.greenIcon} Reward`,
-          value: `**${amount.toLocaleString()} SiuuCoins**`,
-          inline: true
-        },
-        {
-          name: `${E.trophy} Reason`,
-          value: reason,
-          inline: false
-        },
-        {
-          name: `${E.money || '💰'} Recipient Balance`,
-          value: `**${newPlayerBalance.toLocaleString()} SiuuCoins**`,
-          inline: true
-        },
-        {
-          name: `${E.FA} FA Balance`,
-          value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
-          inline: true
+      return { embeds: [embed] };
+    } else {
+      // Club payment logic
+      const players = economy.filter(row =>
+        row[0] &&
+        String(row[0]).trim().toLowerCase() === clubName.trim().toLowerCase() &&
+        String(row[0]).trim() !== 'The FA'
+      );
+
+      if (players.length === 0) {
+        return { content: `${E.error} Could not find any players in the club "${clubName}".` };
+      }
+
+      const totalCost = amount * players.length;
+
+      if (faBalance < totalCost) {
+        return { content: `${E.error} The FA club does not have enough balance for this payment.` };
+      }
+
+      // Deduct FA balance once
+      const newFaBalance = faBalance - totalCost;
+      const faRow = faRowIndex + 2;
+      await updateData(`Economy!D${faRow}`, [[newFaBalance]], {
+        spreadsheetId: process.env.RP_SHEET_ID
+      });
+
+      // Track number of players paid
+      let playersPaid = 0;
+
+      for (const playerRow of players) {
+        let playerBalance = Number(String(playerRow[3] || '0').replace(/,/g, '')) || 0;
+        if (isNaN(playerBalance)) playerBalance = 0;
+        const newPlayerBalance = playerBalance + amount;
+
+        const playerRowNumber = economy.indexOf(playerRow) + 2;
+
+        await updateData(`Economy!D${playerRowNumber}`, [[newPlayerBalance]], {
+          spreadsheetId: process.env.RP_SHEET_ID
+        });
+
+        const playerDiscordId = String(playerRow[1]).trim();
+        if (playerDiscordId) {
+          try {
+            const user = await interaction.client.users.fetch(playerDiscordId);
+            if (user) {
+              const dmEmbed = new EmbedBuilder()
+                .setColor(0x2ECC71)
+                .setTitle(`${E.success} FA Reward Received`)
+                .setDescription(
+                  `${E.FA} **The FA** has rewarded you.\n\n` +
+                  `${E.profile} **Player:** ${playerRow[2]}\n` +
+                  `${E.trophy} **Reason:** ${reason}\n\n` +
+                  `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
+                  `${E.trophy} **New Balance:** ${newPlayerBalance.toLocaleString()} SiuuCoins`
+                )
+                .setTimestamp();
+              await user.send({ embeds: [dmEmbed] });
+            }
+          } catch {
+            // Ignore DM errors
+          }
         }
-      )
-      .setTimestamp();
+        playersPaid++;
+      }
 
-    return { embeds: [embed] };
+      const embed = new EmbedBuilder()
+        .setColor(0x2ECC71)
+        .setTitle(`${E.success} FA Club Payment Successful`)
+        .setDescription(`${E.FA} Reward issued successfully from **The FA** to club **${clubName}**.`)
+        .addFields(
+          {
+            name: 'Club',
+            value: `**${clubName}**`,
+            inline: true
+          },
+          {
+            name: 'Players Paid',
+            value: `${playersPaid}`,
+            inline: true
+          },
+          {
+            name: 'Amount Per Player',
+            value: `**${amount.toLocaleString()} SiuuCoins**`,
+            inline: true
+          },
+          {
+            name: 'Total Paid',
+            value: `**${totalCost.toLocaleString()} SiuuCoins**`,
+            inline: true
+          },
+          {
+            name: `${E.FA} New FA Balance`,
+            value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
+            inline: true
+          }
+        )
+        .setTimestamp();
+
+      return { embeds: [embed] };
+    }
   }
 };
