@@ -7,6 +7,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('fapay')
     .setDescription('Pay rewards from the FA club to a player.')
+    .addStringOption(opt =>
+      opt.setName('amount')
+        .setDescription('Amount to pay (e.g. 50000, 50k, 2m)')
+        .setRequired(true)
+    )
     .addUserOption(opt =>
       opt.setName('user')
         .setDescription('The user to pay')
@@ -16,11 +21,6 @@ module.exports = {
       opt.setName('club')
         .setDescription('Pay every player in a club')
         .setRequired(false)
-    )
-    .addStringOption(opt =>
-      opt.setName('amount')
-        .setDescription('Amount to pay (e.g. 50000, 50k, 2m)')
-        .setRequired(true)
     )
     .addStringOption(opt =>
       opt.setName('reason')
