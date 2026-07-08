@@ -21,6 +21,18 @@ function normalizeClubName(club) {
     return 'REAL MADRID';
   }
 
+  if (['BAYERN MUNICH', 'BAYERN', 'FC BAYERN', 'BAYERN MÜNCHEN'].includes(value)) {
+    return 'BAYERN MUNICH';
+  }
+
+  if (['JUVENTUS', 'JUVE', 'FC JUVENTUS'].includes(value)) {
+    return 'JUVENTUS';
+  }
+
+  if (['PSG', 'PARIS SAINT GERMAIN', 'FC PSG'].includes(value)) {
+    return 'PSG';
+  }
+
   return value;
 }
 
