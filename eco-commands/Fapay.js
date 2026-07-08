@@ -124,7 +124,7 @@ module.exports = {
           .setColor(0x2ECC71)
           .setTitle(`${E.success} FA Reward Received`)
           .setDescription(
-            `${E.FA} **The FA** has rewarded you.\n\n` +
+            `${E.captain} **The FA** has rewarded you.\n\n` +
             `${E.profile} **Player:** ${playerRow[2]}\n` +
             `${E.trophy} **Reason:** ${reason}\n\n` +
             `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
@@ -140,7 +140,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setColor(0x2ECC71)
         .setTitle(`${E.success} FA Payment Successful`)
-        .setDescription(`${E.FA} Reward issued successfully from **The FA**.`)
+        .setDescription(`${E.captain} Reward issued successfully from **The FA**.`)
         .addFields(
           {
             name: `${E.profile} Recipient`,
@@ -163,7 +163,7 @@ module.exports = {
             inline: true
           },
           {
-            name: `${E.FA} FA Balance`,
+            name: `${E.captain} FA Balance`,
             value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
             inline: true
           }
@@ -219,7 +219,7 @@ module.exports = {
                 .setColor(0x2ECC71)
                 .setTitle(`${E.success} FA Reward Received`)
                 .setDescription(
-                  `${E.FA} **The FA** has rewarded you.\n\n` +
+                  `${E.captain} **The FA** has rewarded you.\n\n` +
                   `${E.profile} **Player:** ${playerRow[2]}\n` +
                   `${E.trophy} **Reason:** ${reason}\n\n` +
                   `${E.greenIcon} **Reward:** ${amount.toLocaleString()} SiuuCoins\n` +
@@ -238,7 +238,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setColor(0x2ECC71)
         .setTitle(`${E.success} FA Club Payment Successful`)
-        .setDescription(`${E.FA} Reward issued successfully from **The FA** to club **${clubName}**.`)
+        .setDescription(`${E.captain} Reward issued successfully from **The FA** to club **${clubName}**.`)
         .addFields(
           {
             name: 'Club',
@@ -261,7 +261,7 @@ module.exports = {
             inline: true
           },
           {
-            name: `${E.FA} New FA Balance`,
+            name: `${E.captain} New FA Balance`,
             value: `**${newFaBalance.toLocaleString()} SiuuCoins**`,
             inline: true
           }
