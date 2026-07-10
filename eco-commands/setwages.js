@@ -7,6 +7,40 @@ const E = require('../utils/emojis');
 const MANAGERS_SHEET = 'Managers';
 const WAGES_SHEET = 'Wages';
 
+function normalizeClubName(club) {
+  const value = String(club || '').trim().toUpperCase();
+
+  if (['FC BARCELONA', 'BARCELONA', 'BARCA'].includes(value)) {
+    return 'FC BARCELONA';
+  }
+
+  if (['MANCHESTER CITY', 'MAN CITY', 'CITY'].includes(value)) {
+    return 'MANCHESTER CITY';
+  }
+
+  if (['MANCHESTER UNITED', 'MAN UNITED', 'MAN UTD', 'UNITED'].includes(value)) {
+    return 'MANCHESTER UNITED';
+  }
+
+  if (['REAL MADRID', 'MADRID'].includes(value)) {
+    return 'REAL MADRID';
+  }
+
+  if (['BAYERN MUNICH', 'BAYERN', 'FC BAYERN', 'BAYERN MÜNCHEN'].includes(value)) {
+    return 'BAYERN MUNICH';
+  }
+
+  if (['AC MILAN', 'MILAN', 'FC MILAN'].includes(value)) {
+    return 'AC MILAN';
+  }
+
+  if (['PSG', 'PARIS SAINT GERMAIN', 'FC PSG'].includes(value)) {
+    return 'PSG';
+  }
+
+  return value;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setwages')
@@ -94,7 +128,7 @@ module.exports = {
     const playerRowIndex = isOwner
       ? wagesRows.findIndex(row => String(row[1]).trim() === targetUser.id)
       : wagesRows.findIndex(row =>
-          normalize(row[0]) === normalize(managerClub) &&
+          normalizeClubName(row[0]) === normalizeClubName(managerClub) &&
           String(row[1]).trim() === targetUser.id
         );
     if (playerRowIndex === -1) {
