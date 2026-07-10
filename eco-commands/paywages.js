@@ -103,6 +103,27 @@ module.exports = {
       await updateData(`Economy!D${playerRowNumber}`, [[newBalance]], {
         spreadsheetId: process.env.RP_SHEET_ID
       });
+
+      // DM the player their wages
+      try {
+        const user = await interaction.client.users.fetch(playerUserId);
+
+        const dmEmbed = new EmbedBuilder()
+          .setColor(0x2ECC71)
+          .setTitle(`${E.success} Wages Received`)
+          .setDescription([
+            `${E.money || '💰'} Your weekly wages have been credited.`,
+            '',
+            `${E.team} Club: **${club}**`,
+            `${E.greenIcon} Wages Received: **$${playerWage.toLocaleString()}**`,
+            `${E.fire} New Balance: **$${newBalance.toLocaleString()}**`
+          ].join('\n'))
+          .setTimestamp();
+
+        await user.send({ embeds: [dmEmbed] });
+      } catch {
+        // Ignore DM failures
+      }
     }
 
     // Subtract totalWages from club account balance
