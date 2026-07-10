@@ -25,8 +25,8 @@ function normalizeClubName(club) {
     return 'BAYERN MUNICH';
   }
 
-  if (['JUVENTUS', 'JUVE', 'FC JUVENTUS'].includes(value)) {
-    return 'JUVENTUS';
+  if (['AC MILAN', 'MILAN', 'FC MILAN'].includes(value)) {
+    return 'AC MILAN';
   }
 
   if (['PSG', 'PARIS SAINT GERMAIN', 'FC PSG'].includes(value)) {
@@ -124,17 +124,29 @@ module.exports = {
         continue;
       }
 
-      let syncedSuccessfully = member.roles.cache.has(role.id);
+let syncedSuccessfully = false;
 
-      if (!syncedSuccessfully) {
-        try {
-          await member.roles.add(role);
-          updated++;
-          syncedSuccessfully = true;
-        } catch {
-          syncedSuccessfully = false;
-        }
-      }
+try {
+  // Remove every other club role
+  const clubRoleIds = [...roleMap.values()];
+  const rolesToRemove = member.roles.cache.filter(
+    r => clubRoleIds.includes(r.id) && r.id !== role.id
+  );
+
+  if (rolesToRemove.size) {
+    await member.roles.remove([...rolesToRemove.values()]);
+  }
+
+  // Add the correct club role if missing
+  if (!member.roles.cache.has(role.id)) {
+    await member.roles.add(role);
+    updated++;
+  }
+
+  syncedSuccessfully = true;
+} catch {
+  syncedSuccessfully = false;
+}
 
       if (syncedSuccessfully) {
         const stat = clubStats.get(clubName);
