@@ -3,6 +3,40 @@ const { cachedGetData } = require('../utils/helpers');
 const { updateData } = require('../utils/sheets');
 const E = require('../utils/emojis');
 
+function normalizeClubName(club) {
+  const value = String(club || '').trim().toUpperCase();
+
+  if (['FC BARCELONA', 'BARCELONA', 'BARCA'].includes(value)) {
+    return 'FC BARCELONA';
+  }
+
+  if (['MANCHESTER CITY', 'MAN CITY', 'CITY'].includes(value)) {
+    return 'MANCHESTER CITY';
+  }
+
+  if (['MANCHESTER UNITED', 'MAN UNITED', 'MAN UTD', 'UNITED'].includes(value)) {
+    return 'MANCHESTER UNITED';
+  }
+
+  if (['REAL MADRID', 'MADRID'].includes(value)) {
+    return 'REAL MADRID';
+  }
+
+  if (['BAYERN MUNICH', 'BAYERN', 'FC BAYERN', 'BAYERN MÜNCHEN'].includes(value)) {
+    return 'BAYERN MUNICH';
+  }
+
+  if (['AC MILAN', 'MILAN', 'FC MILAN'].includes(value)) {
+    return 'AC MILAN';
+  }
+
+  if (['PSG', 'PARIS SAINT GERMAIN', 'FC PSG'].includes(value)) {
+    return 'PSG';
+  }
+
+  return value;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('fapay')
@@ -67,7 +101,7 @@ module.exports = {
     }
 
     // Get economy data
-    const economyData = await cachedGetData('Economy!A:D', {
+    const economyData = await cachedGetData('Economy!A:E', {
       spreadsheetId: process.env.RP_SHEET_ID
     });
     const economy = economyData.slice(1);
@@ -173,11 +207,21 @@ module.exports = {
       return { embeds: [embed] };
     } else {
       // Club payment logic
-      const players = economy.filter(row =>
-        row[0] &&
-        String(row[0]).trim().toLowerCase() === clubName.trim().toLowerCase() &&
-        String(row[0]).trim() !== 'The FA'
-      );
+      const normalizedClub = normalizeClubName(clubName);
+
+      const players = economy.filter(row => {
+        const club = String(row[0] || '').trim();
+        const discordId = String(row[1] || '').trim();
+        const position = String(row[4] || '').trim().toLowerCase();
+
+        return (
+          club &&
+          discordId &&
+          position === 'player' &&
+          normalizeClubName(club) === normalizedClub &&
+          normalizeClubName(club) !== 'THE FA'
+        );
+      });
 
       if (players.length === 0) {
         return { content: `${E.error} Could not find any players in the club "${clubName}".` };
