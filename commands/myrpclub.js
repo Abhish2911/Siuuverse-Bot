@@ -138,7 +138,7 @@ module.exports = {
         const mv = row[3] || '0';
         const tp = row[16] || '0';
 
-        return `\`${index + 1}.\` **${name}** • OVR **${ovr}** • MV **${mv}** • TP **${tp}**`;
+        return `\`${index + 1}.\` **${name}**\n> OVR **${ovr}** • MV **${mv}** • TP **${tp}**`;
       })
       .join('\n');
 
