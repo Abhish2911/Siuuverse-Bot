@@ -7,8 +7,11 @@ module.exports = {
     .setDescription('Snapshot Player_Data into Training_Data'),
 
   async execute(interaction) {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true });
+    }
     if (interaction.user.id !== process.env.OWNER_ID) {
-      return interaction.reply({
+      return interaction.editReply({
         content: '❌ This command can only be used by the bot owner.',
         ephemeral: true
       });
