@@ -10,7 +10,7 @@ module.exports = {
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply({ ephemeral: true });
     }
-    if (interaction.user.id !== process.env.OWNER_ID) {
+    if (interaction.user.id !== process.env.OWNER_IDS) {
       return interaction.editReply({
         content: '❌ This command can only be used by the bot owner.',
         ephemeral: true
