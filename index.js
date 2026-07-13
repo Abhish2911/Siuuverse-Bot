@@ -786,7 +786,7 @@ client.on('messageCreate', async message => {
         await message.delete().catch(() => null);
 
         await message.channel.send({
-          content: `❌ ${role} is on cooldown. Remaining: ${hours}h ${minutes}m`
+          content: `❌ ${role.name} is on cooldown. Remaining: ${hours}h ${minutes}m`
         }).catch(() => null);
 
         return;
