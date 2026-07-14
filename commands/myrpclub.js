@@ -165,11 +165,6 @@ module.exports = {
           inline: true
         },
         {
-          name: '\u200B',
-          value: '\u200B',
-          inline: false
-        },
-        {
           name: 'Players (2/2)',
           value: rightColumn || '—',
           inline: true
@@ -185,12 +180,12 @@ module.exports = {
             `👥 **Squad Size:** ${clubPlayers.length}`,
             `⭐ **Average OVR:** ${avgOVR}`
           ].join('\n'),
-          inline: true
+          inline: false
         },
         {
           name: `${emojis.captain} Manager Name`,
           value: `**${managerName}**`,
-          inline: true
+          inline: false
         }
       )
       .setFooter({
