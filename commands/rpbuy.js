@@ -197,6 +197,8 @@ module.exports = {
       }
     }
 
+    let levelUpText = '';
+
     if (newOVR > oldOVR) {
       await updateData(
         `Player_Data!C${sheetRow}:D${sheetRow}`,
@@ -205,6 +207,8 @@ module.exports = {
           spreadsheetId: process.env.RP_SHEET_ID
         }
       );
+
+      levelUpText = `\n\n🎉 **LEVEL UP!** Your OVR has increased from **${oldOVR} → ${newOVR}**.\n💰 New Market Value: **${MARKET_VALUES[newOVR]}**`;
     }
 
     const embed = new EmbedBuilder()
@@ -217,7 +221,7 @@ module.exports = {
           '',
           `${E.money || '💰'} Spent: **${totalCost.toLocaleString()} SiuuCoins**`,
           `${E.rank} Season Limit: **${purchase.purchases}/5 TP Used**`,
-          `${E.fire} Remaining Balance: **${(balance - totalCost).toLocaleString()} SiuuCoins**`
+          `${E.fire} Remaining Balance: **${(balance - totalCost).toLocaleString()} SiuuCoins**` + levelUpText
         ].join('\n')
       )
       .setTimestamp();
