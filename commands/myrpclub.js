@@ -142,7 +142,7 @@ module.exports = {
         const mv = row[3] || '0';
         const tp = row[16] || '0';
 
-        return `\`${startIndex + index}.\` **${name}** • OVR ${ovr} • MV ${mv} • TP ${tp}`;
+        return `\`${startIndex + index}.\` **${name}**\n> OVR ${ovr}   MV ${mv}   TP ${tp}`;
       })
       .join('\n');
 
@@ -165,9 +165,19 @@ module.exports = {
           inline: true
         },
         {
+          name: '\u200B',
+          value: '\u200B',
+          inline: false
+        },
+        {
           name: 'Players (2/2)',
           value: rightColumn || '—',
           inline: true
+        },
+        {
+          name: '\u200B',
+          value: '\u200B',
+          inline: false
         },
         {
           name: '📊 Club Stats',
