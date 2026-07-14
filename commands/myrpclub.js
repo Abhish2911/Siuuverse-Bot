@@ -142,7 +142,7 @@ module.exports = {
         const mv = row[3] || '0';
         const tp = row[16] || '0';
 
-        return `\`${startIndex + index}.\` **${name}**\n> OVR ${ovr}   MV ${mv}   TP ${tp}`;
+        return `\`${startIndex + index}.\` **${name}**\n> ${emojis.rank} ${ovr}  💸 ${mv}   ${emojis.stats} ${tp}`;
       })
       .join('\n');
 
