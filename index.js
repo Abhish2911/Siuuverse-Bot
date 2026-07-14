@@ -194,12 +194,14 @@ function scheduleTrainReminder(userId) {
             const user = await client.users.fetch(userId);
 
             if (user) {
-              await user.send('🏋️ Your /trainrp cooldown has ended. You can train again now!');
+              const reminderMessage = await user.send('🏋️ Your /trainrp cooldown has ended. You can train again now!');
+              freshCooldown.reminderMessageId = reminderMessage.id;
             }
           } catch (dmError) {
             console.error(`❌ Failed to send training reminder to ${userId}:`, dmError);
           }
 
+          // Ensure reminderMessageId assignment remains before notified = true
           freshCooldown.notified = true;
           await freshCooldown.save();
         } catch (error) {
