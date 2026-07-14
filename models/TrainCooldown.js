@@ -13,6 +13,10 @@ const TrainCooldownSchema = new mongoose.Schema({
   notified: {
     type: Boolean,
     default: false
+  },
+  reminderMessageId: {
+    type: String,
+    default: null
   }
 });
 
