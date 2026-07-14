@@ -80,6 +80,19 @@ module.exports = {
       userId: interaction.user.id
     });
 
+    if (cooldown?.reminderMessageId) {
+      try {
+        const dm = await interaction.user.createDM();
+        const reminder = await dm.messages.fetch(cooldown.reminderMessageId);
+        await reminder.delete();
+      } catch (err) {
+        // Ignore if the reminder message no longer exists.
+      }
+
+      cooldown.reminderMessageId = null;
+      await cooldown.save();
+    }
+
     if (cooldown?.lastTrain) {
       const remaining = COOLDOWN_MS - (Date.now() - cooldown.lastTrain.getTime());
 
@@ -142,7 +155,8 @@ module.exports = {
       { userId: interaction.user.id },
       {
         lastTrain: new Date(),
-        notified: false
+        notified: false,
+        reminderMessageId: null
       },
       { upsert: true }
     );
