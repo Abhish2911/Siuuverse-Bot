@@ -130,15 +130,28 @@ module.exports = {
       ? (totalOVR / clubPlayers.length).toFixed(1)
       : '0';
 
-    const playerMentions = clubPlayers
-      .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0))
+    const sortedPlayers = clubPlayers
+      .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0));
+
+    const leftColumn = sortedPlayers
+      .slice(0, 8)
       .map((row, index) => {
         const name = row[1] || 'Unknown';
         const ovr = row[2] || '0';
         const mv = row[3] || '0';
         const tp = row[16] || '0';
+        return `\`${index + 1}.\` **${name}**\n> ⭐ ${ovr} • 💰 ${mv} • 🏋️ ${tp}`;
+      })
+      .join('\n');
 
-        return `\`${index + 1}.\` **${name}**\n> OVR **${ovr}** • MV **${mv}** • TP **${tp}**`;
+    const rightColumn = sortedPlayers
+      .slice(8, 16)
+      .map((row, index) => {
+        const name = row[1] || 'Unknown';
+        const ovr = row[2] || '0';
+        const mv = row[3] || '0';
+        const tp = row[16] || '0';
+        return `\`${index + 9}.\` **${name}**\n> ⭐ ${ovr} • 💰 ${mv} • 🏋️ ${tp}`;
       })
       .join('\n');
 
@@ -149,10 +162,19 @@ module.exports = {
         `${emojis.captain} **Manager:** ${managerMention}`,
         `${emojis.league} **Club:** **${clubName}**`,
         '',
-        `### ${emojis.profile} Squad Roster`,
-        playerMentions || 'No Players Found'
+        `### ${emojis.profile} Squad Roster`
       ].join('\n'))
       .addFields(
+        {
+          name: '👥 Players (1/2)',
+          value: leftColumn || '—',
+          inline: true
+        },
+        {
+          name: '👥 Players (2/2)',
+          value: rightColumn || '—',
+          inline: true
+        },
         {
           name: '📊 Club Stats',
           value: [
