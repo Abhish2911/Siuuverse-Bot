@@ -840,10 +840,17 @@ module.exports = {
       }))
     );
     console.log('[advanceknockout] target round', currentRoundLabel);
-    console.log('[advanceknockout] matching fixtures', currentRoundFixtures.map(f => ({ md: f.md, round: f.round, status: f.status })));
 
     const currentRoundFixtures = normalizedRows
       .filter(row => doesFixtureMatchRound(row.round, currentRoundLabel, row.md));
+    console.log(
+      '[advanceknockout] matching fixtures',
+      currentRoundFixtures.map(f => ({
+        md: f.md,
+        round: f.round,
+        status: f.status
+      }))
+    );
 
     if (!currentRoundFixtures.length) {
       return {
