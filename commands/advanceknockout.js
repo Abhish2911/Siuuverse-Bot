@@ -178,14 +178,15 @@ function normalizeFixtureRow(row) {
   }
 
   // Fallback legacy inference from MD
-  const md = clean(row[0]);
+  const md = clean(row[0]).toUpperCase();
   let inferredRound = '';
 
-  if (/ R1-/i.test(md)) inferredRound = 'Round 1';
-  else if (/ QFQ-/i.test(md)) inferredRound = 'Quarter Final Qualifier';
-  else if (/ QF-/i.test(md)) inferredRound = 'Quarter Final';
-  else if (/ SF-/i.test(md)) inferredRound = 'Semi Final';
-  else if (/FINAL/i.test(md)) inferredRound = 'Final';
+  if (/^FA-R1-|^CB-R1-|^UCL-R1-/.test(md)) inferredRound = 'Round 1';
+  else if (/^FA-QFQ-|^CB-QFQ-/.test(md)) inferredRound = 'Quarter Final Qualifier';
+  else if (/^FA-R16-|^UCL-R16-/.test(md)) inferredRound = 'Round of 16';
+  else if (/^FA-QF-|^CB-QF-|^UCL-QF-/.test(md) && !/^FA-QFQ-|^CB-QFQ-/.test(md)) inferredRound = 'Quarter Final';
+  else if (/^FA-SF-|^CB-SF-|^UCL-SF-/.test(md)) inferredRound = 'Semi Final';
+  else if (/-FINAL$/.test(md) || /-FINAL-/.test(md)) inferredRound = 'Final';
 
   return {
     storageType: 'ROUND_LAST',
@@ -838,6 +839,8 @@ module.exports = {
         status: r.status
       }))
     );
+    console.log('[advanceknockout] target round', currentRoundLabel);
+    console.log('[advanceknockout] matching fixtures', currentRoundFixtures.map(f => ({ md: f.md, round: f.round, status: f.status })));
 
     const currentRoundFixtures = normalizedRows
       .filter(row => doesFixtureMatchRound(row.round, currentRoundLabel, row.md));
