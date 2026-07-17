@@ -839,7 +839,10 @@ module.exports = {
       };
     }
 
-    const unfinished = currentRoundFixtures.filter(fixture => clean(fixture.status).toLowerCase() !== 'done');
+    const unfinished = currentRoundFixtures.filter(fixture => {
+      const status = clean(fixture.status).toLowerCase();
+      return status !== 'done' && status !== 'played';
+    });
     if (unfinished.length) {
       return {
         content: `${safeEmoji(E.wrong || E.error, '❌')} ${unfinished.length} ${currentRoundLabel} fixture(s) are not marked Done yet.`
