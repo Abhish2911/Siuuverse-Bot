@@ -972,7 +972,7 @@ module.exports = {
 
     const nextRows = nextFixtures.map(fixture => {
       // Existing FA/Carabao/UCL sheets:
-      // MD | Date | Home | Away | HG | AG | Result | HS | AS | Status | Round
+      // MD | Date | Home | Away | HG | AG | Result | Decision | HS | AS | Status | Round
       if (usesRoundLastLayout) {
         return [
           fixture.md,
@@ -982,6 +982,7 @@ module.exports = {
           fixture.hg,
           fixture.ag,
           fixture.result,
+          fixture.decision,
           fixture.homeShort,
           fixture.awayShort,
           fixture.status,
@@ -990,7 +991,7 @@ module.exports = {
       }
 
       // Alternate layout:
-      // Round | MD | Date | Home | Away | HG | AG | Result | HS | AS | Status
+      // Round | MD | Date | Home | Away | HG | AG | Result | Decision | HS | AS | Status
       return [
         fixture.round || nextRoundLabel,
         fixture.md,
@@ -1000,6 +1001,7 @@ module.exports = {
         fixture.hg,
         fixture.ag,
         fixture.result,
+        fixture.decision,
         fixture.homeShort,
         fixture.awayShort,
         fixture.status
