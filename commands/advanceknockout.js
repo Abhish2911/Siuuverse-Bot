@@ -119,7 +119,7 @@ function doesFixtureMatchRound(fixtureRound, targetRoundLabel, fixtureMd = '') {
 
 function normalizeFixtureRow(row) {
   const firstColumn = clean(row[0]).toUpperCase();
-  const lastColumn = clean(row[row.length - 1]).toUpperCase();
+  const roundColumn = clean(row[11]).toUpperCase();
 
   const knownRounds = [
     'ROUND 1',
@@ -135,7 +135,7 @@ function normalizeFixtureRow(row) {
   ];
 
   const hasRoundColumnFirst = knownRounds.includes(firstColumn);
-  const hasRoundColumnLast = knownRounds.includes(lastColumn);
+  const hasRoundColumnLast = knownRounds.includes(roundColumn);
 
   // Layout:
   // Round | MD | Date | Home | Away | HG | AG | Result | Decision | HS | AS | Status
@@ -829,6 +829,15 @@ module.exports = {
 
     const currentRoundLabel = getRoundLabel(currentRound);
     const normalizedRows = rows.map(normalizeFixtureRow);
+
+    console.log(
+      '[advanceknockout] normalized fixtures',
+      normalizedRows.map(r => ({
+        md: r.md,
+        round: r.round,
+        status: r.status
+      }))
+    );
 
     const currentRoundFixtures = normalizedRows
       .filter(row => doesFixtureMatchRound(row.round, currentRoundLabel, row.md));
