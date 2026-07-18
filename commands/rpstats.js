@@ -43,16 +43,30 @@ module.exports = {
     return sendStatsLeaderboard(interaction, 'goals', 0);
   },
   async buttonHandler(interaction, action, value) {
-    const [statType = 'goals', page = '0'] = String(value || '').split('__');
-    let newPage = Number(page) || 0;
+    const firstUnderscore = String(value || '').indexOf('_');
 
+    let page = '0';
+    let typeData = 'goals__';
+
+    if (firstUnderscore !== -1) {
+      page = value.slice(0, firstUnderscore);
+      typeData = value.slice(firstUnderscore + 1);
+    }
+
+    const [statType = 'goals', ownerId] = typeData.split('__');
+
+    if (ownerId && ownerId !== interaction.user.id) {
+      return { content: '❌ You cannot use another user\'s RP stats menu.', ephemeral: true };
+    }
+
+    let newPage = Number(page) || 0;
     if (action === 'prev') newPage--;
     if (action === 'next') newPage++;
 
     return sendStatsLeaderboard(interaction, statType, newPage);
   },
   async selectHandler(interaction) {
-    const statType = String(interaction.values?.[0] || 'goals');
+    const statType = String(interaction.values?.[0] || 'goals').split('__')[0];
     return sendStatsLeaderboard(interaction, statType, 0);
   }
 };
@@ -110,12 +124,12 @@ async function sendStatsLeaderboard(interaction, statType, page) {
 
   // Stat selector
   const statSelect = new StringSelectMenuBuilder()
-    .setCustomId('rpstats_select')
+    .setCustomId(`rpstats_select_${interaction.user.id}`)
     .setPlaceholder(`Selected: ${stat.title.replace(/<a?:\w+:\d+>/g, '').trim()}`)
     .addOptions(
       STAT_OPTIONS.map(opt => ({
         label: opt.label,
-        value: opt.value,
+        value: `${opt.value}__${interaction.user.id}`,
         emoji: opt.emoji,
         default: statType === opt.value,
       }))
@@ -124,18 +138,18 @@ async function sendStatsLeaderboard(interaction, statType, page) {
 
   // Pagination buttons
   const prevButton = new ButtonBuilder()
-    .setCustomId(`rpstats_prev_${statType}__${page}`)
+    .setCustomId(`rpstats_prev_${page}_${statType}__${interaction.user.id}`)
     .setLabel('Previous')
     .setEmoji('⬅️')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(page === 0);
   const refreshButton = new ButtonBuilder()
-    .setCustomId(`rpstats_refresh_${statType}__${page}`)
+    .setCustomId(`rpstats_refresh_${page}_${statType}__${interaction.user.id}`)
     .setLabel('Refresh')
     .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary);
   const nextButton = new ButtonBuilder()
-    .setCustomId(`rpstats_next_${statType}__${page}`)
+    .setCustomId(`rpstats_next_${page}_${statType}__${interaction.user.id}`)
     .setLabel('Next')
     .setEmoji('➡️')
     .setStyle(ButtonStyle.Secondary)
