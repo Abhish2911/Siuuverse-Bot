@@ -77,6 +77,15 @@ module.exports = {
       return { content: `${safeEmoji(E.wrong, '❌')} No standings data found.` };
     }
 
+    const shortMap = {};
+    teams.slice(1).forEach(row => {
+      const teamName = row[0];
+      const shortName = row[2];
+      if (teamName && shortName) {
+        shortMap[normalize(teamName)] = String(shortName).trim().toUpperCase();
+      }
+    });
+
     const rows = standings
       .slice(1)
       .filter(row => row[1])
@@ -94,6 +103,7 @@ module.exports = {
 
     const table = rows.map((row, index) => {
       const pos = pad(index + 1, 2, 'start');
+      // Use Short Name column directly from RP Standings sheet (column 2, index 1)
       const team = pad(String(row[1] || 'N/A').trim().toUpperCase(), 6);
       const p = pad(row[2] || 0, 2, 'start');
       const w = pad(row[3] || 0, 2, 'start');
@@ -110,7 +120,7 @@ module.exports = {
 
     const header = '  📈  # TEAM    P  W  D  L   GD  PTS';
     const summary = buildStandingsSummary(rows);
-    const leader = rows[0]?.[1] || '';
+    const leader = rows[0]?.[2] || '';
     const bottomZone = rows.slice(-3).map(row => row[1]).filter(Boolean).join('\n') || 'N/A';
 
     return {
