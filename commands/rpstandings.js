@@ -67,7 +67,7 @@ module.exports = {
 
   async execute() {
     const [standings, teams] = await Promise.all([
-      cachedGetData('Standings!A:J', {
+      cachedGetData('Standings!A:K', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
       cachedGetData('Teams!A:H')
