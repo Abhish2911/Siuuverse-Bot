@@ -77,15 +77,6 @@ module.exports = {
       return { content: `${safeEmoji(E.wrong, '❌')} No standings data found.` };
     }
 
-    const shortMap = {};
-    teams.slice(1).forEach(row => {
-      const teamName = row[0];
-      const shortName = row[2];
-      if (teamName && shortName) {
-        shortMap[normalize(teamName)] = String(shortName).trim().toUpperCase();
-      }
-    });
-
     const rows = standings
       .slice(1)
       .filter(row => row[1])
@@ -103,8 +94,7 @@ module.exports = {
 
     const table = rows.map((row, index) => {
       const pos = pad(index + 1, 2, 'start');
-      const fullTeam = normalize(row[1]);
-      const team = pad(shortMap[fullTeam] || String(row[1] || '').slice(0, 6).toUpperCase() || 'N/A', 6);
+      const team = pad(String(row[1] || 'N/A').trim().toUpperCase(), 6);
       const p = pad(row[2] || 0, 2, 'start');
       const w = pad(row[3] || 0, 2, 'start');
       const d = pad(row[4] || 0, 2, 'start');
