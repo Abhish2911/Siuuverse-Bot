@@ -132,22 +132,27 @@ module.exports = {
       spreadsheetId: process.env.RP_SHEET_ID
     });
 
+    const paymentsText = clubPlayers.map(row => {
+      const wage = row[3] && String(row[3]).trim() !== ''
+        ? `$${Number(String(row[3]).replace(/,/g,'')).toLocaleString()}`
+        : 'Wages Not Set';
+      return `${E.doubleArrow} **${row[2]}** • ${wage}`;
+    }).join('\n');
+
     // Build an EmbedBuilder titled Weekly Wage Summary using emojis and value formatting
     const embed = new EmbedBuilder()
       .setColor(0x2ECC71)
       .setTitle(`${E.success} Weekly Wage Summary`)
-      .setDescription(`${E.team} **${club}** wage distribution completed successfully.`)
+      .setDescription([
+        `${E.team} **${club}** wage distribution completed successfully.`,
+        '',
+        `**Players Paid**`,
+        paymentsText
+      ].join('\n'))
       .addFields(
         { name: `${E.team} Club`, value: club, inline: true },
         { name: `${E.profile} Players Paid`, value: `${clubPlayers.length}`, inline: true },
         { name: `${E.trophy} Total Wages`, value: `$${totalWages.toLocaleString()}`, inline: true },
-        {
-          name: `${E.correct} Payments`,
-          value: clubPlayers.map(row => {
-            const wage = row[3] && String(row[3]).trim() !== '' ? `$${Number(String(row[3]).replace(/,/g,'')).toLocaleString()}` : 'Wages Not Set';
-            return `${E.doubleArrow} **${row[2]}** • ${wage}`;
-          }).join('\n')
-        },
         {
           name: `${E.greenIcon} Remaining Club Balance`,
           value: `$${newClubBalance.toLocaleString()}`,
