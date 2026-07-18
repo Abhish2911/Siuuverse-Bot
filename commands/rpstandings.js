@@ -36,7 +36,7 @@ function buildStandingsSummary(rows) {
 
   const formatTeamLine = row => {
     if (!row) return 'N/A';
-    return `\`${clean(row[1])}\` • ${row[9] || 0} pts`;
+    return `\`${clean(row[1])}\` • ${row[10] || 0} pts`;
   };
 
   return {
@@ -88,12 +88,12 @@ module.exports = {
 
     const rows = standings
       .slice(1)
-      .filter(row => row[1])
+      .filter(row => row[2])
       .sort((a, b) =>
+        toNumber(b[10]) - toNumber(a[10]) ||
         toNumber(b[9]) - toNumber(a[9]) ||
-        toNumber(b[8]) - toNumber(a[8]) ||
-        toNumber(b[6]) - toNumber(a[6]) ||
-        String(a[1]).localeCompare(String(b[1]))
+        toNumber(b[7]) - toNumber(a[7]) ||
+        String(a[2]).localeCompare(String(b[2]))
       );
 
     const pad = (value, len, dir = 'end') => {
@@ -104,14 +104,14 @@ module.exports = {
     const table = rows.map((row, index) => {
       const pos = pad(index + 1, 2, 'start');
       // Use Short Name column directly from RP Standings sheet (column 2, index 1)
-      const team = pad(String(row[1] || 'N/A').trim().toUpperCase(), 6);
-      const p = pad(row[2] || 0, 2, 'start');
-      const w = pad(row[3] || 0, 2, 'start');
-      const d = pad(row[4] || 0, 2, 'start');
-      const l = pad(row[5] || 0, 2, 'start');
-      const gd = pad(formatGD(row[8]), 4, 'start');
-      const pts = pad(row[9] || 0, 3, 'start');
-      const line = `${rankIcon(index, rows.length)} ${pos} ${team} ${p} ${w} ${d} ${l} ${gd} ${pts}`;
+      const team = String(row[1] || 'N/A').trim().toUpperCase();
+      const p = pad(row[3] || 0, 2, 'start');
+      const w = pad(row[4] || 0, 2, 'start');
+      const d = pad(row[5] || 0, 2, 'start');
+      const l = pad(row[6] || 0, 2, 'start');
+      const gd = pad(formatGD(row[9]), 4, 'start');
+      const pts = pad(row[10] || 0, 3, 'start');
+      const line = `${rankIcon(index, rows.length)} ${pos} ${team.padEnd(6)} ${String(p).trim().padStart(2)} ${String(w).trim().padStart(2)} ${String(d).trim().padStart(2)} ${String(l).trim().padStart(2)} ${String(gd).trim().padStart(4)} ${String(pts).trim().padStart(3)}`;
 
       if (index < 3) return `+ ${line}`;
       if (index >= rows.length - 3) return `- ${line}`;
@@ -121,7 +121,7 @@ module.exports = {
     const header = '  📈  # TEAM    P  W  D  L   GD  PTS';
     const summary = buildStandingsSummary(rows);
     const leader = rows[0]?.[2] || '';
-    const bottomZone = rows.slice(-3).map(row => row[1]).filter(Boolean).join('\n') || 'N/A';
+    const bottomZone = rows.slice(-3).map(row => row[2]).filter(Boolean).join('\n') || 'N/A';
 
     return {
       embeds: [
