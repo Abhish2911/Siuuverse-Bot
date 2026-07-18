@@ -59,14 +59,19 @@ module.exports = {
 
 async function sendStatsLeaderboard(interaction, statType, page) {
   const stat = STAT_OPTIONS.find(s => s.value === statType) || STAT_OPTIONS[0];
-  // Always use RP sheet
-  const sheetId = process.env.RP_SHEET_ID;
   let data;
   try {
+    console.time(`rpstats:${statType}`);
     data = await cachedGetData(stat.range, {
+      cache: false,
       spreadsheetId: process.env.RP_SHEET_ID
     });
+    console.timeEnd(`rpstats:${statType}`);
+    if (!Array.isArray(data)) {
+      throw new Error('Stats_Ranking did not return an array');
+    }
   } catch (e) {
+    console.error('RP Stats Error:', e);
     return {
       content: 'Failed to fetch the stats leaderboard.',
       ephemeral: true
@@ -83,7 +88,8 @@ async function sendStatsLeaderboard(interaction, statType, page) {
     }
   }
   leaderboard.sort((a, b) => Number(b.value) - Number(a.value));
-  const totalPages = Math.ceil(leaderboard.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(leaderboard.length / PAGE_SIZE));
+  page = Math.max(0, Math.min(page, totalPages - 1));
   const pageStart = page * PAGE_SIZE;
   const pageEnd = pageStart + PAGE_SIZE;
   const pageLeaderboard = leaderboard.slice(pageStart, pageEnd);
