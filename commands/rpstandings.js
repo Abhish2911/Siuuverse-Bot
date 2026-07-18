@@ -62,8 +62,8 @@ function buildStandingsDescription(summary) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('standings')
-    .setDescription('Show coop league standings'),
+    .setName('rpstandings')
+    .setDescription('Show RP league standings'),
 
   async execute() {
     const [standings, teams] = await Promise.all([
