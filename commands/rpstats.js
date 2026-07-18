@@ -1,5 +1,3 @@
-
-
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { cachedGetData } = require('../utils/helpers');
 const E = require('../utils/emojis');
@@ -42,32 +40,24 @@ module.exports = {
     .setName('rpstats')
     .setDescription('View RP stats leaderboards.'),
   async execute(interaction) {
-    // Default to goals
-    await sendStatsLeaderboard(interaction, 'goals', 0, true);
+    return sendStatsLeaderboard(interaction, 'goals', 0);
   },
-  async handleComponent(interaction) {
-    // Custom IDs: 'rpstats_statselect', 'rpstats_prev', 'rpstats_next', 'rpstats_refresh'
-    const [id, stat, page] = interaction.customId.split(':');
-    let currentStat = stat || 'goals';
-    let currentPage = parseInt(page || '0', 10);
-    if (interaction.isStringSelectMenu()) {
-      currentStat = interaction.values[0];
-      currentPage = 0;
-      await sendStatsLeaderboard(interaction, currentStat, currentPage, false, true);
-    } else if (interaction.isButton()) {
-      if (id === 'rpstats_prev') {
-        currentPage = Math.max(currentPage - 1, 0);
-      } else if (id === 'rpstats_next') {
-        currentPage = currentPage + 1;
-      } else if (id === 'rpstats_refresh') {
-        // no change
-      }
-      await sendStatsLeaderboard(interaction, currentStat, currentPage, false, id === 'rpstats_refresh');
-    }
+  async buttonHandler(interaction, action, value) {
+    const [statType = 'goals', page = '0'] = String(value || '').split('__');
+    let newPage = Number(page) || 0;
+
+    if (action === 'prev') newPage--;
+    if (action === 'next') newPage++;
+
+    return sendStatsLeaderboard(interaction, statType, newPage);
+  },
+  async selectHandler(interaction) {
+    const statType = String(interaction.values?.[0] || 'goals');
+    return sendStatsLeaderboard(interaction, statType, 0);
   }
 };
 
-async function sendStatsLeaderboard(interaction, statType, page, initial, ephemeral) {
+async function sendStatsLeaderboard(interaction, statType, page) {
   const stat = STAT_OPTIONS.find(s => s.value === statType) || STAT_OPTIONS[0];
   // Always use RP sheet
   const sheetId = process.env.RP_SHEET_ID;
@@ -77,11 +67,10 @@ async function sendStatsLeaderboard(interaction, statType, page, initial, epheme
       spreadsheetId: process.env.RP_SHEET_ID
     });
   } catch (e) {
-    await (initial ? interaction.reply : interaction.update)({
+    return {
       content: 'Failed to fetch the stats leaderboard.',
-      ephemeral: true,
-    });
-    return;
+      ephemeral: true
+    };
   }
   // data is 2d array, skip header
   const leaderboard = [];
@@ -115,7 +104,7 @@ async function sendStatsLeaderboard(interaction, statType, page, initial, epheme
 
   // Stat selector
   const statSelect = new StringSelectMenuBuilder()
-    .setCustomId('rpstats_statselect')
+    .setCustomId('rpstats_select')
     .setPlaceholder(`Selected: ${stat.title.replace(/<a?:\w+:\d+>/g, '').trim()}`)
     .addOptions(
       STAT_OPTIONS.map(opt => ({
@@ -129,18 +118,18 @@ async function sendStatsLeaderboard(interaction, statType, page, initial, epheme
 
   // Pagination buttons
   const prevButton = new ButtonBuilder()
-    .setCustomId(`rpstats_prev:${statType}:${page}`)
+    .setCustomId(`rpstats_prev_${statType}__${page}`)
     .setLabel('Previous')
     .setEmoji('⬅️')
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(page === 0);
   const refreshButton = new ButtonBuilder()
-    .setCustomId(`rpstats_refresh:${statType}:${page}`)
+    .setCustomId(`rpstats_refresh_${statType}__${page}`)
     .setLabel('Refresh')
     .setEmoji('🔄')
     .setStyle(ButtonStyle.Primary);
   const nextButton = new ButtonBuilder()
-    .setCustomId(`rpstats_next:${statType}:${page}`)
+    .setCustomId(`rpstats_next_${statType}__${page}`)
     .setLabel('Next')
     .setEmoji('➡️')
     .setStyle(ButtonStyle.Secondary)
@@ -150,13 +139,6 @@ async function sendStatsLeaderboard(interaction, statType, page, initial, epheme
   const payload = {
     embeds: [embed],
     components: [statRow, pageRow],
-    ephemeral: !!ephemeral,
   };
-  if (interaction.replied || interaction.deferred) {
-    await interaction.editReply(payload);
-  } else if (initial) {
-    await interaction.reply(payload);
-  } else {
-    await interaction.update(payload);
-  }
+  return payload;
 }
