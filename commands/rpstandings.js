@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { cachedGetData, cachedGetDataFromSpreadsheet, getTeamColor, normalize } = require('../utils/helpers');
+const { cachedGetData, getTeamColor, normalize } = require('../utils/helpers');
 const E = require('../utils/emojis');
 
 function safeEmoji(value, fallback = '') {
@@ -67,7 +67,9 @@ module.exports = {
 
   async execute() {
     const [standings, teams] = await Promise.all([
-      cachedGetDataFromSpreadsheet(process.env.RP_SHEET_ID, 'Standings!A:J'),
+      cachedGetData('Standings!A:J', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
       cachedGetData('Teams!A:H')
     ]);
 
