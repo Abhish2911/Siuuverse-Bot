@@ -18,7 +18,7 @@ const STAT_OPTIONS = [
   {
     label: 'Assists',
     value: 'assists',
-    range: 'Stats_Ranking!D:F',
+    range: 'Stats_Ranking!E:G',
     title: `${safeEmoji(E.playmaker,'🎯')} Playmakers`,
     emoji: '🎯',
     color: 0x3498DB,
@@ -26,7 +26,7 @@ const STAT_OPTIONS = [
   {
     label: 'Clean Sheets',
     value: 'cleansheets',
-    range: 'Stats_Ranking!G:I',
+    range: 'Stats_Ranking!I:K',
     title: `${safeEmoji(E.save,'🧤')} Clean Sheets`,
     emoji: '🧤',
     color: 0x2ECC71,
@@ -92,15 +92,21 @@ async function sendStatsLeaderboard(interaction, statType, page) {
     };
   }
   // Every selected range has the format: USER | Players | Stat.
-  // Always ignore the USER column and read Players from index 1 and Stat from index 2.
   // data is 2d array, skip header
   const leaderboard = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    // New sheet format: USER | Players | Stat
-    // Ignore USER and use only Players + Stat.
-    const player = row[1];
+
+    const userCell = String(row[0] || '').trim();
+    let player = String(row[1] || '').trim();
     const value = row[2];
+
+    // If the Players column contains a Discord ID and the USER column contains
+    // the actual player name, use the USER column as the display name.
+    if (/^\d{17,20}$/.test(player) && userCell) {
+      player = userCell;
+    }
+
     if (player && value !== undefined && value !== '') {
       leaderboard.push({ player, value });
     }

@@ -28,7 +28,7 @@ module.exports = {
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
       statsRows = await getData(
-        'Stats_Ranking!A:I',
+        'Stats_Ranking!A:K',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
@@ -217,11 +217,11 @@ module.exports = {
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
       statsRows = await getData(
-        'Stats_Ranking!A:I',
+        'Stats_Ranking!A:K',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
-      return interaction.reply({ content: '❌ Failed to fetch RP data.', ephemeral: true });
+      return interaction.update({ content: '❌ Failed to fetch RP data.', embeds: [], components: [] });
     }
     const clubName = interaction.customId.substring('myrpclubstats_'.length);
     // Build set of club players (case-insensitive)
@@ -257,17 +257,17 @@ module.exports = {
           topScorer = { player: goalPlayer, value: goalVal };
         }
       }
-      // Assists: E(4), value F(5)
-      const assistPlayer = String(row[4] || '').trim();
-      const assistVal = Number(row[5] || 0);
+      // Assists: F(5), value G(6)
+      const assistPlayer = String(row[5] || '').trim();
+      const assistVal = Number(row[6] || 0);
       if (clubPlayerSet.has(assistPlayer.trim().toLowerCase())) {
         if (topAssist.value == null || assistVal > topAssist.value) {
           topAssist = { player: assistPlayer, value: assistVal };
         }
       }
-      // Clean Sheets: H(7), value I(8)
-      const cleanPlayer = String(row[7] || '').trim();
-      const cleanVal = Number(row[8] || 0);
+      // Clean Sheets: J(9), value K(10)
+      const cleanPlayer = String(row[9] || '').trim();
+      const cleanVal = Number(row[10] || 0);
       if (clubPlayerSet.has(cleanPlayer.trim().toLowerCase())) {
         if (topClean.value == null || cleanVal > topClean.value) {
           topClean = { player: cleanPlayer, value: cleanVal };
@@ -305,6 +305,16 @@ module.exports = {
       )
       .setFooter({ text: 'Club Stat Leaders' })
       .setTimestamp();
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.update({
+      embeds: [embed],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`myrpclubstats_${clubName}`)
+            .setLabel('Club Stats')
+            .setStyle(ButtonStyle.Primary)
+        )
+      ]
+    });
   }
 };

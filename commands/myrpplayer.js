@@ -33,7 +33,7 @@ module.exports = {
       getData('Wages!A:D', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
-      getData('Stats_Ranking!A:I', {
+      getData('Stats_Ranking!A:K', {
         spreadsheetId: process.env.RP_SHEET_ID
       })
     ]);
@@ -125,13 +125,13 @@ module.exports = {
         if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
           goals = Number(row[2] || 0);
         }
-        // Assists block: columns D:F -> player name in col E (4), assists in col F (5)
-        if (row[4] && String(row[4]).trim().toLowerCase() === playerNameLower) {
-          assists = Number(row[5] || 0);
+        // Assists block: columns E:G -> player name in col F (5), assists in col G (6)
+        if (row[5] && String(row[5]).trim().toLowerCase() === playerNameLower) {
+          assists = Number(row[6] || 0);
         }
-        // Clean Sheet block: columns G:I -> player name in col H (7), clean sheets in col I (8)
-        if (row[7] && String(row[7]).trim().toLowerCase() === playerNameLower) {
-          cleanSheets = Number(row[8] || 0);
+        // Clean Sheet block: columns I:K -> player name in col J (9), clean sheets in col K (10)
+        if (row[9] && String(row[9]).trim().toLowerCase() === playerNameLower) {
+          cleanSheets = Number(row[10] || 0);
         }
       }
     }
@@ -215,14 +215,14 @@ module.exports = {
     // Fetch player data and stats again
     const [rows, statsRows] = await Promise.all([
       getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
-      getData('Stats_Ranking!A:I', { spreadsheetId: process.env.RP_SHEET_ID })
+      getData('Stats_Ranking!A:K', { spreadsheetId: process.env.RP_SHEET_ID })
     ]);
     // Find player row by Discord ID
     const playerRow = rows
       .slice(1)
       .find(row => String(row[0] || '').trim() === discordId);
     if (!playerRow) {
-      return interaction.reply({ content: '❌ Player not found.', ephemeral: true });
+      return interaction.update({ content: '❌ Player not found.', embeds: [], components: [] });
     }
     const playerName = playerRow[1] || 'N/A';
     const playerNameLower = String(playerName).trim().toLowerCase();
@@ -233,13 +233,13 @@ module.exports = {
         if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
           goals = Number(row[2] || 0);
         }
-        // Assists block: columns D:F -> player name in col E (4), assists in col F (5)
-        if (row[4] && String(row[4]).trim().toLowerCase() === playerNameLower) {
-          assists = Number(row[5] || 0);
+        // Assists block: columns E:G -> player name in col F (5), assists in col G (6)
+        if (row[5] && String(row[5]).trim().toLowerCase() === playerNameLower) {
+          assists = Number(row[6] || 0);
         }
-        // Clean Sheet block: columns G:I -> player name in col H (7), clean sheets in col I (8)
-        if (row[7] && String(row[7]).trim().toLowerCase() === playerNameLower) {
-          cleanSheets = Number(row[8] || 0);
+        // Clean Sheet block: columns I:K -> player name in col J (9), clean sheets in col K (10)
+        if (row[9] && String(row[9]).trim().toLowerCase() === playerNameLower) {
+          cleanSheets = Number(row[10] || 0);
         }
       }
     }
@@ -252,6 +252,16 @@ module.exports = {
         { name: 'Clean Sheets', value: String(cleanSheets), inline: true }
       )
       .setTimestamp();
-    return interaction.reply({ embeds: [statsEmbed], ephemeral: true });
+    return interaction.update({
+      embeds: [statsEmbed],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`myrpstats_${discordId}`)
+            .setLabel('Stats')
+            .setStyle(ButtonStyle.Primary)
+        )
+      ]
+    });
   }
 };
