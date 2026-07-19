@@ -60,8 +60,8 @@ module.exports = {
       0
     );
 
-    // Read Economy!A:E
-    const economyDataRaw = await cachedGetData(`${ECONOMY_SHEET}!A:E`, {
+    // Read Economy!A:D
+    const economyDataRaw = await cachedGetData(`${ECONOMY_SHEET}!A:D`, {
       spreadsheetId: process.env.RP_SHEET_ID
     });
     const economyData = economyDataRaw.slice(1);
@@ -75,24 +75,12 @@ module.exports = {
         targetClub.includes(economyClub)
       );
     });
-    // Now resolve to the correct club row (column B empty)
-    let resolvedClubIndex = clubAccountIndex;
-    if (resolvedClubIndex !== -1 && economyData[resolvedClubIndex][1]) {
-      resolvedClubIndex = economyData.findIndex(row => {
-        const economyClub = normalizeClubName(row[0]);
-        return !String(row[1] || '').trim() && (
-          economyClub === targetClub ||
-          economyClub.includes(targetClub) ||
-          targetClub.includes(economyClub)
-        );
-      });
-    }
-    if (resolvedClubIndex === -1) {
+    if (clubAccountIndex === -1) {
       return { content: '❌ Club account not found in Economy sheet.' };
     }
 
-    const clubAccountRowNumber = resolvedClubIndex + 2; // +2 because of header and 1-based indexing
-    const clubBalance = Number(String(economyData[resolvedClubIndex][3] || '0').replace(/,/g, '')) || 0;
+    const clubAccountRowNumber = clubAccountIndex + 2; // +2 because of header and 1-based indexing
+    const clubBalance = Number(String(economyData[clubAccountIndex][3] || '0').replace(/,/g, '')) || 0;
 
     if (clubBalance < totalWages) {
       return { content: '❌ Your club does not have enough balance to pay wages.' };
@@ -144,13 +132,6 @@ module.exports = {
       spreadsheetId: process.env.RP_SHEET_ID
     });
 
-    const paymentsText = clubPlayers.map(row => {
-      const wage = row[3] && String(row[3]).trim() !== ''
-        ? `$${Number(String(row[3]).replace(/,/g,'')).toLocaleString()}`
-        : 'Wages Not Set';
-      return `${E.doubleArrow} **${row[2]}** • ${wage}`;
-    }).join('\n');
-
     // Build an EmbedBuilder titled Weekly Wage Summary using emojis and value formatting
     const embed = new EmbedBuilder()
       .setColor(0x2ECC71)
@@ -158,8 +139,13 @@ module.exports = {
       .setDescription([
         `${E.team} **${club}** wage distribution completed successfully.`,
         '',
-        `**Players Paid**`,
-        paymentsText
+        `### ${E.correct} Payments`,
+        clubPlayers.map(row => {
+          const wage = row[3] && String(row[3]).trim() !== ''
+            ? `$${Number(String(row[3]).replace(/,/g, '')).toLocaleString()}`
+            : 'Wages Not Set';
+          return `${E.doubleArrow} **${row[2]}** • ${wage}`;
+        }).join('\n')
       ].join('\n'))
       .addFields(
         { name: `${E.team} Club`, value: club, inline: true },
