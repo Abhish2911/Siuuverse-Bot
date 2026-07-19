@@ -208,7 +208,154 @@ module.exports = {
   },
   // Button handler for club stats
   async handleButton(interaction) {
-    if (!interaction.customId || !interaction.customId.startsWith('myrpclubstats_')) return;
+    if (!interaction.customId) return;
+
+    if (interaction.customId.startsWith('myrpclubdetails_')) {
+      const clubName = interaction.customId.substring('myrpclubdetails_'.length);
+
+      let managerRows;
+      let rows;
+      try {
+        rows = await getData(
+          'Player_Data!A:Q',
+          { spreadsheetId: process.env.RP_SHEET_ID }
+        );
+        managerRows = await getData(
+          'Managers!A:C',
+          { spreadsheetId: process.env.RP_SHEET_ID }
+        );
+      } catch (err) {
+        return interaction.update({ content: '❌ Failed to fetch RP data.', embeds: [], components: [] });
+      }
+
+      if (!clubName) {
+        return interaction.update({ content: '❌ Club roster not found.', embeds: [], components: [] });
+      }
+
+      const normalizeClubName = value => String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/[._-]/g, '');
+
+      const clubPlayers = rows.slice(1).filter(row => {
+        const playerClub = normalizeClubName(row[5]);
+        const targetClub = normalizeClubName(clubName);
+
+        return (
+          playerClub === targetClub ||
+          playerClub.includes(targetClub) ||
+          targetClub.includes(playerClub)
+        );
+      });
+
+      if (!clubPlayers || clubPlayers.length === 0) {
+        return interaction.update({ content: '❌ Club roster not found.', embeds: [], components: [] });
+      }
+
+      const normalizedClub = normalizeClubName(clubName);
+
+      const managerRow = managerRows
+        .slice(1)
+        .find(row => {
+          const managerClub = normalizeClubName(row[2]);
+
+          return (
+            managerClub === normalizedClub ||
+            managerClub.includes(normalizedClub) ||
+            normalizedClub.includes(managerClub)
+          );
+        });
+
+      if (!managerRow) {
+        console.log(`[MYRPCLUB] Manager not found for club: ${clubName}`);
+      }
+
+      const managerMention = managerRow
+        ? `<@${managerRow[0]}>`
+        : 'Unknown';
+
+      const managerName = managerRow?.[1] || 'Unknown';
+
+      const totalOVR = clubPlayers.reduce((sum, row) => sum + Number(row[2] || 0), 0);
+      const avgOVR = clubPlayers.length
+        ? (totalOVR / clubPlayers.length).toFixed(1)
+        : '0';
+
+      const sortedPlayers = clubPlayers
+        .sort((a, b) => Number(b[2] || 0) - Number(a[2] || 0));
+
+      const midpoint = Math.ceil(sortedPlayers.length / 2);
+
+      const formatColumn = (players, startIndex) => players
+        .map((row, index) => {
+          const name = row[1] || 'Unknown';
+          const ovr = row[2] || '0';
+          const mv = row[3] || '0';
+          const tp = row[16] || '0';
+
+          return `\`${startIndex + index}.\` **${name}**\n> ${emojis.rank} ${ovr} ⚽︎ 💸 ${mv} ⚽︎ ${emojis.Stats} ${tp}`;
+        })
+        .join('\n');
+
+      const leftColumn = formatColumn(sortedPlayers.slice(0, midpoint), 1);
+      const rightColumn = formatColumn(sortedPlayers.slice(midpoint), midpoint + 1);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x00AE86)
+        .setTitle(`${emojis.team} ${clubName}`)
+        .setDescription([
+          `${emojis.captain} **Manager:** ${managerMention}`,
+          `${emojis.league} **Club:** **${clubName}**`,
+          '',
+          `### ${emojis.profile} Squad Roster`
+        ].join('\n'))
+        .addFields(
+          {
+            name: 'Players (1/2)',
+            value: leftColumn || '—',
+            inline: true
+          },
+          {
+            name: 'Players (2/2)',
+            value: rightColumn || '—',
+            inline: true
+          },
+          {
+            name: '\u200B',
+            value: '\u200B',
+            inline: false
+          },
+          {
+            name: '📊 Club Stats',
+            value: [
+              `👥 **Squad Size:** ${clubPlayers.length}`,
+              `⭐ **Average OVR:** ${avgOVR}`
+            ].join('\n'),
+            inline: false
+          },
+          {
+            name: `${emojis.captain} Manager Name`,
+            value: `**${managerName}**`,
+            inline: false
+          }
+        )
+        .setFooter({
+          text: `Roleplay Club Profile • ${clubPlayers.length} Players`
+        })
+        .setTimestamp();
+
+      const statsButtonRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`myrpclubstats_${clubName}`)
+          .setLabel('Club Stats')
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      return interaction.update({ embeds: [embed], components: [statsButtonRow] });
+    }
+
+    if (!interaction.customId.startsWith('myrpclubstats_')) return;
     // Fetch latest data
     let rows, statsRows;
     try {
@@ -309,6 +456,10 @@ module.exports = {
       embeds: [embed],
       components: [
         new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`myrpclubdetails_${clubName}`)
+            .setLabel('Team Details')
+            .setStyle(ButtonStyle.Secondary),
           new ButtonBuilder()
             .setCustomId(`myrpclubstats_${clubName}`)
             .setLabel('Club Stats')
