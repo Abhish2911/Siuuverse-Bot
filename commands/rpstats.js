@@ -91,12 +91,16 @@ async function sendStatsLeaderboard(interaction, statType, page) {
       ephemeral: true
     };
   }
+  // Every selected range has the format: USER | Players | Stat.
+  // Always ignore the USER column and read Players from index 1 and Stat from index 2.
   // data is 2d array, skip header
   const leaderboard = [];
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const player = row[0];
-    const value = row[1];
+    // New sheet format: USER | Players | Stat
+    // Ignore USER and use only Players + Stat.
+    const player = row[1];
+    const value = row[2];
     if (player && value !== undefined && value !== '') {
       leaderboard.push({ player, value });
     }
