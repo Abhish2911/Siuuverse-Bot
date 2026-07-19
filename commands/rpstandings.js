@@ -51,7 +51,7 @@ function buildStandingsSummary(rows) {
 function buildStandingsDescription(summary) {
   return (
     `${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} **League Table Overview**\n` +
-    `Current coop league standings sorted by points, goal difference and goals scored.\n\n` +
+    `Current RP league standings sorted by points, goal difference and goals scored.\n\n` +
     `${safeEmoji(E.team, '👥')} **Teams:** ${summary.teams}\n` +
     `${safeEmoji(E.winner, '👑')} **Leader:** ${summary.leader}\n` +
     `${safeEmoji(E.runnerUp, '🥈')} **2nd:** ${summary.second}\n` +
@@ -133,7 +133,7 @@ module.exports = {
             { name: '🔻 Bottom Zone', value: bottomZone, inline: false }
           )
           .setColor(getTeamColor(teams, leader, 0x5865F2))
-          .setFooter({ text: 'Coop league standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 3' })
+          .setFooter({ text: 'RP league standings • 👑 Leader • 🥈 2nd • 🥉 3rd • 🔻 Bottom 3' })
       ]
     };
   }
