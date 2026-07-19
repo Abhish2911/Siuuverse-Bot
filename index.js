@@ -592,6 +592,22 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // myrpplayer stats button
+      if (interaction.customId.startsWith('myrpstats_')) {
+        const command = client.commands.get('myrpplayer');
+        if (!command || typeof command.handleButton !== 'function') return;
+
+        return await command.handleButton(interaction);
+      }
+
+      // myrpclub stats button
+      if (interaction.customId.startsWith('myrpclubstats_')) {
+        const command = client.commands.get('myrpclub');
+        if (!command || typeof command.handleButton !== 'function') return;
+
+        return await command.handleButton(interaction);
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
