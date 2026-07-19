@@ -388,6 +388,57 @@ client.on('interactionCreate', async interaction => {
     // Buttons
     // =========================
     if (interaction.isButton()) {
+      // =========================
+      // rpstats buttons
+      // =========================
+      if (interaction.customId.startsWith('rpstats_')) {
+        const command = client.commands.get('rpstats');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const [, action, page, ...rest] = interaction.customId.split('_');
+        const value = `${page}_${rest.join('_')}`;
+
+        const result = await command.buttonHandler(interaction, action, value);
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
+      // =========================
+      // rpleaderboard buttons
+      // =========================
+      if (interaction.customId.startsWith('rpleaderboard_')) {
+        const command = client.commands.get('rpleaderboard');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const [, action, page] = interaction.customId.split('_');
+
+        const result = await command.buttonHandler(
+          interaction,
+          action,
+          page
+        );
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
       const parts = interaction.customId.split('_');
       const cmd = parts.shift();
       const action = parts.shift();
@@ -562,6 +613,27 @@ client.on('interactionCreate', async interaction => {
     // Dropdowns
     // =========================
     if (interaction.isStringSelectMenu()) {
+      // =========================
+      // rpstats dropdown
+      // =========================
+      if (interaction.customId.startsWith('rpstats_select_')) {
+        const command = client.commands.get('rpstats');
+        if (!command || !command.selectHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.selectHandler(interaction);
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
       // stats dropdown handler
       if (interaction.customId.startsWith('stats_select_')) {
         const command = client.commands.get('stats');
