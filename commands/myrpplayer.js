@@ -138,11 +138,11 @@ module.exports = {
 
     const profileButtonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`myrpprofile_${player.discordId}`)
+        .setCustomId(`myrpprofile_${interaction.user.id}_${player.discordId}`)
         .setLabel('Profile')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId(`myrpstats_${player.discordId}`)
+        .setCustomId(`myrpstats_${interaction.user.id}_${player.discordId}`)
         .setLabel('Stats')
         .setStyle(ButtonStyle.Primary)
     );
@@ -215,8 +215,16 @@ module.exports = {
   async handleButton(interaction) {
     if (!interaction.isButton()) return;
     const customId = interaction.customId;
+    let ownerId, discordId;
     if (customId.startsWith('myrpstats_')) {
-      const discordId = customId.slice('myrpstats_'.length);
+      // Parse ownerId and discordId from customId
+      [ownerId, discordId] = customId.slice('myrpstats_'.length).split('_');
+      if (ownerId && ownerId !== interaction.user.id) {
+        return interaction.reply({
+          content: '❌ Only the user who ran this command can use these buttons.',
+          ephemeral: true
+        });
+      }
       // Fetch player data and stats again
       const [rows, statsRows] = await Promise.all([
         getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
@@ -262,19 +270,25 @@ module.exports = {
         components: [
           new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setCustomId(`myrpprofile_${discordId}`)
+              .setCustomId(`myrpprofile_${ownerId}_${discordId}`)
               .setLabel('Profile')
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
-              .setCustomId(`myrpstats_${discordId}`)
+              .setCustomId(`myrpstats_${ownerId}_${discordId}`)
               .setLabel('Stats')
               .setStyle(ButtonStyle.Primary)
           )
         ]
       });
     } else if (customId.startsWith('myrpprofile_')) {
-      // Recreate the player profile view
-      const discordId = customId.slice('myrpprofile_'.length);
+      // Parse ownerId and discordId from customId
+      [ownerId, discordId] = customId.slice('myrpprofile_'.length).split('_');
+      if (ownerId && ownerId !== interaction.user.id) {
+        return interaction.reply({
+          content: '❌ Only the user who ran this command can use these buttons.',
+          ephemeral: true
+        });
+      }
       const [rows, wagesRows] = await Promise.all([
         getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
         getData('Wages!A:D', { spreadsheetId: process.env.RP_SHEET_ID })
@@ -327,11 +341,11 @@ module.exports = {
       }
       const profileButtonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`myrpprofile_${player.discordId}`)
+          .setCustomId(`myrpprofile_${ownerId}_${player.discordId}`)
           .setLabel('Profile')
           .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
-          .setCustomId(`myrpstats_${player.discordId}`)
+          .setCustomId(`myrpstats_${ownerId}_${player.discordId}`)
           .setLabel('Stats')
           .setStyle(ButtonStyle.Primary)
       );

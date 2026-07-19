@@ -200,7 +200,7 @@ module.exports = {
     // Add Club Stats button
     const statsButtonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`myrpclubstats_${clubName}`)
+        .setCustomId(`myrpclubstats_${interaction.user.id}_${clubName}`)
         .setLabel('Club Stats')
         .setStyle(ButtonStyle.Primary)
     );
@@ -210,8 +210,19 @@ module.exports = {
   async handleButton(interaction) {
     if (!interaction.customId) return;
 
+    let ownerId, clubName;
+
     if (interaction.customId.startsWith('myrpclubdetails_')) {
-      const clubName = interaction.customId.substring('myrpclubdetails_'.length);
+      const parts = interaction.customId.substring('myrpclubdetails_'.length).split('_');
+      ownerId = parts.shift();
+      clubName = parts.join('_');
+
+      if (ownerId !== interaction.user.id) {
+        return interaction.reply({
+          content: '❌ Only the user who ran this command can use these buttons.',
+          ephemeral: true
+        });
+      }
 
       let managerRows;
       let rows;
@@ -347,7 +358,7 @@ module.exports = {
 
       const statsButtonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`myrpclubstats_${clubName}`)
+          .setCustomId(`myrpclubstats_${ownerId}_${clubName}`)
           .setLabel('Club Stats')
           .setStyle(ButtonStyle.Primary)
       );
@@ -370,7 +381,16 @@ module.exports = {
     } catch (err) {
       return interaction.update({ content: '❌ Failed to fetch RP data.', embeds: [], components: [] });
     }
-    const clubName = interaction.customId.substring('myrpclubstats_'.length);
+    const parts = interaction.customId.substring('myrpclubstats_'.length).split('_');
+    ownerId = parts.shift();
+    clubName = parts.join('_');
+
+    if (ownerId !== interaction.user.id) {
+      return interaction.reply({
+        content: '❌ Only the user who ran this command can use these buttons.',
+        ephemeral: true
+      });
+    }
     // Build set of club players (case-insensitive)
     const normalizeClubName = value => String(value || '')
       .trim()
@@ -457,11 +477,11 @@ module.exports = {
       components: [
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId(`myrpclubdetails_${clubName}`)
+            .setCustomId(`myrpclubdetails_${ownerId}_${clubName}`)
             .setLabel('Team Details')
             .setStyle(ButtonStyle.Secondary),
           new ButtonBuilder()
-            .setCustomId(`myrpclubstats_${clubName}`)
+            .setCustomId(`myrpclubstats_${ownerId}_${clubName}`)
             .setLabel('Club Stats')
             .setStyle(ButtonStyle.Primary)
         )
