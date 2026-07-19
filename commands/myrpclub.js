@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getData } = require('../utils/sheets');
 const emojis = require('../utils/emojis');
 
@@ -17,6 +17,7 @@ module.exports = {
     const clubSearch = interaction.options.getString('club');
     let managerRows;
     let rows;
+    let statsRows;
     try {
       rows = await getData(
         'Player_Data!A:Q',
@@ -24,6 +25,10 @@ module.exports = {
       );
       managerRows = await getData(
         'Managers!A:C',
+        { spreadsheetId: process.env.RP_SHEET_ID }
+      );
+      statsRows = await getData(
+        'Stats_Ranking!A:I',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
@@ -192,6 +197,114 @@ module.exports = {
         text: `Roleplay Club Profile • ${clubPlayers.length} Players`
       })
       .setTimestamp();
-    await interaction.editReply({ embeds: [embed] });
+    // Add Club Stats button
+    const statsButtonRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`myrpclubstats_${clubName}`)
+        .setLabel('Club Stats')
+        .setStyle(ButtonStyle.Primary)
+    );
+    await interaction.editReply({ embeds: [embed], components: [statsButtonRow] });
   },
+  // Button handler for club stats
+  async handleButton(interaction) {
+    if (!interaction.customId || !interaction.customId.startsWith('myrpclubstats_')) return;
+    // Fetch latest data
+    let rows, statsRows;
+    try {
+      rows = await getData(
+        'Player_Data!A:Q',
+        { spreadsheetId: process.env.RP_SHEET_ID }
+      );
+      statsRows = await getData(
+        'Stats_Ranking!A:I',
+        { spreadsheetId: process.env.RP_SHEET_ID }
+      );
+    } catch (err) {
+      return interaction.reply({ content: '❌ Failed to fetch RP data.', ephemeral: true });
+    }
+    const clubName = interaction.customId.substring('myrpclubstats_'.length);
+    // Build set of club players (case-insensitive)
+    const normalizeClubName = value => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[._-]/g, '');
+    const targetClub = normalizeClubName(clubName);
+    const clubPlayers = rows.slice(1).filter(row => {
+      const playerClub = normalizeClubName(row[5]);
+      return (
+        playerClub === targetClub ||
+        playerClub.includes(targetClub) ||
+        targetClub.includes(playerClub)
+      );
+    });
+    // Set of player names (case-insensitive)
+    const clubPlayerSet = new Set(
+      clubPlayers.map(row => String(row[1] || '').trim().toLowerCase())
+    );
+    // Prepare leaders
+    let topScorer = { player: null, value: null };
+    let topAssist = { player: null, value: null };
+    let topClean = { player: null, value: null };
+    for (let i = 1; i < statsRows.length; ++i) {
+      const row = statsRows[i];
+      // Goals: B(1), value C(2)
+      const goalPlayer = String(row[1] || '').trim();
+      const goalVal = Number(row[2] || 0);
+      if (clubPlayerSet.has(goalPlayer.trim().toLowerCase())) {
+        if (topScorer.value == null || goalVal > topScorer.value) {
+          topScorer = { player: goalPlayer, value: goalVal };
+        }
+      }
+      // Assists: E(4), value F(5)
+      const assistPlayer = String(row[4] || '').trim();
+      const assistVal = Number(row[5] || 0);
+      if (clubPlayerSet.has(assistPlayer.trim().toLowerCase())) {
+        if (topAssist.value == null || assistVal > topAssist.value) {
+          topAssist = { player: assistPlayer, value: assistVal };
+        }
+      }
+      // Clean Sheets: H(7), value I(8)
+      const cleanPlayer = String(row[7] || '').trim();
+      const cleanVal = Number(row[8] || 0);
+      if (clubPlayerSet.has(cleanPlayer.trim().toLowerCase())) {
+        if (topClean.value == null || cleanVal > topClean.value) {
+          topClean = { player: cleanPlayer, value: cleanVal };
+        }
+      }
+    }
+    const embed = new EmbedBuilder()
+      .setColor(0x2196f3)
+      .setTitle(`${clubName} Club Leaders`)
+      .addFields(
+        {
+          name: '⚽ Top Scorer',
+          value:
+            topScorer.player
+              ? `${topScorer.player} — ${topScorer.value}`
+              : 'None',
+          inline: false
+        },
+        {
+          name: '🎯 Top Assist',
+          value:
+            topAssist.player
+              ? `${topAssist.player} — ${topAssist.value}`
+              : 'None',
+          inline: false
+        },
+        {
+          name: '🧤 Most Clean Sheets',
+          value:
+            topClean.player
+              ? `${topClean.player} — ${topClean.value}`
+              : 'None',
+          inline: false
+        }
+      )
+      .setFooter({ text: 'Club Stat Leaders' })
+      .setTimestamp();
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+  }
 };

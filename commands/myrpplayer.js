@@ -1,6 +1,9 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 const { getData } = require('../utils/sheets');
 const emojis = require('../utils/emojis');
@@ -23,11 +26,14 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const [rows, wagesRows] = await Promise.all([
+    const [rows, wagesRows, statsRows] = await Promise.all([
       getData('Player_Data!A:Q', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
       getData('Wages!A:D', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('Stats_Ranking!A:I', {
         spreadsheetId: process.env.RP_SHEET_ID
       })
     ]);
@@ -94,21 +100,48 @@ module.exports = {
       : 'Not Set';
 
     let discordUsername = 'Unknown User';
-let avatarURL = interaction.client.user.displayAvatarURL({
-  extension: 'png',
-  size: 512
-});
+    let avatarURL = interaction.client.user.displayAvatarURL({
+      extension: 'png',
+      size: 512
+    });
 
-try {
-  const discordUser = await interaction.client.users.fetch(player.discordId);
-  discordUsername = discordUser.username;
-  avatarURL = discordUser.displayAvatarURL({
-    extension: 'png',
-    size: 512
-  });
-} catch {
-  discordUsername = 'Unknown User';
-}
+    try {
+      const discordUser = await interaction.client.users.fetch(player.discordId);
+      discordUsername = discordUser.username;
+      avatarURL = discordUser.displayAvatarURL({
+        extension: 'png',
+        size: 512
+      });
+    } catch {
+      discordUsername = 'Unknown User';
+    }
+
+    // --- Stats lookup logic ---
+    let goals = 0, assists = 0, cleanSheets = 0;
+    const playerNameLower = String(player.playerName).trim().toLowerCase();
+    if (Array.isArray(statsRows)) {
+      for (const row of statsRows.slice(1)) {
+        // Goals block: columns A:C -> player name in col B (1), goals in col C (2)
+        if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
+          goals = Number(row[2] || 0);
+        }
+        // Assists block: columns D:F -> player name in col E (4), assists in col F (5)
+        if (row[4] && String(row[4]).trim().toLowerCase() === playerNameLower) {
+          assists = Number(row[5] || 0);
+        }
+        // Clean Sheet block: columns G:I -> player name in col H (7), clean sheets in col I (8)
+        if (row[7] && String(row[7]).trim().toLowerCase() === playerNameLower) {
+          cleanSheets = Number(row[8] || 0);
+        }
+      }
+    }
+
+    const statsButtonRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`myrpstats_${player.discordId}`)
+        .setLabel('Stats')
+        .setStyle(ButtonStyle.Primary)
+    );
 
     const embed = new EmbedBuilder()
       .setColor(0x00AE86)
@@ -167,9 +200,58 @@ try {
       .setTimestamp();
 
     if (interaction.deferred || interaction.replied) {
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed], components: [statsButtonRow] });
     }
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds: [embed], components: [statsButtonRow] });
+  },
+  /**
+   * Handles button interaction for Stats.
+   */
+  async handleButton(interaction) {
+    if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith('myrpstats_')) return;
+    const discordId = interaction.customId.slice('myrpstats_'.length);
+    // Fetch player data and stats again
+    const [rows, statsRows] = await Promise.all([
+      getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
+      getData('Stats_Ranking!A:I', { spreadsheetId: process.env.RP_SHEET_ID })
+    ]);
+    // Find player row by Discord ID
+    const playerRow = rows
+      .slice(1)
+      .find(row => String(row[0] || '').trim() === discordId);
+    if (!playerRow) {
+      return interaction.reply({ content: '❌ Player not found.', ephemeral: true });
+    }
+    const playerName = playerRow[1] || 'N/A';
+    const playerNameLower = String(playerName).trim().toLowerCase();
+    let goals = 0, assists = 0, cleanSheets = 0;
+    if (Array.isArray(statsRows)) {
+      for (const row of statsRows.slice(1)) {
+        // Goals block: columns A:C -> player name in col B (1), goals in col C (2)
+        if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
+          goals = Number(row[2] || 0);
+        }
+        // Assists block: columns D:F -> player name in col E (4), assists in col F (5)
+        if (row[4] && String(row[4]).trim().toLowerCase() === playerNameLower) {
+          assists = Number(row[5] || 0);
+        }
+        // Clean Sheet block: columns G:I -> player name in col H (7), clean sheets in col I (8)
+        if (row[7] && String(row[7]).trim().toLowerCase() === playerNameLower) {
+          cleanSheets = Number(row[8] || 0);
+        }
+      }
+    }
+    const statsEmbed = new EmbedBuilder()
+      .setColor(0x00AE86)
+      .setTitle(`${playerName} RP Stats`)
+      .addFields(
+        { name: 'Goals', value: String(goals), inline: true },
+        { name: 'Assists', value: String(assists), inline: true },
+        { name: 'Clean Sheets', value: String(cleanSheets), inline: true }
+      )
+      .setTimestamp();
+    return interaction.reply({ embeds: [statsEmbed], ephemeral: true });
   }
 };
