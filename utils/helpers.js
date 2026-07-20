@@ -274,7 +274,7 @@ function getCompetitionConfig(matchNo) {
     return {
       key: 'fa',
       label: 'FA Cup',
-      fixturesRange: 'FA_Cup_Coop_Fixtures!A:K',
+      fixturesRange: 'FA_Cup_Coop_Fixtures!A:L',
       resultsRange: 'FA_Cup_Coop_Results!A:S'
     };
   }
@@ -283,7 +283,7 @@ function getCompetitionConfig(matchNo) {
     return {
       key: 'carabao',
       label: 'Carabao Cup',
-      fixturesRange: 'Carabao_Coop_Fixtures!A:K',
+      fixturesRange: 'Carabao_Coop_Fixtures!A:L',
       resultsRange: 'Carabao_Coop_Results!A:S'
     };
   }
@@ -292,7 +292,7 @@ function getCompetitionConfig(matchNo) {
     return {
       key: 'ucl',
       label: 'UCL Group Stage',
-      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      fixturesRange: 'UCL_Coop_Group_Fixtures!A:L',
       resultsRange: 'UCL_Coop_Results!A:S'
     };
   }
