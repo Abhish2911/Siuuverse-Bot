@@ -93,6 +93,20 @@ module.exports = {
     return sendStatsLeaderboard(interaction, 'goals', 0);
   },
   async buttonHandler(interaction, action, value) {
+    if (action === 'view') {
+      const [view, ownerId] = String(value || '').split('__');
+      if (ownerId && ownerId !== interaction.user.id) {
+        return { content: '❌ You cannot use another user\'s RP stats menu.', ephemeral: true };
+      }
+      if (view === 'current') {
+        return sendStatsLeaderboard(interaction, 'goals', 0);
+      }
+      if (view === 'alltime') {
+        return sendStatsLeaderboard(interaction, 'alltime_goals', 0);
+      }
+      return;
+    }
+
     const firstUnderscore = String(value || '').indexOf('_');
 
     let page = '0';
@@ -203,13 +217,11 @@ async function sendStatsLeaderboard(interaction, statType, page) {
     new ButtonBuilder()
       .setCustomId(`rpstats_view_current__${interaction.user.id}`)
       .setLabel('Current Season')
-      .setStyle(currentView === 'current' ? ButtonStyle.Success : ButtonStyle.Secondary)
-      .setDisabled(currentView === 'current'),
+      .setStyle(currentView === 'current' ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`rpstats_view_alltime__${interaction.user.id}`)
       .setLabel('All Time')
       .setStyle(currentView === 'alltime' ? ButtonStyle.Success : ButtonStyle.Secondary)
-      .setDisabled(currentView === 'alltime')
   );
 
   // Pagination buttons

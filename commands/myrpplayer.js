@@ -141,25 +141,21 @@ module.exports = {
     }
     // Helper for Stats_Ranking sheet
     function getCompetitionStats(rows, playerName, section) {
-      const offsets = {
-        league: 0,
-        ucl: 16,
-        fa: 32,
-        shield: 48
+      const sections = {
+        league: { goals:[1,2], assists:[5,6], saves:[9,10], clean:[13,14] },
+        ucl: { goals:[17,18], assists:[21,22], saves:[25,26], clean:[29,30] },
+        fa: { goals:[33,34], assists:[37,38], saves:[41,42], clean:[45,46] },
+        shield: { goals:[49,50], assists:[53,54], saves:[57,58], clean:[61,62] }
       };
-      const offset = offsets[section] || 0;
+      const cols = sections[section];
+      const stats = { goals:0, assists:0, saves:0, cleanSheets:0 };
+      if (!cols || !Array.isArray(rows)) return stats;
       const name = String(playerName).trim().toLowerCase();
-      let stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
-      if (!Array.isArray(rows)) return stats;
       for (const row of rows.slice(1)) {
-        // Player name always in col 1
-        if (row[1] && String(row[1]).trim().toLowerCase() === name) {
-          stats.goals = Number(row[offset + 1] || 0) + Number(row[offset + 2] || 0);
-          stats.assists = Number(row[offset + 5] || 0) + Number(row[offset + 6] || 0);
-          stats.saves = Number(row[offset + 9] || 0) + Number(row[offset + 10] || 0);
-          stats.cleanSheets = Number(row[offset + 13] || 0) + Number(row[offset + 14] || 0);
-          break;
-        }
+        if (String(row[cols.goals[0]]||'').trim().toLowerCase()===name) stats.goals = Number(row[cols.goals[1]])||0;
+        if (String(row[cols.assists[0]]||'').trim().toLowerCase()===name) stats.assists = Number(row[cols.assists[1]])||0;
+        if (String(row[cols.saves[0]]||'').trim().toLowerCase()===name) stats.saves = Number(row[cols.saves[1]])||0;
+        if (String(row[cols.clean[0]]||'').trim().toLowerCase()===name) stats.cleanSheets = Number(row[cols.clean[1]])||0;
       }
       return stats;
     }
@@ -262,25 +258,21 @@ module.exports = {
     }
     // Helper for Stats_Ranking sheet
     function getCompetitionStats(rows, playerName, section) {
-      const offsets = {
-        league: 0,
-        ucl: 16,
-        fa: 32,
-        shield: 48
+      const sections = {
+        league: { goals:[1,2], assists:[5,6], saves:[9,10], clean:[13,14] },
+        ucl: { goals:[17,18], assists:[21,22], saves:[25,26], clean:[29,30] },
+        fa: { goals:[33,34], assists:[37,38], saves:[41,42], clean:[45,46] },
+        shield: { goals:[49,50], assists:[53,54], saves:[57,58], clean:[61,62] }
       };
-      const offset = offsets[section] || 0;
+      const cols = sections[section];
+      const stats = { goals:0, assists:0, saves:0, cleanSheets:0 };
+      if (!cols || !Array.isArray(rows)) return stats;
       const name = String(playerName).trim().toLowerCase();
-      let stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
-      if (!Array.isArray(rows)) return stats;
       for (const row of rows.slice(1)) {
-        // Player name always in col 1
-        if (row[1] && String(row[1]).trim().toLowerCase() === name) {
-          stats.goals = Number(row[offset + 1] || 0) + Number(row[offset + 2] || 0);
-          stats.assists = Number(row[offset + 5] || 0) + Number(row[offset + 6] || 0);
-          stats.saves = Number(row[offset + 9] || 0) + Number(row[offset + 10] || 0);
-          stats.cleanSheets = Number(row[offset + 13] || 0) + Number(row[offset + 14] || 0);
-          break;
-        }
+        if (String(row[cols.goals[0]]||'').trim().toLowerCase()===name) stats.goals = Number(row[cols.goals[1]])||0;
+        if (String(row[cols.assists[0]]||'').trim().toLowerCase()===name) stats.assists = Number(row[cols.assists[1]])||0;
+        if (String(row[cols.saves[0]]||'').trim().toLowerCase()===name) stats.saves = Number(row[cols.saves[1]])||0;
+        if (String(row[cols.clean[0]]||'').trim().toLowerCase()===name) stats.cleanSheets = Number(row[cols.clean[1]])||0;
       }
       return stats;
     }
