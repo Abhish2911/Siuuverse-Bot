@@ -398,8 +398,10 @@ client.on('interactionCreate', async interaction => {
         const deferred = await safeDeferUpdate(interaction);
         if (!deferred) return;
 
-        const [, action, page, ...rest] = interaction.customId.split('_');
-        const value = `${page}_${rest.join('_')}`;
+        // Use improved parsing logic for rpstats buttons
+        const parts = interaction.customId.split('_');
+        const action = parts[1];
+        const value = parts.slice(2).join('_');
 
         const result = await command.buttonHandler(interaction, action, value);
 
