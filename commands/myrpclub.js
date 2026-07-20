@@ -447,21 +447,52 @@ module.exports = {
       };
     }
 
-    // Build description for all competitions
-    let description = '';
-    for (const comp of competitions) {
-      const leaders = collectLeaders(comp.offset);
-      description += `__**${comp.name}**__\n`;
-      description += `⚽ **Goals**\n${formatTop(leaders.goals)}\n`;
-      description += `🎯 **Assists**\n${formatTop(leaders.assists)}\n`;
-      description += `🧤 **Saves**\n${formatTop(leaders.saves)}\n`;
-      description += `🛡️ **Clean Sheets**\n${formatTop(leaders.cleanSheets)}\n\n`;
-    }
+    // Build fields for each competition
+    const league = collectLeaders(0);
+    const ucl = collectLeaders(16);
+    const fa = collectLeaders(32);
+    const shield = collectLeaders(48);
+
+    const buildCompetitionField = (title, leaders) => [
+      '⚽ **Goals**',
+      formatTop(leaders.goals),
+      '',
+      '🎯 **Assists**',
+      formatTop(leaders.assists),
+      '',
+      '🧤 **Saves**',
+      formatTop(leaders.saves),
+      '',
+      '🛡️ **Clean Sheets**',
+      formatTop(leaders.cleanSheets)
+    ].join('\n');
 
     const embed = new EmbedBuilder()
       .setColor(0x2196f3)
       .setTitle(`${clubName} Club Leaders`)
-      .setDescription(description.trim())
+      .setDescription('🏆 **Current Season Club Leaders**')
+      .addFields(
+        {
+          name: '🏆 League',
+          value: buildCompetitionField('League', league),
+          inline: true
+        },
+        {
+          name: '🏆 UCL',
+          value: buildCompetitionField('UCL', ucl),
+          inline: true
+        },
+        {
+          name: '🏆 FA Cup',
+          value: buildCompetitionField('FA Cup', fa),
+          inline: true
+        },
+        {
+          name: '🏆 Community Shield',
+          value: buildCompetitionField('Community Shield', shield),
+          inline: true
+        }
+      )
       .setFooter({ text: 'Club Stat Leaders' })
       .setTimestamp();
     await interaction.update({
