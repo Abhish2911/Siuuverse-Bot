@@ -374,8 +374,9 @@ module.exports = {
         'Player_Data!A:Q',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
+      // Use full stats range for all competitions
       statsRows = await getData(
-        'Stats_Ranking!A:O',
+        'Stats_Ranking!A:BK',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
@@ -414,72 +415,53 @@ module.exports = {
     const formatTop = list => list.length
       ? list.map((p, i) => `\`${i + 1}.\` **${p.player}** — ${p.value}`).join('\n')
       : 'None';
-    // Build arrays for each category
-    const goals = [];
-    const assists = [];
-    const saves = [];
-    const cleanSheets = [];
-    for (let i = 1; i < statsRows.length; ++i) {
-      const row = statsRows[i];
-      // Goals: player in B(1), value in C(2)
-      const goalPlayer = String(row[1] || '').trim();
-      const goalVal = Number(row[2] || 0);
-      if (clubPlayerSet.has(goalPlayer.toLowerCase()) && goalVal > 0) {
-        goals.push({ player: goalPlayer, value: goalVal });
+
+    // Competition definitions and stat offsets
+    const competitions = [
+      { name: 'League', offset: 0 },
+      { name: 'UCL', offset: 16 },
+      { name: 'FA Cup', offset: 32 },
+      { name: 'Community Shield', offset: 48 }
+    ];
+
+    // Helper to collect leaders for a competition offset
+    function collectLeaders(offset) {
+      const goals = [], assists = [], saves = [], cleanSheets = [];
+      for (const row of statsRows.slice(1)) {
+        const add = (nameCol, valCol, list) => {
+          const player = String(row[nameCol] || '').trim();
+          const value = Number(row[valCol] || 0);
+          if (player && clubPlayerSet.has(player.toLowerCase()) && value > 0) list.push({ player, value });
+        };
+        add(offset + 1, offset + 2, goals);
+        add(offset + 5, offset + 6, assists);
+        add(offset + 9, offset + 10, saves);
+        add(offset + 13, offset + 14, cleanSheets);
       }
-      // Assists: player in F(5), value in G(6)
-      const assistPlayer = String(row[5] || '').trim();
-      const assistVal = Number(row[6] || 0);
-      if (clubPlayerSet.has(assistPlayer.toLowerCase()) && assistVal > 0) {
-        assists.push({ player: assistPlayer, value: assistVal });
-      }
-      // GK Saves: player in J(9), value in K(10)
-      const savePlayer = String(row[9] || '').trim();
-      const saveVal = Number(row[10] || 0);
-      if (clubPlayerSet.has(savePlayer.toLowerCase()) && saveVal > 0) {
-        saves.push({ player: savePlayer, value: saveVal });
-      }
-      // Clean Sheets: player in N(13), value in O(14)
-      const cleanPlayer = String(row[13] || '').trim();
-      const cleanVal = Number(row[14] || 0);
-      if (clubPlayerSet.has(cleanPlayer.toLowerCase()) && cleanVal > 0) {
-        cleanSheets.push({ player: cleanPlayer, value: cleanVal });
-      }
+      for (const arr of [goals, assists, saves, cleanSheets]) arr.sort((a, b) => b.value - a.value);
+      return {
+        goals: goals.slice(0, 5),
+        assists: assists.slice(0, 5),
+        saves: saves.slice(0, 5),
+        cleanSheets: cleanSheets.slice(0, 5)
+      };
     }
-    // Sort descending and keep top 5
-    goals.sort((a, b) => b.value - a.value);
-    assists.sort((a, b) => b.value - a.value);
-    saves.sort((a, b) => b.value - a.value);
-    cleanSheets.sort((a, b) => b.value - a.value);
-    const topGoals = goals.slice(0, 5);
-    const topAssists = assists.slice(0, 5);
-    const topSaves = saves.slice(0, 5);
-    const topCleanSheets = cleanSheets.slice(0, 5);
+
+    // Build description for all competitions
+    let description = '';
+    for (const comp of competitions) {
+      const leaders = collectLeaders(comp.offset);
+      description += `__**${comp.name}**__\n`;
+      description += `⚽ **Goals**\n${formatTop(leaders.goals)}\n`;
+      description += `🎯 **Assists**\n${formatTop(leaders.assists)}\n`;
+      description += `🧤 **Saves**\n${formatTop(leaders.saves)}\n`;
+      description += `🛡️ **Clean Sheets**\n${formatTop(leaders.cleanSheets)}\n\n`;
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x2196f3)
       .setTitle(`${clubName} Club Leaders`)
-      .addFields(
-        {
-          name: '⚽ Goals',
-          value: formatTop(topGoals),
-          inline: true
-        },
-        {
-          name: '🎯 Assists',
-          value: formatTop(topAssists),
-          inline: true
-        },
-        {
-          name: '🧤 GK Saves',
-          value: formatTop(topSaves),
-          inline: true
-        },
-        {
-          name: '🛡️ Clean Sheets',
-          value: formatTop(topCleanSheets),
-          inline: true
-        }
-      )
+      .setDescription(description.trim())
       .setFooter({ text: 'Club Stat Leaders' })
       .setTimestamp();
     await interaction.update({
