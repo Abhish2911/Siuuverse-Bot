@@ -166,30 +166,15 @@ module.exports = {
     // Default to league stats for the main profile page, using Stats_Ranking
     const playerStats = getCompetitionStats(statsRows, player.playerName, 'league');
 
-    const profileButtonRow = new ActionRowBuilder().addComponents(
+    // Single row for Profile and Stats buttons
+    const profileStatsButtonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`myrpprofile_${interaction.user.id}_${player.discordId}`)
-        .setLabel('Profile')
+        .setLabel('👤 Profile')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId(`myrpstats_league_${interaction.user.id}_${player.discordId}`)
-        .setLabel('Current League')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`myrpstats_ucl_${interaction.user.id}_${player.discordId}`)
-        .setLabel('UCL')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`myrpstats_fa_${interaction.user.id}_${player.discordId}`)
-        .setLabel('FA Cup')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`myrpstats_shield_${interaction.user.id}_${player.discordId}`)
-        .setLabel('Community Shield')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`myrpstats_alltime_${interaction.user.id}_${player.discordId}`)
-        .setLabel('All Time')
+        .setCustomId(`myrpstats_${interaction.user.id}_${player.discordId}`)
+        .setLabel('📊 Stats')
         .setStyle(ButtonStyle.Primary)
     );
 
@@ -250,10 +235,10 @@ module.exports = {
       .setTimestamp();
 
     if (interaction.deferred || interaction.replied) {
-      return interaction.editReply({ embeds: [embed], components: [profileButtonRow] });
+      return interaction.editReply({ embeds: [embed], components: [profileStatsButtonRow] });
     }
 
-    return interaction.reply({ embeds: [embed], components: [profileButtonRow] });
+    return interaction.reply({ embeds: [embed], components: [profileStatsButtonRow] });
   },
   /**
    * Handles button interaction for Stats.
@@ -300,12 +285,11 @@ module.exports = {
       return stats;
     }
     if (customId.startsWith('myrpstats_')) {
-      // Format: myrpstats_<type>_<ownerId>_<discordId>
+      // Format: myrpstats_<ownerId>_<discordId>
       const split = customId.split('_');
-      // [ 'myrpstats', <type>, <ownerId>, <discordId> ]
-      const type = split[1];
-      ownerId = split[2];
-      discordId = split[3];
+      // [ 'myrpstats', <ownerId>, <discordId> ]
+      ownerId = split[1];
+      discordId = split[2];
       if (ownerId && ownerId !== interaction.user.id) {
         return interaction.reply({
           content: '❌ Only the user who ran this command can use these buttons.',
@@ -330,69 +314,71 @@ module.exports = {
         return interaction.update({ content: '❌ Player not found.', embeds: [], components: [] });
       }
       const playerName = playerRow[1] || 'N/A';
-      let stats, titleSuffix;
-      if (type === 'alltime') {
-        stats = getPlayerStats(allTimeRankingRows, playerName);
-        titleSuffix = 'All Time Stats';
-      } else {
-        stats = getCompetitionStats(statsRows, playerName, type);
-        switch (type) {
-          case 'ucl':
-            titleSuffix = 'UCL Stats';
-            break;
-          case 'fa':
-            titleSuffix = 'FA Cup Stats';
-            break;
-          case 'shield':
-            titleSuffix = 'Community Shield Stats';
-            break;
-          case 'league':
-          default:
-            titleSuffix = 'League Stats';
-            break;
-        }
-      }
+      // Compute all stats
+      const league = getCompetitionStats(statsRows, playerName, 'league');
+      const ucl = getCompetitionStats(statsRows, playerName, 'ucl');
+      const fa = getCompetitionStats(statsRows, playerName, 'fa');
+      const shield = getCompetitionStats(statsRows, playerName, 'shield');
+      const allTime = getPlayerStats(allTimeRankingRows, playerName);
+      // Emoji fallbacks
+      const goalEmoji = emojis.goal || '⚽';
+      const assistEmoji = emojis.assist || '🎯';
+      const saveEmoji = emojis.save || '🧤';
+      const cleanSheetEmoji = emojis.cleanSheet || '🛡️';
+      // Compose stats embed
       const statsEmbed = new EmbedBuilder()
         .setColor(0x00AE86)
-        .setTitle(`${playerName} RP ${titleSuffix}`)
-        .addFields(
-          { name: `${emojis.goal} Goals`, value: String(stats.goals), inline: true },
-          { name: `${emojis.assist} Assists`, value: String(stats.assists), inline: true },
-          { name: `${emojis.save} GK Saves`, value: String(stats.saves), inline: true },
-          { name: `${emojis.cleanSheet || '🧤'} Clean Sheets`, value: String(stats.cleanSheets), inline: true }
-        )
+        .setTitle(`${playerName} RP Stats`)
+        .setDescription([
+          `🏆 **Current Season**`,
+          ``,
+          `**League**`,
+          `${goalEmoji} Goals: ${league.goals}`,
+          `${assistEmoji} Assists: ${league.assists}`,
+          `${saveEmoji} Saves: ${league.saves}`,
+          `${cleanSheetEmoji} Clean Sheets: ${league.cleanSheets}`,
+          ``,
+          `**UCL**`,
+          `${goalEmoji} Goals: ${ucl.goals}`,
+          `${assistEmoji} Assists: ${ucl.assists}`,
+          `${saveEmoji} Saves: ${ucl.saves}`,
+          `${cleanSheetEmoji} Clean Sheets: ${ucl.cleanSheets}`,
+          ``,
+          `**FA Cup**`,
+          `${goalEmoji} Goals: ${fa.goals}`,
+          `${assistEmoji} Assists: ${fa.assists}`,
+          `${saveEmoji} Saves: ${fa.saves}`,
+          `${cleanSheetEmoji} Clean Sheets: ${fa.cleanSheets}`,
+          ``,
+          `**Community Shield**`,
+          `${goalEmoji} Goals: ${shield.goals}`,
+          `${assistEmoji} Assists: ${shield.assists}`,
+          `${saveEmoji} Saves: ${shield.saves}`,
+          `${cleanSheetEmoji} Clean Sheets: ${shield.cleanSheets}`,
+          ``,
+          `━━━━━━━━━━━━━━`,
+          ``,
+          `🏅 **All Time**`,
+          `${goalEmoji} Goals: ${allTime.goals}`,
+          `${assistEmoji} Assists: ${allTime.assists}`,
+          `${saveEmoji} Saves: ${allTime.saves}`,
+          `${cleanSheetEmoji} Clean Sheets: ${allTime.cleanSheets}`,
+        ].join('\n'))
         .setTimestamp();
-      // Buttons: Profile + all 5 stats buttons
+      // Single row for Profile and Stats buttons
+      const profileStatsButtonRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`myrpprofile_${ownerId}_${discordId}`)
+          .setLabel('👤 Profile')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`myrpstats_${ownerId}_${discordId}`)
+          .setLabel('📊 Stats')
+          .setStyle(ButtonStyle.Primary)
+      );
       return interaction.update({
         embeds: [statsEmbed],
-        components: [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`myrpprofile_${ownerId}_${discordId}`)
-              .setLabel('Profile')
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId(`myrpstats_league_${ownerId}_${discordId}`)
-              .setLabel('Current League')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`myrpstats_ucl_${ownerId}_${discordId}`)
-              .setLabel('UCL')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`myrpstats_fa_${ownerId}_${discordId}`)
-              .setLabel('FA Cup')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`myrpstats_shield_${ownerId}_${discordId}`)
-              .setLabel('Community Shield')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`myrpstats_alltime_${ownerId}_${discordId}`)
-              .setLabel('All Time')
-              .setStyle(ButtonStyle.Primary)
-          )
-        ]
+        components: [profileStatsButtonRow]
       });
     } else if (customId.startsWith('myrpprofile_')) {
       // Parse ownerId and discordId from customId
@@ -453,14 +439,15 @@ module.exports = {
       } catch {
         discordUsername = 'Unknown User';
       }
-      const profileButtonRow = new ActionRowBuilder().addComponents(
+      // Single row for Profile and Stats buttons
+      const profileStatsButtonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`myrpprofile_${ownerId}_${player.discordId}`)
-          .setLabel('Profile')
+          .setLabel('👤 Profile')
           .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
           .setCustomId(`myrpstats_${ownerId}_${player.discordId}`)
-          .setLabel('Stats')
+          .setLabel('📊 Stats')
           .setStyle(ButtonStyle.Primary)
       );
       const embed = new EmbedBuilder()
@@ -518,7 +505,7 @@ module.exports = {
           name: `${player.playerName} Profile`
         })
         .setTimestamp();
-      return interaction.update({ embeds: [embed], components: [profileButtonRow] });
+      return interaction.update({ embeds: [embed], components: [profileStatsButtonRow] });
     }
   }
 };
