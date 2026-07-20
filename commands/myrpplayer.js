@@ -26,16 +26,12 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    // Load all relevant sheets, including stats and all ranking sheets
+    // Load only the relevant sheets: Player_Data, Wages, Stats_Ranking, All_Time_Ranking
     const [
       rows,
       wagesRows,
       statsRows,
-      allTimeRankingRows,
-      leagueRankingRows,
-      uclRankingRows,
-      faRankingRows,
-      shieldRankingRows
+      allTimeRankingRows
     ] = await Promise.all([
       getData('Player_Data!A:Q', {
         spreadsheetId: process.env.RP_SHEET_ID
@@ -43,22 +39,10 @@ module.exports = {
       getData('Wages!A:D', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
-      getData('Stats_Ranking!A:K', {
+      getData('Stats_Ranking!A:BK', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
       getData('All_Time_Ranking!A:O', {
-        spreadsheetId: process.env.RP_SHEET_ID
-      }),
-      getData('League_Ranking!A:O', {
-        spreadsheetId: process.env.RP_SHEET_ID
-      }),
-      getData('UCL_Ranking!A:O', {
-        spreadsheetId: process.env.RP_SHEET_ID
-      }),
-      getData('FA_Ranking!A:O', {
-        spreadsheetId: process.env.RP_SHEET_ID
-      }),
-      getData('Community_Shield_Ranking!A:O', {
         spreadsheetId: process.env.RP_SHEET_ID
       })
     ]);
@@ -141,7 +125,8 @@ module.exports = {
       discordUsername = 'Unknown User';
     }
 
-    // --- Stats lookup logic (using helper) ---
+    // --- Stats lookup logic ---
+    // Helper for all-time ranking
     function getPlayerStats(rows, playerName) {
       const name = String(playerName).trim().toLowerCase();
       const stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
@@ -154,8 +139,32 @@ module.exports = {
       }
       return stats;
     }
-    // Default to league stats for the main profile page
-    const playerStats = getPlayerStats(leagueRankingRows, player.playerName);
+    // Helper for Stats_Ranking sheet
+    function getCompetitionStats(rows, playerName, section) {
+      const offsets = {
+        league: 0,
+        ucl: 16,
+        fa: 32,
+        shield: 48
+      };
+      const offset = offsets[section] || 0;
+      const name = String(playerName).trim().toLowerCase();
+      let stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
+      if (!Array.isArray(rows)) return stats;
+      for (const row of rows.slice(1)) {
+        // Player name always in col 1
+        if (row[1] && String(row[1]).trim().toLowerCase() === name) {
+          stats.goals = Number(row[offset + 1] || 0) + Number(row[offset + 2] || 0);
+          stats.assists = Number(row[offset + 5] || 0) + Number(row[offset + 6] || 0);
+          stats.saves = Number(row[offset + 9] || 0) + Number(row[offset + 10] || 0);
+          stats.cleanSheets = Number(row[offset + 13] || 0) + Number(row[offset + 14] || 0);
+          break;
+        }
+      }
+      return stats;
+    }
+    // Default to league stats for the main profile page, using Stats_Ranking
+    const playerStats = getCompetitionStats(statsRows, player.playerName, 'league');
 
     const profileButtonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -253,7 +262,7 @@ module.exports = {
     if (!interaction.isButton()) return;
     const customId = interaction.customId;
     let ownerId, discordId;
-    // Helper for stats lookup
+    // Helper for all-time ranking
     function getPlayerStats(rows, playerName) {
       const name = String(playerName).trim().toLowerCase();
       const stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
@@ -263,6 +272,30 @@ module.exports = {
         if (row[5] && String(row[5]).trim().toLowerCase() === name) stats.assists = Number(row[6] || 0);
         if (row[9] && String(row[9]).trim().toLowerCase() === name) stats.saves = Number(row[10] || 0);
         if (row[13] && String(row[13]).trim().toLowerCase() === name) stats.cleanSheets = Number(row[14] || 0);
+      }
+      return stats;
+    }
+    // Helper for Stats_Ranking sheet
+    function getCompetitionStats(rows, playerName, section) {
+      const offsets = {
+        league: 0,
+        ucl: 16,
+        fa: 32,
+        shield: 48
+      };
+      const offset = offsets[section] || 0;
+      const name = String(playerName).trim().toLowerCase();
+      let stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
+      if (!Array.isArray(rows)) return stats;
+      for (const row of rows.slice(1)) {
+        // Player name always in col 1
+        if (row[1] && String(row[1]).trim().toLowerCase() === name) {
+          stats.goals = Number(row[offset + 1] || 0) + Number(row[offset + 2] || 0);
+          stats.assists = Number(row[offset + 5] || 0) + Number(row[offset + 6] || 0);
+          stats.saves = Number(row[offset + 9] || 0) + Number(row[offset + 10] || 0);
+          stats.cleanSheets = Number(row[offset + 13] || 0) + Number(row[offset + 14] || 0);
+          break;
+        }
       }
       return stats;
     }
@@ -279,20 +312,14 @@ module.exports = {
           ephemeral: true
         });
       }
-      // Fetch player data and all ranking sheets
+      // Fetch player data, Stats_Ranking, and All_Time_Ranking sheets
       const [
         rows,
-        leagueRankingRows,
-        uclRankingRows,
-        faRankingRows,
-        shieldRankingRows,
+        statsRows,
         allTimeRankingRows
       ] = await Promise.all([
         getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
-        getData('League_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
-        getData('UCL_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
-        getData('FA_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
-        getData('Community_Shield_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
+        getData('Stats_Ranking!A:BK', { spreadsheetId: process.env.RP_SHEET_ID }),
         getData('All_Time_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID })
       ]);
       // Find player row by Discord ID
@@ -303,33 +330,28 @@ module.exports = {
         return interaction.update({ content: '❌ Player not found.', embeds: [], components: [] });
       }
       const playerName = playerRow[1] || 'N/A';
-      // Select ranking rows based on type
-      let statsRows;
-      let titleSuffix;
-      switch (type) {
-        case 'ucl':
-          statsRows = uclRankingRows;
-          titleSuffix = 'UCL Stats';
-          break;
-        case 'fa':
-          statsRows = faRankingRows;
-          titleSuffix = 'FA Cup Stats';
-          break;
-        case 'shield':
-          statsRows = shieldRankingRows;
-          titleSuffix = 'Community Shield Stats';
-          break;
-        case 'alltime':
-          statsRows = allTimeRankingRows;
-          titleSuffix = 'All Time Stats';
-          break;
-        case 'league':
-        default:
-          statsRows = leagueRankingRows;
-          titleSuffix = 'League Stats';
-          break;
+      let stats, titleSuffix;
+      if (type === 'alltime') {
+        stats = getPlayerStats(allTimeRankingRows, playerName);
+        titleSuffix = 'All Time Stats';
+      } else {
+        stats = getCompetitionStats(statsRows, playerName, type);
+        switch (type) {
+          case 'ucl':
+            titleSuffix = 'UCL Stats';
+            break;
+          case 'fa':
+            titleSuffix = 'FA Cup Stats';
+            break;
+          case 'shield':
+            titleSuffix = 'Community Shield Stats';
+            break;
+          case 'league':
+          default:
+            titleSuffix = 'League Stats';
+            break;
+        }
       }
-      const stats = getPlayerStats(statsRows, playerName);
       const statsEmbed = new EmbedBuilder()
         .setColor(0x00AE86)
         .setTitle(`${playerName} RP ${titleSuffix}`)
