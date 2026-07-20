@@ -375,7 +375,7 @@ module.exports = {
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
       statsRows = await getData(
-        'Stats_Ranking!A:O',
+        'Stats_Ranking!A:BK',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
@@ -414,70 +414,149 @@ module.exports = {
     const formatTop = list => list.length
       ? list.map((p, i) => `\`${i + 1}.\` **${p.player}** — ${p.value}`).join('\n')
       : 'None';
-    // Build arrays for each category
-    const goals = [];
-    const assists = [];
-    const saves = [];
-    const cleanSheets = [];
-    for (let i = 1; i < statsRows.length; ++i) {
-      const row = statsRows[i];
-      // Goals: player in B(1), value in C(2)
-      const goalPlayer = String(row[1] || '').trim();
-      const goalVal = Number(row[2] || 0);
-      if (clubPlayerSet.has(goalPlayer.toLowerCase()) && goalVal > 0) {
-        goals.push({ player: goalPlayer, value: goalVal });
+
+    // Helper to collect leaders for a competition offset
+    const collectLeaders = (offset) => {
+      const goals = [];
+      const assists = [];
+      const saves = [];
+      const cleanSheets = [];
+      for (let i = 1; i < statsRows.length; ++i) {
+        const row = statsRows[i];
+        // Goals: player in B+offset (1+offset), value in C+offset (2+offset)
+        const goalPlayer = String(row[1 + offset] || '').trim();
+        const goalVal = Number(row[2 + offset] || 0);
+        if (clubPlayerSet.has(goalPlayer.toLowerCase()) && goalVal > 0) {
+          goals.push({ player: goalPlayer, value: goalVal });
+        }
+        // Assists: player in F+offset (5+offset), value in G+offset (6+offset)
+        const assistPlayer = String(row[5 + offset] || '').trim();
+        const assistVal = Number(row[6 + offset] || 0);
+        if (clubPlayerSet.has(assistPlayer.toLowerCase()) && assistVal > 0) {
+          assists.push({ player: assistPlayer, value: assistVal });
+        }
+        // GK Saves: player in J+offset (9+offset), value in K+offset (10+offset)
+        const savePlayer = String(row[9 + offset] || '').trim();
+        const saveVal = Number(row[10 + offset] || 0);
+        if (clubPlayerSet.has(savePlayer.toLowerCase()) && saveVal > 0) {
+          saves.push({ player: savePlayer, value: saveVal });
+        }
+        // Clean Sheets: player in N+offset (13+offset), value in O+offset (14+offset)
+        const cleanPlayer = String(row[13 + offset] || '').trim();
+        const cleanVal = Number(row[14 + offset] || 0);
+        if (clubPlayerSet.has(cleanPlayer.toLowerCase()) && cleanVal > 0) {
+          cleanSheets.push({ player: cleanPlayer, value: cleanVal });
+        }
       }
-      // Assists: player in F(5), value in G(6)
-      const assistPlayer = String(row[5] || '').trim();
-      const assistVal = Number(row[6] || 0);
-      if (clubPlayerSet.has(assistPlayer.toLowerCase()) && assistVal > 0) {
-        assists.push({ player: assistPlayer, value: assistVal });
-      }
-      // GK Saves: player in J(9), value in K(10)
-      const savePlayer = String(row[9] || '').trim();
-      const saveVal = Number(row[10] || 0);
-      if (clubPlayerSet.has(savePlayer.toLowerCase()) && saveVal > 0) {
-        saves.push({ player: savePlayer, value: saveVal });
-      }
-      // Clean Sheets: player in N(13), value in O(14)
-      const cleanPlayer = String(row[13] || '').trim();
-      const cleanVal = Number(row[14] || 0);
-      if (clubPlayerSet.has(cleanPlayer.toLowerCase()) && cleanVal > 0) {
-        cleanSheets.push({ player: cleanPlayer, value: cleanVal });
-      }
-    }
-    // Sort descending and keep top 5
-    goals.sort((a, b) => b.value - a.value);
-    assists.sort((a, b) => b.value - a.value);
-    saves.sort((a, b) => b.value - a.value);
-    cleanSheets.sort((a, b) => b.value - a.value);
-    const topGoals = goals.slice(0, 5);
-    const topAssists = assists.slice(0, 5);
-    const topSaves = saves.slice(0, 5);
-    const topCleanSheets = cleanSheets.slice(0, 5);
+      // Sort and take top 5
+      goals.sort((a, b) => b.value - a.value);
+      assists.sort((a, b) => b.value - a.value);
+      saves.sort((a, b) => b.value - a.value);
+      cleanSheets.sort((a, b) => b.value - a.value);
+      return {
+        goals: goals.slice(0, 5),
+        assists: assists.slice(0, 5),
+        saves: saves.slice(0, 5),
+        cleanSheets: cleanSheets.slice(0, 5),
+      };
+    };
+
+    // Helper to build a field value
+    const buildField = list => formatTop(list);
+
+    // Collect for each competition
+    const league = collectLeaders(0);
+    const ucl = collectLeaders(16);
+    const fa = collectLeaders(32);
+    const shield = collectLeaders(48);
+
     const embed = new EmbedBuilder()
       .setColor(0x2196f3)
       .setTitle(`${clubName} Club Leaders`)
       .addFields(
+        // League
         {
-          name: '⚽ Goals',
-          value: formatTop(topGoals),
-          inline: true
+          name: `${emojis.PL} League Goals`,
+          value: buildField(league.goals),
+          inline: false
         },
         {
-          name: '🎯 Assists',
-          value: formatTop(topAssists),
-          inline: true
+          name: `${emojis.PL} League Assists`,
+          value: buildField(league.assists),
+          inline: false
         },
         {
-          name: '🧤 GK Saves',
-          value: formatTop(topSaves),
-          inline: true
+          name: `${emojis.PL} League Saves`,
+          value: buildField(league.saves),
+          inline: false
         },
         {
-          name: '🛡️ Clean Sheets',
-          value: formatTop(topCleanSheets),
-          inline: true
+          name: `${emojis.PL} League Clean Sheets`,
+          value: buildField(league.cleanSheets),
+          inline: false
+        },
+        // UCL
+        {
+          name: `${emojis.UCL} UCL Goals`,
+          value: buildField(ucl.goals),
+          inline: false
+        },
+        {
+          name: `${emojis.UCL} UCL Assists`,
+          value: buildField(ucl.assists),
+          inline: false
+        },
+        {
+          name: `${emojis.UCL} UCL Saves`,
+          value: buildField(ucl.saves),
+          inline: false
+        },
+        {
+          name: `${emojis.UCL} UCL Clean Sheets`,
+          value: buildField(ucl.cleanSheets),
+          inline: false
+        },
+        // FA Cup
+        {
+          name: `${emojis.FA} FA Cup Goals`,
+          value: buildField(fa.goals),
+          inline: false
+        },
+        {
+          name: `${emojis.FA} FA Cup Assists`,
+          value: buildField(fa.assists),
+          inline: false
+        },
+        {
+          name: `${emojis.FA} FA Cup Saves`,
+          value: buildField(fa.saves),
+          inline: false
+        },
+        {
+          name: `${emojis.FA} FA Cup Clean Sheets`,
+          value: buildField(fa.cleanSheets),
+          inline: false
+        },
+        // Community Shield
+        {
+          name: `${emojis.Trophy_icon} Community Shield Goals`,
+          value: buildField(shield.goals),
+          inline: false
+        },
+        {
+          name: `${emojis.Trophy_icon} Community Shield Assists`,
+          value: buildField(shield.assists),
+          inline: false
+        },
+        {
+          name: `${emojis.Trophy_icon} Community Shield Saves`,
+          value: buildField(shield.saves),
+          inline: false
+        },
+        {
+          name: `${emojis.Trophy_icon} Community Shield Clean Sheets`,
+          value: buildField(shield.cleanSheets),
+          inline: false
         }
       )
       .setFooter({ text: 'Club Stat Leaders' })
