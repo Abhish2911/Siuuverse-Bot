@@ -26,7 +26,17 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const [rows, wagesRows, statsRows] = await Promise.all([
+    // Load all relevant sheets, including stats and all ranking sheets
+    const [
+      rows,
+      wagesRows,
+      statsRows,
+      allTimeRankingRows,
+      leagueRankingRows,
+      uclRankingRows,
+      faRankingRows,
+      shieldRankingRows
+    ] = await Promise.all([
       getData('Player_Data!A:Q', {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
@@ -34,6 +44,21 @@ module.exports = {
         spreadsheetId: process.env.RP_SHEET_ID
       }),
       getData('Stats_Ranking!A:K', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('All_Time_Ranking!A:O', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('League_Ranking!A:O', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('UCL_Ranking!A:O', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('FA_Ranking!A:O', {
+        spreadsheetId: process.env.RP_SHEET_ID
+      }),
+      getData('Community_Shield_Ranking!A:O', {
         spreadsheetId: process.env.RP_SHEET_ID
       })
     ]);
@@ -116,25 +141,21 @@ module.exports = {
       discordUsername = 'Unknown User';
     }
 
-    // --- Stats lookup logic ---
-    let goals = 0, assists = 0, cleanSheets = 0;
-    const playerNameLower = String(player.playerName).trim().toLowerCase();
-    if (Array.isArray(statsRows)) {
-      for (const row of statsRows.slice(1)) {
-        // Goals block: columns A:C -> player name in col B (1), goals in col C (2)
-        if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
-          goals = Number(row[2] || 0);
-        }
-        // Assists block: columns E:G -> player name in col F (5), assists in col G (6)
-        if (row[5] && String(row[5]).trim().toLowerCase() === playerNameLower) {
-          assists = Number(row[6] || 0);
-        }
-        // Clean Sheet block: columns I:K -> player name in col J (9), clean sheets in col K (10)
-        if (row[9] && String(row[9]).trim().toLowerCase() === playerNameLower) {
-          cleanSheets = Number(row[10] || 0);
-        }
+    // --- Stats lookup logic (using helper) ---
+    function getPlayerStats(rows, playerName) {
+      const name = String(playerName).trim().toLowerCase();
+      const stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
+      if (!Array.isArray(rows)) return stats;
+      for (const row of rows.slice(1)) {
+        if (row[1] && String(row[1]).trim().toLowerCase() === name) stats.goals = Number(row[2] || 0);
+        if (row[5] && String(row[5]).trim().toLowerCase() === name) stats.assists = Number(row[6] || 0);
+        if (row[9] && String(row[9]).trim().toLowerCase() === name) stats.saves = Number(row[10] || 0);
+        if (row[13] && String(row[13]).trim().toLowerCase() === name) stats.cleanSheets = Number(row[14] || 0);
       }
+      return stats;
     }
+    // Default to league stats for the main profile page
+    const playerStats = getPlayerStats(leagueRankingRows, player.playerName);
 
     const profileButtonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -142,8 +163,24 @@ module.exports = {
         .setLabel('Profile')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId(`myrpstats_${interaction.user.id}_${player.discordId}`)
-        .setLabel('Stats')
+        .setCustomId(`myrpstats_league_${interaction.user.id}_${player.discordId}`)
+        .setLabel('Current League')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`myrpstats_ucl_${interaction.user.id}_${player.discordId}`)
+        .setLabel('UCL')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`myrpstats_fa_${interaction.user.id}_${player.discordId}`)
+        .setLabel('FA Cup')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`myrpstats_shield_${interaction.user.id}_${player.discordId}`)
+        .setLabel('Community Shield')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`myrpstats_alltime_${interaction.user.id}_${player.discordId}`)
+        .setLabel('All Time')
         .setStyle(ButtonStyle.Primary)
     );
 
@@ -216,19 +253,47 @@ module.exports = {
     if (!interaction.isButton()) return;
     const customId = interaction.customId;
     let ownerId, discordId;
+    // Helper for stats lookup
+    function getPlayerStats(rows, playerName) {
+      const name = String(playerName).trim().toLowerCase();
+      const stats = { goals: 0, assists: 0, saves: 0, cleanSheets: 0 };
+      if (!Array.isArray(rows)) return stats;
+      for (const row of rows.slice(1)) {
+        if (row[1] && String(row[1]).trim().toLowerCase() === name) stats.goals = Number(row[2] || 0);
+        if (row[5] && String(row[5]).trim().toLowerCase() === name) stats.assists = Number(row[6] || 0);
+        if (row[9] && String(row[9]).trim().toLowerCase() === name) stats.saves = Number(row[10] || 0);
+        if (row[13] && String(row[13]).trim().toLowerCase() === name) stats.cleanSheets = Number(row[14] || 0);
+      }
+      return stats;
+    }
     if (customId.startsWith('myrpstats_')) {
-      // Parse ownerId and discordId from customId
-      [ownerId, discordId] = customId.slice('myrpstats_'.length).split('_');
+      // Format: myrpstats_<type>_<ownerId>_<discordId>
+      const split = customId.split('_');
+      // [ 'myrpstats', <type>, <ownerId>, <discordId> ]
+      const type = split[1];
+      ownerId = split[2];
+      discordId = split[3];
       if (ownerId && ownerId !== interaction.user.id) {
         return interaction.reply({
           content: '❌ Only the user who ran this command can use these buttons.',
           ephemeral: true
         });
       }
-      // Fetch player data and stats again
-      const [rows, statsRows] = await Promise.all([
+      // Fetch player data and all ranking sheets
+      const [
+        rows,
+        leagueRankingRows,
+        uclRankingRows,
+        faRankingRows,
+        shieldRankingRows,
+        allTimeRankingRows
+      ] = await Promise.all([
         getData('Player_Data!A:Q', { spreadsheetId: process.env.RP_SHEET_ID }),
-        getData('Stats_Ranking!A:K', { spreadsheetId: process.env.RP_SHEET_ID })
+        getData('League_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
+        getData('UCL_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
+        getData('FA_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
+        getData('Community_Shield_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID }),
+        getData('All_Time_Ranking!A:O', { spreadsheetId: process.env.RP_SHEET_ID })
       ]);
       // Find player row by Discord ID
       const playerRow = rows
@@ -238,33 +303,44 @@ module.exports = {
         return interaction.update({ content: '❌ Player not found.', embeds: [], components: [] });
       }
       const playerName = playerRow[1] || 'N/A';
-      const playerNameLower = String(playerName).trim().toLowerCase();
-      let goals = 0, assists = 0, cleanSheets = 0;
-      if (Array.isArray(statsRows)) {
-        for (const row of statsRows.slice(1)) {
-          // Goals block: columns A:C -> player name in col B (1), goals in col C (2)
-          if (row[1] && String(row[1]).trim().toLowerCase() === playerNameLower) {
-            goals = Number(row[2] || 0);
-          }
-          // Assists block: columns E:G -> player name in col F (5), assists in col G (6)
-          if (row[5] && String(row[5]).trim().toLowerCase() === playerNameLower) {
-            assists = Number(row[6] || 0);
-          }
-          // Clean Sheet block: columns I:K -> player name in col J (9), clean sheets in col K (10)
-          if (row[9] && String(row[9]).trim().toLowerCase() === playerNameLower) {
-            cleanSheets = Number(row[10] || 0);
-          }
-        }
+      // Select ranking rows based on type
+      let statsRows;
+      let titleSuffix;
+      switch (type) {
+        case 'ucl':
+          statsRows = uclRankingRows;
+          titleSuffix = 'UCL Stats';
+          break;
+        case 'fa':
+          statsRows = faRankingRows;
+          titleSuffix = 'FA Cup Stats';
+          break;
+        case 'shield':
+          statsRows = shieldRankingRows;
+          titleSuffix = 'Community Shield Stats';
+          break;
+        case 'alltime':
+          statsRows = allTimeRankingRows;
+          titleSuffix = 'All Time Stats';
+          break;
+        case 'league':
+        default:
+          statsRows = leagueRankingRows;
+          titleSuffix = 'League Stats';
+          break;
       }
+      const stats = getPlayerStats(statsRows, playerName);
       const statsEmbed = new EmbedBuilder()
         .setColor(0x00AE86)
-        .setTitle(`${playerName} RP Stats`)
+        .setTitle(`${playerName} RP ${titleSuffix}`)
         .addFields(
-          { name: `${emojis.goal} Goals`, value: String(goals), inline: true },
-          { name: `${emojis.assist} Assists`, value: String(assists), inline: true },
-          { name: `${emojis.save} Clean Sheets`, value: String(cleanSheets), inline: true }
+          { name: `${emojis.goal} Goals`, value: String(stats.goals), inline: true },
+          { name: `${emojis.assist} Assists`, value: String(stats.assists), inline: true },
+          { name: `${emojis.save} GK Saves`, value: String(stats.saves), inline: true },
+          { name: `${emojis.cleanSheet || '🧤'} Clean Sheets`, value: String(stats.cleanSheets), inline: true }
         )
         .setTimestamp();
+      // Buttons: Profile + all 5 stats buttons
       return interaction.update({
         embeds: [statsEmbed],
         components: [
@@ -274,8 +350,24 @@ module.exports = {
               .setLabel('Profile')
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
-              .setCustomId(`myrpstats_${ownerId}_${discordId}`)
-              .setLabel('Stats')
+              .setCustomId(`myrpstats_league_${ownerId}_${discordId}`)
+              .setLabel('Current League')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(`myrpstats_ucl_${ownerId}_${discordId}`)
+              .setLabel('UCL')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(`myrpstats_fa_${ownerId}_${discordId}`)
+              .setLabel('FA Cup')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(`myrpstats_shield_${ownerId}_${discordId}`)
+              .setLabel('Community Shield')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(`myrpstats_alltime_${ownerId}_${discordId}`)
+              .setLabel('All Time')
               .setStyle(ButtonStyle.Primary)
           )
         ]

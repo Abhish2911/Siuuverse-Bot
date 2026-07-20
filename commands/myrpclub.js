@@ -375,7 +375,7 @@ module.exports = {
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
       statsRows = await getData(
-        'Stats_Ranking!A:K',
+        'Stats_Ranking!A:O',
         { spreadsheetId: process.env.RP_SHEET_ID }
       );
     } catch (err) {
@@ -410,64 +410,74 @@ module.exports = {
     const clubPlayerSet = new Set(
       clubPlayers.map(row => String(row[1] || '').trim().toLowerCase())
     );
-    // Prepare leaders
-    let topScorer = { player: null, value: null };
-    let topAssist = { player: null, value: null };
-    let topClean = { player: null, value: null };
+    // Helper to format top list
+    const formatTop = list => list.length
+      ? list.map((p, i) => `\`${i + 1}.\` **${p.player}** — ${p.value}`).join('\n')
+      : 'None';
+    // Build arrays for each category
+    const goals = [];
+    const assists = [];
+    const saves = [];
+    const cleanSheets = [];
     for (let i = 1; i < statsRows.length; ++i) {
       const row = statsRows[i];
-      // Goals: B(1), value C(2)
+      // Goals: player in B(1), value in C(2)
       const goalPlayer = String(row[1] || '').trim();
       const goalVal = Number(row[2] || 0);
-      if (clubPlayerSet.has(goalPlayer.trim().toLowerCase())) {
-        if (topScorer.value == null || goalVal > topScorer.value) {
-          topScorer = { player: goalPlayer, value: goalVal };
-        }
+      if (clubPlayerSet.has(goalPlayer.toLowerCase()) && goalVal > 0) {
+        goals.push({ player: goalPlayer, value: goalVal });
       }
-      // Assists: F(5), value G(6)
+      // Assists: player in F(5), value in G(6)
       const assistPlayer = String(row[5] || '').trim();
       const assistVal = Number(row[6] || 0);
-      if (clubPlayerSet.has(assistPlayer.trim().toLowerCase())) {
-        if (topAssist.value == null || assistVal > topAssist.value) {
-          topAssist = { player: assistPlayer, value: assistVal };
-        }
+      if (clubPlayerSet.has(assistPlayer.toLowerCase()) && assistVal > 0) {
+        assists.push({ player: assistPlayer, value: assistVal });
       }
-      // Clean Sheets: J(9), value K(10)
-      const cleanPlayer = String(row[9] || '').trim();
-      const cleanVal = Number(row[10] || 0);
-      if (clubPlayerSet.has(cleanPlayer.trim().toLowerCase())) {
-        if (topClean.value == null || cleanVal > topClean.value) {
-          topClean = { player: cleanPlayer, value: cleanVal };
-        }
+      // GK Saves: player in J(9), value in K(10)
+      const savePlayer = String(row[9] || '').trim();
+      const saveVal = Number(row[10] || 0);
+      if (clubPlayerSet.has(savePlayer.toLowerCase()) && saveVal > 0) {
+        saves.push({ player: savePlayer, value: saveVal });
+      }
+      // Clean Sheets: player in N(13), value in O(14)
+      const cleanPlayer = String(row[13] || '').trim();
+      const cleanVal = Number(row[14] || 0);
+      if (clubPlayerSet.has(cleanPlayer.toLowerCase()) && cleanVal > 0) {
+        cleanSheets.push({ player: cleanPlayer, value: cleanVal });
       }
     }
+    // Sort descending and keep top 5
+    goals.sort((a, b) => b.value - a.value);
+    assists.sort((a, b) => b.value - a.value);
+    saves.sort((a, b) => b.value - a.value);
+    cleanSheets.sort((a, b) => b.value - a.value);
+    const topGoals = goals.slice(0, 5);
+    const topAssists = assists.slice(0, 5);
+    const topSaves = saves.slice(0, 5);
+    const topCleanSheets = cleanSheets.slice(0, 5);
     const embed = new EmbedBuilder()
       .setColor(0x2196f3)
       .setTitle(`${clubName} Club Leaders`)
       .addFields(
         {
-          name: '⚽ Top Scorer',
-          value:
-            topScorer.player
-              ? `${topScorer.player} — ${topScorer.value}`
-              : 'None',
-          inline: false
+          name: '⚽ Goals',
+          value: formatTop(topGoals),
+          inline: true
         },
         {
-          name: '🎯 Top Assist',
-          value:
-            topAssist.player
-              ? `${topAssist.player} — ${topAssist.value}`
-              : 'None',
-          inline: false
+          name: '🎯 Assists',
+          value: formatTop(topAssists),
+          inline: true
         },
         {
-          name: '🧤 Most Clean Sheets',
-          value:
-            topClean.player
-              ? `${topClean.player} — ${topClean.value}`
-              : 'None',
-          inline: false
+          name: '🧤 GK Saves',
+          value: formatTop(topSaves),
+          inline: true
+        },
+        {
+          name: '🛡️ Clean Sheets',
+          value: formatTop(topCleanSheets),
+          inline: true
         }
       )
       .setFooter({ text: 'Club Stat Leaders' })

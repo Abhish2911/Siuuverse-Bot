@@ -24,13 +24,63 @@ const STAT_OPTIONS = [
     color: 0x3498DB,
   },
   {
-    label: 'Clean Sheets',
-    value: 'cleansheets',
+    label: 'GK Saves',
+    value: 'gksaves',
     range: 'Stats_Ranking!I:K',
-    title: `${safeEmoji(E.save,'🧤')} Clean Sheets`,
+    title: `${safeEmoji(E.save,'🧤')} GK Saves`,
     emoji: '🧤',
     color: 0x2ECC71,
   },
+  {
+    label: 'Clean Sheets',
+    value: 'cleansheets',
+    range: 'Stats_Ranking!M:O',
+    title: `${safeEmoji(E.save,'🛡️')} Clean Sheets`,
+    emoji: '🛡️',
+    color: 0x27AE60,
+  },
+];
+
+const ALL_TIME_OPTIONS = [
+  {
+    label: 'Goals',
+    value: 'alltime_goals',
+    range: 'All_Time_Ranking!A:C',
+    title: '🏆 All-Time Goals',
+    emoji: '⚽',
+    color: 0xF1C40F,
+  },
+  {
+    label: 'Assists',
+    value: 'alltime_assists',
+    range: 'All_Time_Ranking!E:G',
+    title: '🏆 All-Time Assists',
+    emoji: '🎯',
+    color: 0x3498DB,
+  },
+  {
+    label: 'GK Saves',
+    value: 'alltime_gksaves',
+    range: 'All_Time_Ranking!I:K',
+    title: '🏆 All-Time GK Saves',
+    emoji: '🧤',
+    color: 0x2ECC71,
+  },
+  {
+    label: 'Clean Sheets',
+    value: 'alltime_cleansheets',
+    range: 'All_Time_Ranking!M:O',
+    title: '🏆 All-Time Clean Sheets',
+    emoji: '🛡️',
+    color: 0x27AE60,
+  },
+];
+
+const getOptions = statType => statType.startsWith('alltime_') ? ALL_TIME_OPTIONS : STAT_OPTIONS;
+
+const VIEW_BUTTONS = [
+  { id: 'current', label: 'Current Season' },
+  { id: 'alltime', label: 'All Time' },
 ];
 
 const PAGE_SIZE = 10;
@@ -72,7 +122,8 @@ module.exports = {
 };
 
 async function sendStatsLeaderboard(interaction, statType, page) {
-  const stat = STAT_OPTIONS.find(s => s.value === statType) || STAT_OPTIONS[0];
+  const options = getOptions(statType);
+  const stat = options.find(s => s.value === statType) || options[0];
   let data;
   try {
     console.time(`rpstats:${statType}`);
@@ -137,7 +188,7 @@ async function sendStatsLeaderboard(interaction, statType, page) {
     .setCustomId(`rpstats_select_${interaction.user.id}`)
     .setPlaceholder(`Selected: ${stat.title.replace(/<a?:\w+:\d+>/g, '').trim()}`)
     .addOptions(
-      STAT_OPTIONS.map(opt => ({
+      options.map(opt => ({
         label: opt.label,
         value: `${opt.value}__${interaction.user.id}`,
         emoji: opt.emoji,
@@ -145,6 +196,21 @@ async function sendStatsLeaderboard(interaction, statType, page) {
       }))
     );
   const statRow = new ActionRowBuilder().addComponents(statSelect);
+
+  const currentView = statType.startsWith('alltime_') ? 'alltime' : 'current';
+
+  const viewRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rpstats_view_current__${interaction.user.id}`)
+      .setLabel('Current Season')
+      .setStyle(currentView === 'current' ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setDisabled(currentView === 'current'),
+    new ButtonBuilder()
+      .setCustomId(`rpstats_view_alltime__${interaction.user.id}`)
+      .setLabel('All Time')
+      .setStyle(currentView === 'alltime' ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setDisabled(currentView === 'alltime')
+  );
 
   // Pagination buttons
   const prevButton = new ButtonBuilder()
@@ -168,7 +234,7 @@ async function sendStatsLeaderboard(interaction, statType, page) {
 
   const payload = {
     embeds: [embed],
-    components: [statRow, pageRow],
+    components: [viewRow, statRow, pageRow],
   };
   return payload;
 }
