@@ -126,7 +126,7 @@ module.exports = {
     return {
       embeds: [
         new EmbedBuilder()
-          .setTitle(`${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} Coop League Table`)
+          .setTitle(`${safeEmoji(E.trophy_animated, safeEmoji(E.PL, '🏆'))} RP League Table`)
           .setDescription(buildStandingsDescription(summary))
           .addFields(
             { name: `${safeEmoji(E.stats || E.rank, '📊')} Table`, value: `\`\`\`diff\n${header}\n${table || 'No teams'}\n\`\`\``, inline: false },
