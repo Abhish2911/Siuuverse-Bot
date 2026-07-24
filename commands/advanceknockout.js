@@ -530,7 +530,7 @@ function buildNextFixturesFromCurrent(currentFixtures, config, nextRound) {
     };
   }
 
-  if ((config.key === 'fa' || config.key === 'carabao' || config.key === 'ucl') && (next === 'SF')) {
+  if (config.key === 'ucl' && next === 'SF') {
     return { ok: true, fixtures: buildTwoLegFixtures(winners, next, config.code) };
   }
 
@@ -934,7 +934,7 @@ module.exports = {
 
       advanceResult = {
         ok: true,
-        fixtures: buildTwoLegFixtures(orderedQuarterFinalists, 'QF', config.code)
+        fixtures: buildSingleLegFixtures(orderedQuarterFinalists, 'QF', config.code)
       };
     } else {
       advanceResult = buildNextFixturesFromCurrent(currentRoundFixtures, config, nextRound);
