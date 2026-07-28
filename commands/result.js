@@ -374,7 +374,14 @@ module.exports = {
       };
     }
 
-    const fixtures = await getData(competition.fixturesRange);
+    let fixtures = await getData(competition.fixturesRange);
+
+    if (
+      competition.key === 'ucl' &&
+      (!Array.isArray(fixtures) || fixtures.length <= 1)
+    ) {
+      fixtures = await getData('UCL_Coop_Knockout_Fixtures!A:L');
+    }
 
     if (!Array.isArray(fixtures) || fixtures.length <= 1) {
       return {
@@ -383,11 +390,22 @@ module.exports = {
     }
 
     const rows = fixtures.slice(1);
-    // const matchNoIndex = pendingResults.get(interaction.user.id)?.competition?.matchNoIndex ?? competition.matchNoIndex ?? 0;
 
-    const index = rows.findIndex(
+    let index = rows.findIndex(
       r => normalizeMatchNo(r[competition.matchNoIndex ?? 0]) === matchNo
     );
+
+    if (index === -1 && competition.key === 'ucl') {
+      fixtures = await getData('UCL_Coop_Knockout_Fixtures!A:L');
+      const knockoutRows = Array.isArray(fixtures) ? fixtures.slice(1) : [];
+      index = knockoutRows.findIndex(
+        r => normalizeMatchNo(r[competition.matchNoIndex ?? 0]) === matchNo
+      );
+      if (index !== -1) {
+        rows.length = 0;
+        rows.push(...knockoutRows);
+      }
+    }
 
     if (index === -1) {
       return {
