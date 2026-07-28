@@ -94,6 +94,7 @@ function getCompetitionConfig(key) {
       key: 'ucl',
       label: 'UCL',
       fixturesRange: 'UCL_Coop_Fixtures!A:L',
+      knockoutFixturesRange: 'UCL_Coop_Knockout_Fixtures!A:L',
       reserveLabel: 'UCL',
       matchNoIndex: 0,
       dateIndex: 1,
@@ -395,13 +396,49 @@ async function buildMyFixtures(interaction, page = 0, targetType = 'self', targe
   const pageSize = config.key === 'league'
     ? LEAGUE_PAGE_SIZE
     : CUP_PAGE_SIZE;
-  const [teams, fixtures, standings, reserveRows, derbyRows] = await Promise.all([
-    cachedGetData('Teams!A:Z'),
-    cachedGetData(config.fixturesRange),
-    cachedGetData('Standings!A:J').catch(() => []),
-    cachedGetData(RESERVE_SHEET_RANGE).catch(() => []),
-    cachedGetData('Derbies!A:D').catch(() => [])
-  ]);
+
+  let teams;
+  let fixtures;
+  let standings;
+  let reserveRows;
+  let derbyRows;
+
+  if (config.key === 'ucl') {
+    const [
+      teamsData,
+      groupFixtures,
+      knockoutFixtures,
+      standingsData,
+      reserveData,
+      derbyData
+    ] = await Promise.all([
+      cachedGetData('Teams!A:Z'),
+      cachedGetData(config.fixturesRange).catch(() => []),
+      cachedGetData(config.knockoutFixturesRange).catch(() => []),
+      cachedGetData('Standings!A:J').catch(() => []),
+      cachedGetData(RESERVE_SHEET_RANGE).catch(() => []),
+      cachedGetData('Derbies!A:D').catch(() => [])
+    ]);
+
+    teams = teamsData;
+    standings = standingsData;
+    reserveRows = reserveData;
+    derbyRows = derbyData;
+
+    fixtures = [
+      groupFixtures?.[0] || knockoutFixtures?.[0] || [],
+      ...(groupFixtures?.slice(1) || []),
+      ...(knockoutFixtures?.slice(1) || [])
+    ];
+  } else {
+    [teams, fixtures, standings, reserveRows, derbyRows] = await Promise.all([
+      cachedGetData('Teams!A:Z'),
+      cachedGetData(config.fixturesRange),
+      cachedGetData('Standings!A:J').catch(() => []),
+      cachedGetData(RESERVE_SHEET_RANGE).catch(() => []),
+      cachedGetData('Derbies!A:D').catch(() => [])
+    ]);
+  }
 
   derbyMapCache = (derbyRows || [])
     .slice(1)
