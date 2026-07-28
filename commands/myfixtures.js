@@ -93,7 +93,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'ucl',
       label: 'UCL',
-      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      fixturesRange: 'UCL_Coop_Fixtures!A:L',
       reserveLabel: 'UCL',
       matchNoIndex: 0,
       dateIndex: 1,
@@ -102,9 +102,9 @@ function getCompetitionConfig(key) {
       hgIndex: 4,
       agIndex: 5,
       resultIndex: 6,
-      homeShortIndex: 7,
-      awayShortIndex: 8,
-      statusIndex: 9
+      homeShortIndex: 8,
+      awayShortIndex: 9,
+      statusIndex: 10
     };
   }
 

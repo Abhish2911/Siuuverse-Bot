@@ -615,6 +615,7 @@ function buildUclQuarterFinalFixtures(qualifiedTeams) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: home.shortName,
       awayShort: away.shortName,
       status: 'Upcoming'
@@ -629,6 +630,7 @@ function buildUclQuarterFinalFixtures(qualifiedTeams) {
       hg: '',
       ag: '',
       result: '',
+      decision: '',
       homeShort: away.shortName,
       awayShort: home.shortName,
       status: 'Upcoming'
@@ -769,7 +771,6 @@ module.exports = {
       }
 
       const nextRows = nextFixtures.map(fixture => [
-        fixture.round,
         fixture.md,
         fixture.date,
         fixture.homeTeam,
@@ -777,9 +778,11 @@ module.exports = {
         fixture.hg,
         fixture.ag,
         fixture.result,
+        fixture.decision || '',
         fixture.homeShort,
         fixture.awayShort,
-        fixture.status
+        fixture.status,
+        fixture.round
       ]);
 
       await updateData(config.saveRange, nextRows);
