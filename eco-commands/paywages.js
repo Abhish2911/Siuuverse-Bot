@@ -18,19 +18,26 @@ module.exports = {
       .replace(/\s+/g, ' ')
       .replace(/[._-]/g, '');
 
-    // Read Managers!A:C
-    const managersDataRaw = await cachedGetData(`${MANAGERS_SHEET}!A:C`, {
+    // Read Managers!A:D
+    const managersDataRaw = await cachedGetData(`${MANAGERS_SHEET}!A:D`, {
       spreadsheetId: process.env.RP_SHEET_ID
     });
     const managersData = managersDataRaw.slice(1);
-    // Find the row whose first column (Discord ID) matches interaction.user.id
-    const managerRow = managersData.find(row => row[0] === interaction.user.id);
+    // Allow the assigned manager or a manager marked as a Player Manager (column D)
+    const managerRow = managersData.find(row => {
+      const isAssignedManager = row[0] === interaction.user.id;
+      const isPlayerManager =
+        row[0] === interaction.user.id &&
+        String(row[3] || '').trim().toLowerCase() === 'yes';
+
+      return isAssignedManager || isPlayerManager;
+    });
 
     if (!managerRow) {
       return { content: '❌ Only club managers can use this command.' };
     }
 
-    // Store the club from column C
+    // Store the club from column C regardless of manager type
     const club = managerRow[2];
     const targetClub = normalizeClubName(club);
 
