@@ -23,15 +23,26 @@ module.exports = {
       spreadsheetId: process.env.RP_SHEET_ID
     });
     const managersData = managersDataRaw.slice(1);
-    // Allow the assigned manager or a manager marked as a Player Manager (column D)
-    const managerRow = managersData.find(row => {
-      const isAssignedManager = row[0] === interaction.user.id;
-      const isPlayerManager =
-        row[0] === interaction.user.id &&
-        String(row[3] || '').trim().toLowerCase() === 'yes';
+    // First, check if the user is the assigned club manager.
+    let managerRow = managersData.find(row => row[0] === interaction.user.id);
 
-      return isAssignedManager || isPlayerManager;
-    });
+    // If not, check whether they are a player whose club has a Player Manager.
+    if (!managerRow) {
+      const wagesDataRaw = await cachedGetData(`${WAGES_SHEET}!A:D`, {
+        spreadsheetId: process.env.RP_SHEET_ID
+      });
+      const wagesData = wagesDataRaw.slice(1);
+
+      const playerRow = wagesData.find(row => row[1] === interaction.user.id);
+
+      if (playerRow) {
+        managerRow = managersData.find(
+          row =>
+            normalizeClubName(row[2]) === normalizeClubName(playerRow[0]) &&
+            String(row[3] || '').trim().toLowerCase() === 'yes'
+        );
+      }
+    }
 
     if (!managerRow) {
       return { content: '❌ Only club managers can use this command.' };
