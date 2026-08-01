@@ -145,8 +145,8 @@ function getHeaderLabel(row, config) {
     return `UCL-GS-${uclGroup[1]}`;
   }
 
-  // UCL Knockout: UCL-R16-1 -> UCL-R16
-  const uclKnockout = matchNo.match(/^UCL-(R16|QF|SF|F)-\d+$/);
+  // UCL Knockout: UCL-R16-1A, UCL-QF-2B, UCL-SF-1A, UCL-F
+  const uclKnockout = matchNo.match(/^UCL-(R16|QF|SF|F)/);
   if (uclKnockout) {
     return `UCL-${uclKnockout[1]}`;
   }
