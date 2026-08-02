@@ -74,7 +74,7 @@ function getCompetitionConfig(key) {
     return {
       key: 'ucl',
       label: 'UCL',
-      fixturesRange: 'UCL_Coop_Group_Fixtures!A:J',
+      fixturesRange: 'UCL_Coop_Group_Fixtures!A:L',
       knockoutRange: 'UCL_Coop_Knockout_Fixtures!A:L',
       reserveLabel: 'UCL',
       matchNoIndex: 0,
@@ -84,9 +84,11 @@ function getCompetitionConfig(key) {
       hgIndex: 4,
       agIndex: 5,
       resultIndex: 6,
-      homeShortIndex: 7,
-      awayShortIndex: 8,
-      statusIndex: 9,
+      decisionIndex: 7,
+      homeShortIndex: 8,
+      awayShortIndex: 9,
+      statusIndex: 10,
+      roundIndex: 11,
       footerText: 'SiuuVerse UCL'
     };
   }
@@ -289,8 +291,10 @@ function buildFixtureLines(fixtures, config, reserveMap = new Map()) {
     const hg = row?.[config.hgIndex];
     const ag = row?.[config.agIndex];
     const result = row?.[config.resultIndex];
-    const homeShort = row?.[config.homeShortIndex];
-    const awayShort = row?.[config.awayShortIndex];
+    // Detect knockout rows for UCL
+    const isKnockout = config.key === 'ucl' && row.length >= 12;
+    const homeShort = row?.[isKnockout ? 8 : config.homeShortIndex];
+    const awayShort = row?.[isKnockout ? 9 : config.awayShortIndex];
 
     const played = hasScore(row, config);
 
