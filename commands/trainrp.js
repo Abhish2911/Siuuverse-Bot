@@ -8,6 +8,7 @@ const { getData, updateData } = require('../utils/sheets');
 const TrainCooldown = require('../models/TrainCooldown');
 
 const COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const TRAINING_ENABLED = String(process.env.RP_TRAINING_ENABLED ?? 'true').toLowerCase() === 'true';
 
 const ATTRIBUTE_COLUMNS = {
   'Shooting': 6,
@@ -54,6 +55,11 @@ module.exports = {
 
   async execute(interaction) {
     const attribute = interaction.options.getString('attribute');
+    if (!TRAINING_ENABLED) {
+      return interaction.editReply({
+        content: '❌ RP training is currently disabled by the administrators.'
+      });
+    }
 
     const rows = await getData('Player_Data!A:Q', {
       spreadsheetId: process.env.RP_SHEET_ID
