@@ -5,10 +5,11 @@ const path = require('path');
 const { REST, Routes } = require('discord.js');
 
 const commands = [];
-const commandFolders = [
+const slashCommandFolders = [
   path.join(__dirname, 'commands'),
   path.join(__dirname, 'eco-commands')
 ];
+const prefixCommandsPath = path.join(__dirname, 'prefix-commands');
 
 const guildIds = String(process.env.GUILD_IDS || process.env.GUILD_ID || '')
   .split(',')
@@ -22,7 +23,7 @@ if (!process.env.TOKEN || !process.env.CLIENT_ID) {
 
 const loaded = new Set();
 
-for (const commandsPath of commandFolders) {
+for (const commandsPath of slashCommandFolders) {
   if (!fs.existsSync(commandsPath)) continue;
 
   const commandFiles = fs
@@ -58,6 +59,14 @@ for (const commandsPath of commandFolders) {
       console.error(err);
     }
   }
+}
+
+if (fs.existsSync(prefixCommandsPath)) {
+  const prefixCommandCount = fs
+    .readdirSync(prefixCommandsPath)
+    .filter(file => file.endsWith('.js')).length;
+
+  console.log(`ℹ️ Prefix commands are runtime-only; skipped deploy for ${prefixCommandCount} prefix command files.`);
 }
 
 console.log(`📦 Total commands: ${commands.length}`);

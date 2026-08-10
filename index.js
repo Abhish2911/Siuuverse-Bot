@@ -7,6 +7,10 @@ const path = require('path');
 
 const express = require('express');
 const { sendAuditLog } = require('./utils/helpers');
+const {
+  refreshAllHFLiveMessages,
+  startHFLiveUpdater
+} = require('./utils/handfootballLive');
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
 const TrainCooldown = require('./models/TrainCooldown');
 
@@ -93,6 +97,8 @@ async function connectMongo() {
 }
 
 client.commands = new Collection();
+client.prefixCommands = new Collection();
+const PREFIX = process.env.PREFIX || '.';
 client.scheduleTrainReminder = scheduleTrainReminder;
 
 async function safeReply(interaction, payload) {
@@ -257,6 +263,46 @@ for (const commandsPath of commandFolders) {
   }
 }
 
+const prefixCommandFolders = [
+  path.join(__dirname, 'prefix'),
+  path.join(__dirname, 'prefix-commands')
+];
+
+// Load prefix commands and aliases
+for (const prefixCommandsPath of prefixCommandFolders) {
+  if (!fs.existsSync(prefixCommandsPath)) continue;
+
+  const prefixCommandFiles = fs
+    .readdirSync(prefixCommandsPath)
+    .filter(file => file.endsWith('.js'));
+
+  for (const file of prefixCommandFiles) {
+    try {
+      const command = require(path.join(prefixCommandsPath, file));
+      const commandName = command.name || command.data?.name;
+
+      if (!commandName || !command.execute) {
+        console.log(`❌ Missing prefix command data in ${file}`);
+        continue;
+      }
+
+      client.prefixCommands.set(commandName.toLowerCase(), command);
+
+      if (Array.isArray(command.aliases)) {
+        for (const alias of command.aliases) {
+          if (alias) {
+            client.prefixCommands.set(String(alias).toLowerCase(), command);
+          }
+        }
+      }
+
+      console.log(`✅ Loaded prefix: ${file}`);
+    } catch (err) {
+      console.log(`❌ ERROR in prefix command ${file}:`, err.message);
+    }
+  }
+}
+
 client.once('clientReady', async () => {
   console.log(`🚀 Bot ready: ${client.user.tag}`);
   console.log(`📝 Audit log config: ${process.env.AUDIT_LOG_CHANNELS || process.env.DISCORD_AUDIT_LOG_CHANNEL_ID || process.env.AUDIT_LOG_CHANNEL_ID || 'NOT SET'}`);
@@ -345,6 +391,14 @@ client.once('clientReady', async () => {
   } catch (error) {
     console.error('❌ Failed to restore train reminders:', error);
   }
+
+  try {
+    await startHFLiveUpdater(client);
+    await refreshAllHFLiveMessages(client);
+    console.log('✅ HandFootball live messages restored');
+  } catch (error) {
+    console.error('❌ Failed to restore HandFootball live messages:', error);
+  }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -430,6 +484,43 @@ client.on('interactionCreate', async interaction => {
           interaction,
           action,
           page
+        );
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
+      // =========================
+      // HandFootball leaderboard buttons
+      // =========================
+      if (interaction.customId.startsWith('hfleaderboard_')) {
+        const command = client.prefixCommands.get('hfleaderboard');
+        if (!command || !command.buttonHandler) return;
+
+        const [, action, statKey, page, ownerId] = interaction.customId.split('_');
+
+        if (ownerId && ownerId !== interaction.user.id) {
+          await interaction.reply({
+            content: 'Only the user who opened this leaderboard can use these buttons.',
+            ephemeral: true
+          }).catch(() => null);
+          return;
+        }
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(
+          interaction,
+          action,
+          statKey,
+          page,
+          ownerId
         );
 
         if (result) {
@@ -616,6 +707,44 @@ client.on('interactionCreate', async interaction => {
         return await command.handleButton(interaction);
       }
 
+      // HandFootball prefix fixture buttons
+      if (cmd === 'hffixtures') {
+        const command = client.prefixCommands.get('fixtures');
+        if (!command || !command.buttonHandler) return;
+
+        const [page, targetType, ...targetParts] = parts;
+        const ownerId = targetParts.pop();
+        const targetValue = targetParts.join('_');
+
+        if (ownerId && ownerId !== interaction.user.id) {
+          await interaction.reply({
+            content: 'Only the user who opened this fixtures menu can use these buttons.',
+            ephemeral: true
+          }).catch(() => null);
+          return;
+        }
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(
+          interaction,
+          action,
+          page,
+          decodeURIComponent(targetType || ''),
+          decodeURIComponent(targetValue || ''),
+          ownerId
+        );
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
       const command = client.commands.get(cmd);
       if (!command || !command.buttonHandler) return;
 
@@ -648,6 +777,39 @@ client.on('interactionCreate', async interaction => {
         if (!deferred) return;
 
         const result = await command.selectHandler(interaction);
+
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
+      // HandFootball leaderboard stat selector
+      if (interaction.customId.startsWith('hfleaderboard_select_')) {
+        const command = client.prefixCommands.get('hfleaderboard');
+        if (!command || !command.selectHandler) return;
+
+        const ownerId = interaction.customId.replace('hfleaderboard_select_', '');
+
+        if (ownerId && ownerId !== interaction.user.id) {
+          await interaction.reply({
+            content: 'Only the user who opened this leaderboard can use this menu.',
+            ephemeral: true
+          }).catch(() => null);
+          return;
+        }
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.selectHandler(
+          interaction,
+          interaction.values?.[0],
+          ownerId
+        );
 
         if (result) {
           await safeEditMessage(interaction.message, {
@@ -850,6 +1012,32 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
   try {
     if (message.author.bot || !message.guild) return;
+
+    // =========================
+    // Prefix Commands
+    // =========================
+    if (message.content.startsWith(PREFIX)) {
+      const args = message.content
+        .slice(PREFIX.length)
+        .trim()
+        .split(/\s+/);
+      const commandName = args.shift()?.toLowerCase();
+      const command = client.prefixCommands.get(commandName);
+
+      if (!command) return;
+
+      try {
+        await command.execute(message, args, client);
+      } catch (err) {
+        console.error(`❌ Prefix Command Error (${commandName}):`, err);
+        await message.reply(
+          `❌ Error occurred while executing command\n\`${err.message || 'Unknown error'}\``
+        ).catch(() => {});
+      }
+
+      return;
+    }
+
     if (!message.mentions.roles.size) return;
 
     for (const role of message.mentions.roles.values()) {
