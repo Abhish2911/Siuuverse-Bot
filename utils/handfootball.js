@@ -344,6 +344,29 @@ async function upsertHFPlayer({ team, player, userId, isCaptain }) {
   clearCacheByPrefixes(['Team_Data']);
 }
 
+async function removeHFPlayer(userId) {
+  const spreadsheetId = getHFSpreadsheetId();
+  const rows = ensureHeader(
+    await getData('Team_Data!A:D', { spreadsheetId, cache: false }),
+    ['TEAM', 'PLAYER', 'USER ID', 'Captain']
+  );
+  const cleanUserId = cleanId(userId);
+  const rowIndex = rows.slice(1).findIndex(row => cleanId(row[2]) === cleanUserId);
+
+  if (rowIndex === -1) return null;
+
+  const nextRows = rows
+    .filter((_, index) => index !== rowIndex + 1)
+    .map(row => [...row]);
+
+  // Keep the old range length so the removed final row is cleared in Sheets.
+  nextRows.push(['', '', '', '']);
+
+  await updateData('Team_Data!A:D', nextRows, { spreadsheetId });
+  clearCacheByPrefixes(['Team_Data']);
+  return true;
+}
+
 async function upsertHFTeamMeta(teamName, patch = {}) {
   const spreadsheetId = getHFSpreadsheetId();
   const rows = ensureHeader(
@@ -509,6 +532,7 @@ module.exports = {
   getHFCaptainRoleId,
   canManageHandFootball,
   upsertHFPlayer,
+  removeHFPlayer,
   upsertHFTeamMeta,
   getHFTournamentRoleId,
   isHFRegistrationOpen,
