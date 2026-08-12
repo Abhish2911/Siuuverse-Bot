@@ -121,6 +121,13 @@ module.exports = {
       return message.reply(`${E.profile} Usage: \`.hfregister Team Name | Your Player Name\` to create your team, or \`.addhfplayer @user Player Name\` after your team is registered.`);
     }
 
+    const existingPlayer = findPlayerByUserId(data.players, parsed.userId);
+    if (existingPlayer) {
+      return message.reply(
+        `${E.warning} <@${parsed.userId}> is already registered for **${existingPlayer.team}**. Remove them from that team before adding them to another team.`
+      );
+    }
+
     if (owner) {
       const isFirstTeamPlayer = !data.players.some(player => sameTeam(player.team, parsed.team));
       const shouldBeCaptain = parsed.isCaptain || isFirstTeamPlayer;
