@@ -90,10 +90,16 @@ async function connectMongo() {
   }
 
   try {
-    await mongoose.connect(mongoUri);
+    // Do not let an unreachable MongoDB instance prevent the Discord gateway
+    // from connecting. Commands that need MongoDB will report their own error.
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000
+    });
     console.log('✅ MongoDB connected');
+    return true;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
+    return false;
   }
 }
 
@@ -400,6 +406,18 @@ client.once('clientReady', async () => {
   } catch (error) {
     console.error('❌ Failed to restore HandFootball live messages:', error);
   }
+});
+
+client.on('error', error => {
+  console.error('❌ Discord client error:', error);
+});
+
+client.on('shardDisconnect', (event, shardId) => {
+  console.error(`⚠️ Discord shard ${shardId} disconnected:`, event);
+});
+
+client.on('shardReconnecting', shardId => {
+  console.warn(`🔄 Discord shard ${shardId} reconnecting`);
 });
 
 client.on('interactionCreate', async interaction => {
@@ -1119,6 +1137,16 @@ client.on('messageCreate', async message => {
 });
 
 (async () => {
-  await connectMongo();
-  await client.login(process.env.TOKEN);
+  try {
+    if (!process.env.TOKEN) {
+      throw new Error('TOKEN environment variable is missing');
+    }
+
+    // Connect Discord first. A database outage must not leave the bot offline.
+    await client.login(process.env.TOKEN);
+    await connectMongo();
+  } catch (error) {
+    console.error('❌ Bot startup failed:', error);
+    process.exitCode = 1;
+  }
 })();
