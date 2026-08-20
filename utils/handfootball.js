@@ -179,6 +179,10 @@ function getTeamRoster(players, teamName) {
     });
 }
 
+function getTeamCaptains(players, teamName) {
+  return getTeamRoster(players, teamName).filter(player => player.isCaptain);
+}
+
 function getTeamFixtures(fixtures, teamName) {
   return fixtures.filter(fixture => (
     sameTeam(fixture.home, teamName) ||
@@ -517,6 +521,7 @@ module.exports = {
   findTeamByName,
   findTeamMeta,
   getTeamRoster,
+  getTeamCaptains,
   getTeamFixtures,
   getTeamRecord,
   getNextFixture,
