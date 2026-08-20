@@ -9,7 +9,7 @@ const {
 
 module.exports = {
   name: 'pingteam',
-  aliases: ['hfrally', 'hfpingteam'],
+  aliases: ['pt', 'hfrally', 'hfpingteam'],
 
   async execute(message) {
     const data = await loadHandFootballData();
