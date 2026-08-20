@@ -20,8 +20,7 @@ const {
   loadHandFootballData,
   mentionUser,
   sameTeam,
-  toNumber,
-  truncateField
+  toNumber
 } = require('../utils/handfootball');
 
 const PER_PAGE = 4;
@@ -149,6 +148,15 @@ function buildFixturePayload({ data, guild, user, teamName, page, ownerId }) {
     ? getTeamRoster(data.players, nextOpponent).filter(player => player.isCaptain)
     : [];
   const fixtureText = pageFixtures.map(fixture => formatFixtureLine(fixture, teamName)).join('\n\n') || `${E.missing} No fixtures found.`;
+  const nextMatchText = nextFixture
+    ? [
+        `**${nextFixture.home} ${E.vs} ${nextFixture.away}**`,
+        `${E.rank} ${nextFixture.matchday || `Match ${nextFixture.matchNo}`}`,
+        nextFixture.venue ? `${E.team} Venue: **${nextFixture.venue}**` : '',
+        `${E.captain} Opponent captain${opponentCaptains.length === 1 ? '' : 's'}: ${opponentCaptains.length ? opponentCaptains.map(captain => mentionUser(captain.userId)).join(', ') : 'Not set'}`,
+        `${getFixtureStatusEmoji(nextFixture)} Status: **${formatFixtureStatus(nextFixture)}**`
+      ].filter(Boolean).join('\n')
+    : `${E.missing} No pending matches.`;
 
   const embed = new EmbedBuilder()
     .setTitle(`${safeEmoji(E.calendar, 'Fixtures')} ${teamName} - Fixtures`)
@@ -158,24 +166,12 @@ function buildFixturePayload({ data, guild, user, teamName, page, ownerId }) {
         `${E.team} Stadium: **${teamMeta.stadium || teamMeta.venue || 'Not set'}**`,
         `${E.rank} Record:\n${formatRecord(record)}`,
         '',
+        `${E.calendar} **Next Match**`,
+        nextMatchText,
+        '',
         `${E.calendar} **Fixtures ${fixtures.length ? start + 1 : 0}-${Math.min(start + PER_PAGE, fixtures.length)} of ${fixtures.length}**`,
         fixtureText
       ].join('\n')
-    )
-    .addFields(
-      {
-        name: `${E.calendar} Next Match`,
-        value: nextFixture
-          ? truncateField([
-              `**${nextFixture.home} ${E.vs} ${nextFixture.away}**`,
-              `${E.rank} ${nextFixture.matchday || `Match ${nextFixture.matchNo}`}`,
-              nextFixture.venue ? `${E.team} Venue: **${nextFixture.venue}**` : '',
-              `${E.captain} Opponent captain${opponentCaptains.length === 1 ? '' : 's'}: ${opponentCaptains.length ? opponentCaptains.map(captain => mentionUser(captain.userId)).join(', ') : 'Not set'}`,
-              `${getFixtureStatusEmoji(nextFixture)} Status: **${formatFixtureStatus(nextFixture)}**`
-            ].filter(Boolean).join('\n'))
-          : `${E.missing} No pending matches.`,
-        inline: false
-      }
     )
     .setFooter({
       text: `Page ${safePage + 1}/${totalPages} - Requested by ${user.username}`
