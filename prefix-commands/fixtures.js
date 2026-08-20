@@ -145,9 +145,10 @@ function buildFixturePayload({ data, guild, user, teamName, page, ownerId }) {
   const start = safePage * PER_PAGE;
   const pageFixtures = fixtures.slice(start, start + PER_PAGE);
   const nextOpponent = nextFixture ? getOpponent(nextFixture, teamName) : '';
-  const opponentCaptain = nextOpponent
-    ? getTeamRoster(data.players, nextOpponent).find(player => player.isCaptain)
-    : null;
+  const opponentCaptains = nextOpponent
+    ? getTeamRoster(data.players, nextOpponent).filter(player => player.isCaptain)
+    : [];
+  const fixtureText = pageFixtures.map(fixture => formatFixtureLine(fixture, teamName)).join('\n\n') || `${E.missing} No fixtures found.`;
 
   const embed = new EmbedBuilder()
     .setTitle(`${safeEmoji(E.calendar, 'Fixtures')} ${teamName} - Fixtures`)
@@ -155,7 +156,10 @@ function buildFixturePayload({ data, guild, user, teamName, page, ownerId }) {
     .setDescription(
       [
         `${E.team} Stadium: **${teamMeta.stadium || teamMeta.venue || 'Not set'}**`,
-        `${E.rank} Record:\n${formatRecord(record)}`
+        `${E.rank} Record:\n${formatRecord(record)}`,
+        '',
+        `${E.calendar} **Fixtures ${fixtures.length ? start + 1 : 0}-${Math.min(start + PER_PAGE, fixtures.length)} of ${fixtures.length}**`,
+        fixtureText
       ].join('\n')
     )
     .addFields(
@@ -166,15 +170,10 @@ function buildFixturePayload({ data, guild, user, teamName, page, ownerId }) {
               `**${nextFixture.home} ${E.vs} ${nextFixture.away}**`,
               `${E.rank} ${nextFixture.matchday || `Match ${nextFixture.matchNo}`}`,
               nextFixture.venue ? `${E.team} Venue: **${nextFixture.venue}**` : '',
-              `${E.captain} Opponent captain: ${opponentCaptain ? mentionUser(opponentCaptain.userId) : 'Not set'}`,
+              `${E.captain} Opponent captain${opponentCaptains.length === 1 ? '' : 's'}: ${opponentCaptains.length ? opponentCaptains.map(captain => mentionUser(captain.userId)).join(', ') : 'Not set'}`,
               `${getFixtureStatusEmoji(nextFixture)} Status: **${formatFixtureStatus(nextFixture)}**`
             ].filter(Boolean).join('\n'))
           : `${E.missing} No pending matches.`,
-        inline: false
-      },
-      {
-        name: `${E.Stats} Matches ${fixtures.length ? start + 1 : 0}-${Math.min(start + PER_PAGE, fixtures.length)} of ${fixtures.length}`,
-        value: truncateField(pageFixtures.map(fixture => formatFixtureLine(fixture, teamName)).join('\n\n') || `${E.missing} No fixtures found.`),
         inline: false
       }
     )

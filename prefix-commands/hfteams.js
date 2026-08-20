@@ -4,6 +4,7 @@ const {
   loadHandFootballData,
   findTeamMeta,
   getTeamRoster,
+  getTeamCaptains,
   getTeamRecord,
   mentionUser,
   truncateField
@@ -35,7 +36,7 @@ module.exports = {
     const lines = teamNames.map(teamName => {
       const team = findTeamMeta(data.teams, teamName);
       const roster = getTeamRoster(data.players, teamName);
-      const captain = roster.find(player => player.isCaptain);
+      const captains = getTeamCaptains(data.players, teamName);
       const record = getTeamRecord(data.fixtures, teamName);
       const roleText = team.roleId ? `<@&${team.roleId}>` : 'No role';
       const recordText = data.fixtures.length
@@ -44,7 +45,7 @@ module.exports = {
 
       return [
         `**${teamName}** - ${roster.length} players${recordText}`,
-        `Captain: ${captain ? `${captain.player} ${mentionUser(captain.userId)}` : 'Not set'} | ${roleText}`
+        `Captain${captains.length === 1 ? '' : 's'}: ${captains.length ? captains.map(captain => `${captain.player} ${mentionUser(captain.userId)}`).join(', ') : 'Not set'} | ${roleText}`
       ].join('\n');
     });
 

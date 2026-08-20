@@ -4,6 +4,7 @@ const {
   isBotOwner,
   loadHandFootballData
 } = require('../utils/handfootball');
+const { EmbedBuilder } = require('discord.js');
 const E = require('../utils/emojis');
 
 module.exports = {
@@ -36,6 +37,29 @@ module.exports = {
       return message.reply(`${E.missing} No team Role IDs or Tournament Role ID were found in the sheets.`);
     }
 
+    const total = data.players.length;
+    const progressMessage = await message.reply({
+      embeds: [new EmbedBuilder()
+        .setTitle(`${E.loading || '⏳'} HF Role Sync In Progress`)
+        .setDescription(`${E.loading || '⏳'} Processing **0/${total}** players...`)
+        .setTimestamp()]
+    });
+    let completed = 0;
+
+    const updateProgress = async () => {
+      await progressMessage.edit({
+        embeds: [new EmbedBuilder()
+          .setTitle(`${E.loading || '⏳'} HF Role Sync In Progress`)
+          .setDescription([
+            `${E.loading || '⏳'} Processed **${completed}/${total}** players`,
+            `${E.correct} Added: **${summary.added}**  |  Removed: **${summary.removed}**`,
+            `${E.trophy} Tournament roles added: **${summary.tournamentAdded}**`,
+            `${E.missing} Missing members: **${summary.missingMember}**  |  Failed: **${summary.failed}**`
+          ].join('\n'))
+          .setTimestamp()]
+      }).catch(() => null);
+    };
+
     for (const player of data.players) {
       const team = findTeamMeta(data.teams, player.team);
       const targetRoleId = team.roleId;
@@ -43,6 +67,8 @@ module.exports = {
       const member = await message.guild.members.fetch(player.userId).catch(() => null);
       if (!member) {
         summary.missingMember += 1;
+        completed += 1;
+        if (completed % 3 === 0 || completed === total) await updateProgress();
         continue;
       }
 
@@ -56,12 +82,16 @@ module.exports = {
 
         if (!targetRoleId) {
           summary.noRole += 1;
+          completed += 1;
+          if (completed % 3 === 0 || completed === total) await updateProgress();
           continue;
         }
 
         const targetRole = message.guild.roles.cache.get(targetRoleId) || await message.guild.roles.fetch(targetRoleId).catch(() => null);
         if (!targetRole) {
           summary.noRole += 1;
+          completed += 1;
+          if (completed % 3 === 0 || completed === total) await updateProgress();
           continue;
         }
 
@@ -80,11 +110,13 @@ module.exports = {
         summary.failed += 1;
         console.error(`HF role sync failed for ${player.userId}:`, error);
       }
+
+      completed += 1;
+      if (completed % 3 === 0 || completed === total) await updateProgress();
     }
 
-    return message.reply(
-      [
-        `**${E.correct} HF role sync complete**`,
+    return progressMessage.edit({
+      embeds: [new EmbedBuilder().setTitle(`${E.correct} HF role sync complete`).setDescription([
         `${E.profile} Processed: **${summary.processed}**`,
         `${E.trophy} Tournament roles added: **${summary.tournamentAdded}**`,
         `${E.correct} Roles added: **${summary.added}**`,
@@ -93,7 +125,7 @@ module.exports = {
         `${E.missing} Tournament role missing: **${summary.tournamentRoleMissing}**`,
         `${E.missing} Members not found: **${summary.missingMember}**`,
         `${E.wrong} Failed: **${summary.failed}**`
-      ].join('\n')
-    );
+      ].join('\n')).setTimestamp()]
+    });
   }
 };

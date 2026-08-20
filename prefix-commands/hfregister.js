@@ -107,14 +107,17 @@ module.exports = {
 
   async execute(message, args) {
     const owner = isBotOwner(message);
-    const registrationOpen = await isHFRegistrationOpen();
+    const data = await loadHandFootballData();
+    const captainTeams = [...new Set(
+      data.players
+        .filter(player => player.userId === message.author.id && player.isCaptain)
+        .map(player => player.team)
+    )];
+    const captainPlayer = findPlayerByUserId(data.players, message.author.id);
 
-    if (!owner && !registrationOpen) {
+    if (!owner && !captainTeams.length && !(await isHFRegistrationOpen())) {
       return message.reply(`${E.lock} HandFootball registration is currently closed.`);
     }
-
-    const data = await loadHandFootballData();
-    const captainPlayer = findPlayerByUserId(data.players, message.author.id);
     const parsed = parseRegisterArgs(message, args, captainPlayer);
 
     if (!parsed.team || !parsed.player || !parsed.userId) {
@@ -150,24 +153,26 @@ module.exports = {
       );
     }
 
-    if (captainPlayer?.isCaptain) {
+    if (captainTeams.length) {
       if (parsed.isCaptain) {
         return message.reply(`${E.wrong} Only the bot owner can register a player as captain.`);
       }
 
-      if (!sameTeam(parsed.team, captainPlayer.team)) {
+      if (!captainTeams.some(team => sameTeam(parsed.team, team))) {
         return message.reply(`${E.warning} Captains can only register players for their own team.`);
       }
 
+      const captainTeam = captainTeams.find(team => sameTeam(parsed.team, team)) || captainTeams[0];
+
       await upsertHFPlayer({
         ...parsed,
-        team: captainPlayer.team,
+        team: captainTeam,
         isCaptain: false
       });
 
       return replyAfterRegistration(
         message,
-        `${E.correct} Registered **${parsed.player}** for **${captainPlayer.team}** as <@${parsed.userId}>.`,
+        `${E.correct} Registered **${parsed.player}** for **${captainTeam}** as <@${parsed.userId}>.`,
         parsed.userId
       );
     }

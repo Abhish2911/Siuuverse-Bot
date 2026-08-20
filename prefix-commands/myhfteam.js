@@ -7,6 +7,7 @@ const {
   findTeamByName,
   findTeamMeta,
   getTeamRoster,
+  getTeamCaptains,
   mentionUser,
   getMentionedUserId,
   getFirstIdArg,
@@ -91,7 +92,7 @@ module.exports = {
 
     const roster = getTeamRoster(data.players, teamName);
     const teamMeta = findTeamMeta(data.teams, teamName);
-    const captain = roster.find(player => player.isCaptain);
+    const captains = getTeamCaptains(data.players, teamName);
     const roleText = teamMeta.roleId ? `<@&${teamMeta.roleId}>` : 'Not linked';
     const color = parseHexColor(teamMeta.color) || getTeamColor(message, teamMeta.roleId);
 
@@ -102,7 +103,7 @@ module.exports = {
         {
           name: 'Team Info',
           value: [
-            `Captain: ${captain ? `${mentionUser(captain.userId)} (${captain.player})` : 'Not set'}`,
+            `Captain${captains.length === 1 ? '' : 's'}: ${captains.length ? captains.map(captain => `${mentionUser(captain.userId)} (${captain.player})`).join(', ') : 'Not set'}`,
             `Stadium: ${teamMeta.stadium || 'Not set'}`,
             `Role: ${roleText}`,
             `Players: **${roster.length}**`

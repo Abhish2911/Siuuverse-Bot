@@ -37,8 +37,10 @@ module.exports = {
       return message.reply(`${E.missing} HandFootball player not found. Provide a player mention, ID, or name.`);
     }
 
-    const captain = findPlayerByUserId(data.players, message.author.id);
-    if (!owner && (!captain?.isCaptain || !sameTeam(captain.team, player.team))) {
+    const captainTeams = data.players
+      .filter(item => item.userId === message.author.id && item.isCaptain)
+      .map(item => item.team);
+    if (!owner && !captainTeams.some(team => sameTeam(team, player.team))) {
       return message.reply(`${E.wrong} Only the captain of **${player.team}** can remove this player.`);
     }
 
