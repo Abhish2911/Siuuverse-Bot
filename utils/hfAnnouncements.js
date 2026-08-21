@@ -19,6 +19,58 @@ function getConfiguredResultRoleIds() {
   ].map(value => value.replace(/[<@&>]/g, '').trim()).filter(Boolean);
 }
 
+function getHFTimezone() {
+  const timezone = String(process.env.HF_TIMEZONE || 'UTC').trim() || 'UTC';
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
+    return timezone;
+  } catch {
+    console.warn(`⚠️ Invalid HF_TIMEZONE "${timezone}". Falling back to UTC.`);
+    return 'UTC';
+  }
+}
+
+function getZonedParts(date, timeZone) {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).formatToParts(date)
+      .filter(part => ['year', 'month', 'day', 'hour', 'minute'].includes(part.type))
+      .map(part => [part.type, Number(part.value)])
+  );
+}
+
+function getTimezoneOffsetMs(date, timeZone) {
+  const parts = getZonedParts(date, timeZone);
+  const zonedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    0
+  );
+
+  return zonedAsUtc - date.getTime();
+}
+
+function createDateInTimezone(year, month, day, hour, minute, timeZone) {
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  const firstGuess = new Date(wallClockAsUtc);
+  const firstOffset = getTimezoneOffsetMs(firstGuess, timeZone);
+  const correctedGuess = new Date(wallClockAsUtc - firstOffset);
+  const correctedOffset = getTimezoneOffsetMs(correctedGuess, timeZone);
+
+  return new Date(wallClockAsUtc - correctedOffset);
+}
+
 function canManageHFChannel(message) {
   const resultRoleIds = getConfiguredResultRoleIds();
   const hasResultRole = resultRoleIds.some(roleId => message.member?.roles?.cache?.has(roleId));
@@ -49,21 +101,34 @@ function parseAnnouncementTime(value, now = new Date()) {
     return null;
   }
 
-  const scheduledAt = new Date(now);
-  scheduledAt.setHours(hour, minute, 0, 0);
+  const timezone = getHFTimezone();
+  const today = getZonedParts(now, timezone);
 
-  return scheduledAt;
+  return createDateInTimezone(
+    today.year,
+    today.month,
+    today.day,
+    hour,
+    minute,
+    timezone
+  );
 }
 
 function formatAnnouncementTime(date) {
   return new Intl.DateTimeFormat('en-US', {
+    timeZone: getHFTimezone(),
     weekday: 'long',
     day: '2-digit',
     month: 'long',
     year: 'numeric',
     hour: 'numeric',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZoneName: 'short'
   }).format(date);
+}
+
+function formatAnnouncementTimestamp(date) {
+  return `<t:${Math.floor(new Date(date).getTime() / 1000)}:F>`;
 }
 
 function scheduleAnnouncement(channel, scheduledAt, callback) {
@@ -137,7 +202,7 @@ async function completeAnnouncement(channel, scheduledAt, roleIds) {
     });
   }
 
-  await channel.send(`🎮 Match announced for **${formatAnnouncementTime(scheduledAt)}**\n\nChannel Unlocked`);
+  await channel.send(`🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**\n\nChannel Unlocked`);
   await deleteStoredAnnouncement(channel.guild.id, channel.id);
 }
 
@@ -197,6 +262,7 @@ module.exports = {
   canManageHFChannel,
   parseAnnouncementTime,
   formatAnnouncementTime,
+  formatAnnouncementTimestamp,
   scheduleAnnouncement,
   cancelScheduledAnnouncement,
   hasAnnouncementPersistence,
