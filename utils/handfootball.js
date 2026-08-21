@@ -107,7 +107,7 @@ async function loadHandFootballData() {
   const [playerRows, teamRows, fixtureRows] = await Promise.all([
     getData('Team_Data!A:D', { spreadsheetId }),
     getData('Teams!A:E', { spreadsheetId }),
-    getData('Fixtures!A:G', { spreadsheetId }).catch(() => [])
+    getData('Fixtures!A:K', { spreadsheetId }).catch(() => [])
   ]);
 
   return {
