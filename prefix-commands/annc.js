@@ -149,11 +149,14 @@ async function announce(message, timeText, teamText) {
     return message.reply(`${E.wrong} Could not schedule the announcement: ${error.message}`);
   }
 
-  return message.reply([
-    roleMentions,
-    `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**`,
-    `${E.calendar} Channel will unlock at the announcement time.`
-  ].join('\n'));
+  return message.reply({
+    content: [
+      roleMentions,
+      `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**`,
+      `${E.calendar} Channel will unlock at the announcement time.`
+    ].join('\n'),
+    allowedMentions: { roles: allowedRoleIds }
+  });
 }
 
 module.exports = {
