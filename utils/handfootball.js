@@ -272,6 +272,10 @@ function canSubmitHFResult(message) {
   );
 }
 
+function hasHFResultRole(message) {
+  return memberHasAnyRole(message, getRoleIdsFromEnv('HF_RESULT_ROLE_ID', 'HF_RESULT_ROLE_IDS'));
+}
+
 function canUseHFCaptainCommands(message) {
   return (
     isBotOwner(message) ||
@@ -533,6 +537,7 @@ module.exports = {
   truncateField,
   isBotOwner,
   canSubmitHFResult,
+  hasHFResultRole,
   canUseHFCaptainCommands,
   getHFCaptainRoleId,
   canManageHandFootball,
