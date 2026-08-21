@@ -20,7 +20,9 @@ function getConfiguredResultRoleIds() {
 function canManageHFChannel(message) {
   const resultRoleIds = getConfiguredResultRoleIds();
   const hasResultRole = resultRoleIds.some(roleId => message.member?.roles?.cache?.has(roleId));
-  const canManageChannel = message.member?.permissions?.has(PermissionFlagsBits.ManageChannels);
+  const canManageChannel = message.channel
+    ?.permissionsFor?.(message.member)
+    ?.has(PermissionFlagsBits.ManageChannels);
 
   return hasResultRole && canManageChannel;
 }
