@@ -84,15 +84,9 @@ async function setLocked(channel, locked, reason) {
     throw new Error('I need Manage Channels permission to lock this channel.');
   }
 
-  if (botMember && !botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    throw new Error('I need Manage Roles permission to change the lock role mentionability.');
-  }
-
   await channel.permissionOverwrites.edit(role, {
     SendMessages: locked ? false : null
   }, { reason });
-
-  await role.setMentionable(!locked, `${reason} — ${locked ? 'role hidden from mentions' : 'role mentionability restored'}`);
 
   return role;
 }
