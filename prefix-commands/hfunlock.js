@@ -16,7 +16,7 @@ module.exports = {
 
     try {
       await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
-      return message.reply(`${E.correct} The configured HF lock role can send messages in this channel again.`);
+      return message.reply(`#${message.channel.name} is unlocked.`);
     } catch (error) {
       return message.reply(`${E.wrong} ${error.message}`);
     }
