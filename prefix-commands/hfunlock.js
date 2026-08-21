@@ -1,13 +1,22 @@
 const E = require('../utils/emojis');
-const { getConfiguredLockRoleId, setLocked } = require('../utils/hfAnnouncements');
+const {
+  getConfiguredLockRoleId,
+  getConfiguredResultRoleIds,
+  canManageHFChannel,
+  setLocked
+} = require('../utils/hfAnnouncements');
 
 module.exports = {
   name: 'hfunlock',
   aliases: ['unlockhf'],
 
   async execute(message) {
-    if (!message.member?.permissions?.has('ManageChannels')) {
-      return message.reply(`${E.wrong} You need Manage Channels permission to use this command.`);
+    if (!getConfiguredResultRoleIds().length) {
+      return message.reply(`${E.missing} Add \`HF_RESULT_ROLE_ID\` to your .env first.`);
+    }
+
+    if (!canManageHFChannel(message)) {
+      return message.reply(`${E.wrong} You need the configured HF result role and Manage Channels permission for this channel.`);
     }
 
     if (!getConfiguredLockRoleId()) {
