@@ -149,7 +149,7 @@ async function announce(message, timeText, teamText) {
     return message.reply(`${E.wrong} Could not schedule the announcement: ${error.message}`);
   }
 
-  return message.reply({
+  return message.channel.send({
     content: [
       roleMentions,
       `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**`,
