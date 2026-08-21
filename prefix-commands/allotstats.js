@@ -1,6 +1,7 @@
 const TournamentStats = require('../models/TournamentStats');
 const { canSubmitHFResult } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
+const { sendStatsSummaryDMs } = require('../utils/hfStatsSummary');
 const E = require('../utils/emojis');
 
 const STAT_PATTERN = /(^|[^\d])(\d{5,25})\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
@@ -37,8 +38,8 @@ function getInlineStatsText(message) {
 }
 
 async function getStatsText(message) {
-  if (message.reference?.messageId) {
-    const targetMessage = await message.fetchReference().catch(() => null);
+  const targetMessage = await getReferencedMessage(message);
+  if (targetMessage) {
     const targetText = collectMessageText(targetMessage).trim();
 
     if (targetText) {
@@ -47,6 +48,14 @@ async function getStatsText(message) {
   }
 
   return getInlineStatsText(message);
+}
+
+async function getReferencedMessage(message) {
+  const referenceId = message.reference?.messageId || message.reference?.message_id;
+  if (!referenceId) return null;
+  return message.fetchReference().catch(() => (
+    message.channel?.messages?.fetch(referenceId).catch(() => null)
+  ));
 }
 
 function toStatNumber(value) {
@@ -122,9 +131,27 @@ module.exports = {
       { ordered: false }
     );
 
+    const sourceMessage = await getReferencedMessage(message);
+    const summary = sourceMessage
+      ? await sendStatsSummaryDMs(message, rows, sourceMessage).catch(error => ({ error }))
+      : null;
+
     refreshAllHFLiveMessages(message.client, 'stats')
       .catch(error => console.error('HF live stats refresh after .as failed:', error));
 
-    return message.reply(`${E.correct} Stats updated.`);
+    if (summary?.error) {
+      console.error('❌ Failed to send HF stats summary DMs:', summary.error);
+    }
+
+    const summaryText = summary?.error
+      ? ' Summary DM failed; check the bot logs.'
+      : summary
+        ? ` Summary DM sent to ${summary.sent}/${summary.attempted} result-role members.${summary.reason ? ` ${summary.reason}` : ''}`
+        : ' No source message was found, so no match summary was sent.';
+
+    return message.reply(`${E.correct} Stats updated.${summaryText}`);
   }
 };
+
+module.exports.parseRawStats = parseRawStats;
+module.exports.getReferencedMessage = getReferencedMessage;
