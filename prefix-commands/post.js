@@ -4,6 +4,7 @@ const {
   loadHandFootballData,
   findTeamMeta,
 } = require('../utils/handfootball');
+const { isReserved } = require('../utils/hfReservations');
 
 const HF_RESULT_ROLE_ID = String(process.env.HF_RESULT_ROLE_ID || '').replace(/[<@&>]/g, '').trim();
 const HF_FIXTURES_ROLE_ID = String(process.env.HF_FIXTURES_ROLE_ID || '').replace(/[<@&>]/g, '').trim();
@@ -97,16 +98,23 @@ module.exports = {
       return message.reply(`${E.missing} Add \`HF_RESULT_ROLE_ID\` to your .env first.`);
     }
 
-    const matchdayNumber = parseMatchday(args);
-    if (!matchdayNumber) {
-      return message.reply(`${E.profile} Usage: \`.post 1\`, \`.post md 1\`, or \`.post matchday 1\`.`);
+    const data = await loadHandFootballData();
+    const reservesMode = ['reserve', 'reserves', 'reserved'].includes(String(args[0] || '').toLowerCase());
+    const matchdayNumber = reservesMode ? null : parseMatchday(args);
+    if (!reservesMode && !matchdayNumber) {
+      return message.reply(`${E.profile} Usage: \`.post 1\`, \`.post md 1\`, \`.post matchday 1\`, or \`.post reserves\`.`);
     }
 
-    const data = await loadHandFootballData();
-    const fixtures = data.fixtures.filter(fixture => getMatchdayNumber(fixture.matchday) === matchdayNumber);
+    const fixtures = reservesMode
+      ? data.fixtures.filter(isReserved)
+      : data.fixtures.filter(fixture => getMatchdayNumber(fixture.matchday) === matchdayNumber);
 
     if (!fixtures.length) {
-      return message.reply(`${E.missing} No HandFootball fixtures found for Matchday ${matchdayNumber}.`);
+      return message.reply(
+        reservesMode
+          ? `${E.missing} No reserved HandFootball matches found.`
+          : `${E.missing} No HandFootball fixtures found for Matchday ${matchdayNumber}.`
+      );
     }
 
     const roleIds = new Set([HF_RESULT_ROLE_ID]);
@@ -114,7 +122,9 @@ module.exports = {
     const fixtureText = fixtures.map(fixture => formatFixture(fixture, data, roleIds)).join('\n\n');
     const content = [
       `${E.team || '⚽'}${E.trophy || '🏆'} **SCHEDULE FOR SIUUVERSE HAND-FOOTBALL LEAGUE** ${E.trophy || '🏆'}${E.team || '⚽'}`,
-      `${E.fire || '🔥'} **MATCHDAY ${matchdayNumber}** ${E.fire || '🔥'}`,
+      reservesMode
+        ? `${E.lock || '🔒'} **RESERVED MATCHES** ${E.lock || '🔒'}`
+        : `${E.fire || '🔥'} **MATCHDAY ${matchdayNumber}** ${E.fire || '🔥'}`,
       '---',
       fixtureText,
       '---',
