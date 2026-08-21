@@ -48,7 +48,7 @@ function formatFixture(fixture, data, roleIds) {
   const venue = homeTeam.stadiumChannelId || fixture.venue || homeTeam.stadium || 'Venue not set';
 
   return [
-    `${E.duel || E.vs || '⚔️'} ${formatTeam(homeTeam, roleIds)} ${E.vs || '**VS**'} ${formatTeam(awayTeam, roleIds)}`,
+    `${E.rank || '#'} **#${fixture.matchNo}** ${E.duel || E.vs || '⚔️'} ${formatTeam(homeTeam, roleIds)} ${E.vs || '**VS**'} ${formatTeam(awayTeam, roleIds)}`,
     `${E.Badge || E.team || '🏟️'} ${formatStadium(venue)}`,
     fixture.note ? `${E.profile || '📝'} ${fixture.note}` : null
   ].filter(Boolean).join('\n');
