@@ -46,14 +46,10 @@ function formatFixture(fixture, data, roleIds) {
   const homeTeam = findTeamMeta(data.teams, fixture.home);
   const awayTeam = findTeamMeta(data.teams, fixture.away);
   const venue = homeTeam.stadiumChannelId || fixture.venue || homeTeam.stadium || 'Venue not set';
-  const status = fixture.played
-    ? `${E.played || '✅'} ${fixture.homeGoals}-${fixture.awayGoals}`
-    : `${E.calendar || '📅'} ${fixture.status || 'Pending'}`;
 
   return [
     `${E.duel || E.vs || '⚔️'} ${formatTeam(homeTeam, roleIds)} ${E.vs || '**VS**'} ${formatTeam(awayTeam, roleIds)}`,
     `${E.Badge || E.team || '🏟️'} ${formatStadium(venue)}`,
-    `${E.profile || '📌'} ${status}`,
     fixture.note ? `${E.profile || '📝'} ${fixture.note}` : null
   ].filter(Boolean).join('\n');
 }
