@@ -193,16 +193,29 @@ async function completeAnnouncement(channel, scheduledAt, roleIds) {
   const allowedRoleIds = [...new Set((roleIds || []).filter(Boolean))];
   const roleMentions = allowedRoleIds.map(roleId => `<@&${roleId}>`).join(' vs ');
 
-  await setLocked(channel, false, 'HandFootball announcement time reached');
-
-  if (roleMentions) {
-    await channel.send({
-      content: roleMentions,
-      allowedMentions: { roles: allowedRoleIds }
-    });
+  let unlockError = null;
+  try {
+    await setLocked(channel, false, 'HandFootball announcement time reached');
+  } catch (error) {
+    unlockError = error;
+    console.error(`❌ Failed to unlock HandFootball announcement channel ${channel.id}:`, error);
   }
 
-  await channel.send(`🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**\n\nChannel Unlocked`);
+  if (roleMentions) {
+    try {
+      await channel.send({
+        content: roleMentions,
+        allowedMentions: { roles: allowedRoleIds }
+      });
+    } catch (error) {
+      console.error(`❌ Failed to tag HandFootball announcement teams in ${channel.id}:`, error);
+    }
+  }
+
+  const statusLine = unlockError
+    ? `Channel unlock failed: ${unlockError.message}`
+    : 'Channel Unlocked';
+  await channel.send(`🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**\n\n${statusLine}`);
   await deleteStoredAnnouncement(channel.guild.id, channel.id);
 }
 
