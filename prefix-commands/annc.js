@@ -151,7 +151,7 @@ async function announce(message, timeText, teamText) {
 
   return message.reply([
     roleMentions,
-    `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}** _(input timezone: ${process.env.HF_TIMEZONE || 'UTC'})_`,
+    `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}**`,
     `${E.calendar} Channel will unlock at the announcement time.`
   ].join('\n'));
 }
