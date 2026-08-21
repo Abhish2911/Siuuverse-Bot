@@ -85,7 +85,7 @@ async function setLocked(channel, locked, reason) {
   }
 
   await channel.permissionOverwrites.edit(role, {
-    SendMessages: locked ? false : null
+    SendMessages: locked ? false : true
   }, { reason });
 
   return role;
