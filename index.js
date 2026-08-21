@@ -13,6 +13,7 @@ const {
 } = require('./utils/handfootballLive');
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
 const TrainCooldown = require('./models/TrainCooldown');
+const { restoreStoredAnnouncements } = require('./utils/hfAnnouncements');
 
 function startHealthServer() {
   const app = express();
@@ -1047,8 +1048,23 @@ client.on('messageCreate', async message => {
 
       try {
         await command.execute(message, args, client);
+        sendAuditLog(message, {
+          title: '📝 Prefix Command Used',
+          description:
+            `**Command:** \`${message.content.slice(0, 1000)}\`\n` +
+            `**Channel:** <#${message.channel.id}>`,
+          color: 0x5865F2
+        }).catch(error => console.error('❌ Prefix audit log failed:', error));
       } catch (err) {
         console.error(`❌ Prefix Command Error (${commandName}):`, err);
+        sendAuditLog(message, {
+          title: '⚠️ Prefix Command Failed',
+          description:
+            `**Command:** \`${message.content.slice(0, 1000)}\`\n` +
+            `**Channel:** <#${message.channel.id}>\n` +
+            `**Error:** ${String(err.message || 'Unknown error').slice(0, 1000)}`,
+          color: 0xED4245
+        }).catch(error => console.error('❌ Prefix failure audit log failed:', error));
         await message.reply(
           `❌ Error occurred while executing command\n\`${err.message || 'Unknown error'}\``
         ).catch(() => {});
@@ -1144,7 +1160,12 @@ client.on('messageCreate', async message => {
 
     // Connect Discord first. A database outage must not leave the bot offline.
     await client.login(process.env.TOKEN);
-    await connectMongo();
+    const mongoConnected = await connectMongo();
+
+    if (mongoConnected) {
+      const restoredAnnouncements = await restoreStoredAnnouncements(client);
+      console.log(`✅ Restored ${restoredAnnouncements} scheduled HandFootball announcements`);
+    }
   } catch (error) {
     console.error('❌ Bot startup failed:', error);
     process.exitCode = 1;
