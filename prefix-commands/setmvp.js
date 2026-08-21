@@ -38,9 +38,6 @@ function extractMvpUserId(text) {
   const arrowMatch = raw.match(/(?:->|=>|→)\s*<@!?(\d{5,25})>/);
   if (arrowMatch) return arrowMatch[1];
 
-  const mentionMatch = raw.match(/<@!?(\d{5,25})>/);
-  if (mentionMatch) return mentionMatch[1];
-
   const idMatch = raw.match(/\b\d{5,25}\b/);
   return idMatch ? idMatch[0] : '';
 }
