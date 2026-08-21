@@ -31,11 +31,16 @@ function parseHexColor(value, fallback = 0xF1C40F) {
 }
 
 function getAllTeamNames(data) {
-  return [...new Set([
+  const namesByKey = new Map();
+  for (const name of [
     ...data.teams.map(team => team.team),
     ...data.players.map(player => player.team),
     ...data.fixtures.flatMap(fixture => [fixture.home, fixture.away])
-  ].filter(Boolean))];
+  ].filter(Boolean)) {
+    const key = String(name).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+  }
+  return [...namesByKey.values()];
 }
 
 function getTeamMeta(data, teamName) {

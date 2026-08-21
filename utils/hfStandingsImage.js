@@ -43,11 +43,16 @@ function getShortName(teamName) {
 }
 
 function getAllTeamNames(data) {
-  return [...new Set([
+  const namesByKey = new Map();
+  for (const name of [
     ...data.teams.map(team => team.team),
     ...data.players.map(player => player.team),
     ...data.fixtures.flatMap(fixture => [fixture.home, fixture.away])
-  ].filter(Boolean))];
+  ].filter(Boolean)) {
+    const key = normalize(name);
+    if (key && !namesByKey.has(key)) namesByKey.set(key, name);
+  }
+  return [...namesByKey.values()];
 }
 
 function getTeamMeta(data, teamName) {
@@ -125,7 +130,10 @@ async function buildHFStandingsImage() {
   const rowHeight = 44;
   const rowGap = 7;
   const canvasWidth = 1200;
-  const canvasHeight = Math.max(780, 240 + totalTeams * (rowHeight + rowGap));
+  // Keep every row inside the card and leave a dedicated footer area below it.
+  const layoutStartY = 60 + 80 + 45 + 55;
+  const footerHeight = 55;
+  const canvasHeight = Math.max(780, layoutStartY + totalTeams * (rowHeight + rowGap) + footerHeight + 60);
   const canvas = createCanvas(canvasWidth, canvasHeight);
   const ctx = canvas.getContext('2d');
 
