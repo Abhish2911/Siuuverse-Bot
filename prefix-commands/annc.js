@@ -7,6 +7,7 @@ const {
 const {
   parseAnnouncementTime,
   formatAnnouncementTime,
+  formatAnnouncementTimestamp,
   hasAnnouncementPersistence,
   getStoredAnnouncement,
   saveStoredAnnouncement,
@@ -33,7 +34,7 @@ async function removeSetupMessages(messages) {
 }
 
 async function confirmOverwrite(message, existing) {
-  const dateText = formatAnnouncementTime(new Date(existing.scheduledAt));
+  const dateText = `${formatAnnouncementTime(new Date(existing.scheduledAt))} • ${formatAnnouncementTimestamp(existing.scheduledAt)}`;
   const prompt = await message.reply(
     `${E.warning} This channel already has an announcement scheduled for **${dateText}**. Type \`yes\` to replace it or \`no\` to keep it.`
   );
@@ -150,7 +151,7 @@ async function announce(message, timeText, teamText) {
 
   return message.reply([
     roleMentions,
-    `🎮 Match announced for **${formatAnnouncementTime(scheduledAt)}**`,
+    `🎮 Match announced for **${formatAnnouncementTimestamp(scheduledAt)}** _(input timezone: ${process.env.HF_TIMEZONE || 'UTC'})_`,
     `${E.calendar} Channel will unlock at the announcement time.`
   ].join('\n'));
 }
