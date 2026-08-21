@@ -122,7 +122,7 @@ module.exports = {
       '---',
       fixtureText,
       '---',
-      `${E.warning || '📢'} **Any Doubts Ping:** <@&${HF_RESULT_ROLE_ID}>`,
+      `${E.missing || '📢'} **Any Doubts Ping:** <@&${HF_RESULT_ROLE_ID}>`,
       HF_FIXTURES_ROLE_ID ? `||<@&${HF_FIXTURES_ROLE_ID}>||` : null
     ].filter(Boolean).join('\n\n');
 
