@@ -45,7 +45,7 @@ function formatStadium(value) {
 function formatFixture(fixture, data, roleIds) {
   const homeTeam = findTeamMeta(data.teams, fixture.home);
   const awayTeam = findTeamMeta(data.teams, fixture.away);
-  const venue = fixture.venue || homeTeam.stadium || 'Venue not set';
+  const venue = homeTeam.stadiumChannelId || fixture.venue || homeTeam.stadium || 'Venue not set';
   const status = fixture.played
     ? `${E.played || '✅'} ${fixture.homeGoals}-${fixture.awayGoals}`
     : `${E.calendar || '📅'} ${fixture.status || 'Pending'}`;
