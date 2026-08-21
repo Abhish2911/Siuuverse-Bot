@@ -34,19 +34,27 @@ function formatTeam(team, roleIds) {
   return `**${team?.team || 'Unknown Team'}**`;
 }
 
+function formatStadium(value) {
+  const stadium = String(value || '').trim();
+  if (!stadium) return '**Venue not set**';
+  if (/^<#\d{5,25}>$/.test(stadium)) return stadium;
+  if (/^\d{5,25}$/.test(stadium)) return `<#${stadium}>`;
+  return `**${stadium}**`;
+}
+
 function formatFixture(fixture, data, roleIds) {
   const homeTeam = findTeamMeta(data.teams, fixture.home);
   const awayTeam = findTeamMeta(data.teams, fixture.away);
   const venue = fixture.venue || homeTeam.stadium || 'Venue not set';
   const status = fixture.played
-    ? `✅ ${fixture.homeGoals}-${fixture.awayGoals}`
-    : fixture.status || 'Pending';
+    ? `${E.played || '✅'} ${fixture.homeGoals}-${fixture.awayGoals}`
+    : `${E.calendar || '📅'} ${fixture.status || 'Pending'}`;
 
   return [
-    `⚔️ ${formatTeam(homeTeam, roleIds)} **VS** ${formatTeam(awayTeam, roleIds)}`,
-    `🏟️ **${venue}**`,
-    `📌 ${status}`,
-    fixture.note ? `📝 ${fixture.note}` : null
+    `${E.duel || E.vs || '⚔️'} ${formatTeam(homeTeam, roleIds)} ${E.vs || '**VS**'} ${formatTeam(awayTeam, roleIds)}`,
+    `${E.Badge || E.team || '🏟️'} ${formatStadium(venue)}`,
+    `${E.profile || '📌'} ${status}`,
+    fixture.note ? `${E.profile || '📝'} ${fixture.note}` : null
   ].filter(Boolean).join('\n');
 }
 
@@ -109,12 +117,12 @@ module.exports = {
     if (HF_FIXTURES_ROLE_ID) roleIds.add(HF_FIXTURES_ROLE_ID);
     const fixtureText = fixtures.map(fixture => formatFixture(fixture, data, roleIds)).join('\n\n');
     const content = [
-      '⚽🏆 **SCHEDULE FOR SIUUVERSE HAND-FOOTBALL LEAGUE** 🏆⚽',
-      `🔥 **MATCHDAY ${matchdayNumber}** 🔥`,
+      `${E.team || '⚽'}${E.trophy || '🏆'} **SCHEDULE FOR SIUUVERSE HAND-FOOTBALL LEAGUE** ${E.trophy || '🏆'}${E.team || '⚽'}`,
+      `${E.fire || '🔥'} **MATCHDAY ${matchdayNumber}** ${E.fire || '🔥'}`,
       '---',
       fixtureText,
       '---',
-      `📢 **Any Doubts Ping:** <@&${HF_RESULT_ROLE_ID}>`,
+      `${E.warning || '📢'} **Any Doubts Ping:** <@&${HF_RESULT_ROLE_ID}>`,
       HF_FIXTURES_ROLE_ID ? `||<@&${HF_FIXTURES_ROLE_ID}>||` : null
     ].filter(Boolean).join('\n\n');
 
