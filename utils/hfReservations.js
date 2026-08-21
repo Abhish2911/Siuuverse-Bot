@@ -18,13 +18,19 @@ function normalizeMatchNo(value) {
 }
 
 function isReserved(fixture) {
-  return normalizeMatchNo(fixture?.status) === 'reserved';
+  return normalizeMatchNo(fixture?.status).startsWith('reserved');
+}
+
+function getReservationTeam(fixture) {
+  const status = clean(fixture?.status);
+  const match = status.match(/^reserved\s*(?::|-)\s*(.+)$/i);
+  return match ? match[1].trim() : '';
 }
 
 function getReservedFixtures(fixtures = [], teamName = '') {
   return fixtures.filter(fixture => (
     isReserved(fixture) && (
-      !teamName || sameTeam(fixture.home, teamName) || sameTeam(fixture.away, teamName)
+      !teamName || sameTeam(getReservationTeam(fixture), teamName)
     )
   ));
 }
@@ -58,6 +64,14 @@ function buildReservationEmbed(data, fixtures, teamName = '') {
     )
     .setTimestamp();
 
+  if (teamName) {
+    embed.addFields({
+      name: `${E.lock} Reserve Limit`,
+      value: `Used: **${reserved.length}/${MAX_RESERVED_MATCHES_PER_TEAM}**\nRemaining: **${Math.max(0, MAX_RESERVED_MATCHES_PER_TEAM - reserved.length)}**`,
+      inline: true
+    });
+  }
+
   if (!reserved.length) {
     embed.addFields({ name: 'No Reserved Matches', value: 'There are no reserved matches to show.' });
     return embed;
@@ -89,19 +103,19 @@ async function reserveFixture(data, matchNo, targetTeam = '') {
 
   const team = targetTeam ? findTeamByName(data, targetTeam) : null;
   const resolvedTeam = team?.team || targetTeam;
+  if (!resolvedTeam) {
+    return { ok: false, reason: `Specify the team reserving match **#${fixture.matchNo}**.` };
+  }
+
   if (resolvedTeam && !sameTeam(fixture.home, resolvedTeam) && !sameTeam(fixture.away, resolvedTeam)) {
     return { ok: false, reason: `**${resolvedTeam}** is not one of the teams in match **#${fixture.matchNo}**.` };
   }
 
-  const involvedTeams = [fixture.home, fixture.away].filter(Boolean);
-  const fullTeam = involvedTeams.find(teamName => (
-    getTeamReservedCount(data.fixtures, teamName) >= MAX_RESERVED_MATCHES_PER_TEAM
-  ));
-  if (fullTeam) {
-    return { ok: false, reason: `**${fullTeam}** already has ${MAX_RESERVED_MATCHES_PER_TEAM} reserved matches.` };
+  if (getTeamReservedCount(data.fixtures, resolvedTeam) >= MAX_RESERVED_MATCHES_PER_TEAM) {
+    return { ok: false, reason: `**${resolvedTeam}** already has ${MAX_RESERVED_MATCHES_PER_TEAM} reserved matches.` };
   }
 
-  const updated = await updateHFFixtureStatus(fixture.matchNo, 'Reserved');
+  const updated = await updateHFFixtureStatus(fixture.matchNo, `Reserved: ${resolvedTeam}`);
   if (!updated) return { ok: false, reason: `Could not update match **#${fixture.matchNo}** in the Fixtures sheet.` };
   return { ok: true, fixture, reservedTeam: resolvedTeam };
 }
@@ -111,6 +125,7 @@ module.exports = {
   clean,
   normalizeMatchNo,
   isReserved,
+  getReservationTeam,
   getReservedFixtures,
   getTeamReservedCount,
   findFixture,
