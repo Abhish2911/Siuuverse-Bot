@@ -7,6 +7,12 @@ const {
 const {
   parseAnnouncementTime,
   formatAnnouncementTime,
+  hasAnnouncementPersistence,
+  getStoredAnnouncement,
+  saveStoredAnnouncement,
+  deleteStoredAnnouncement,
+  cancelScheduledAnnouncement,
+  completeAnnouncement,
   scheduleAnnouncement,
   setLocked
 } = require('../utils/hfAnnouncements');
@@ -26,12 +32,70 @@ async function removeSetupMessages(messages) {
   )));
 }
 
+async function confirmOverwrite(message, existing) {
+  const dateText = formatAnnouncementTime(new Date(existing.scheduledAt));
+  const prompt = await message.reply(
+    `${E.warning} This channel already has an announcement scheduled for **${dateText}**. Type \`yes\` to replace it or \`no\` to keep it.`
+  );
+
+  const response = await new Promise(resolve => {
+    const collector = message.channel.createMessageCollector({
+      filter: candidate => candidate.author.id === message.author.id,
+      time: 30000,
+      max: 1
+    });
+
+    collector.on('collect', candidate => {
+      resolve({ confirmed: /^(yes|y|confirm)$/i.test(candidate.content.trim()), message: candidate });
+      collector.stop('answered');
+    });
+
+    collector.on('end', (_, reason) => {
+      if (reason === 'time') resolve({ confirmed: false, message: null });
+    });
+  });
+
+  await removeSetupMessages([prompt, response.message]);
+  return response.confirmed;
+}
+
+async function cancelAnnouncement(message) {
+  if (!hasAnnouncementPersistence()) {
+    return message.reply(`${E.warning} MongoDB is not connected, so there is no persistent announcement to cancel.`);
+  }
+
+  const existing = await getStoredAnnouncement(message.guild.id, message.channel.id);
+  if (!existing) {
+    return message.reply(`${E.warning} There is no scheduled announcement in this channel.`);
+  }
+
+  cancelScheduledAnnouncement(message.channel.id);
+  await deleteStoredAnnouncement(message.guild.id, message.channel.id);
+  await setLocked(message.channel, false, `Cancelled by ${message.author.tag}`).catch(() => null);
+  return message.reply(`#${message.channel.name} announcement cancelled.`);
+}
+
 async function announce(message, timeText, teamText) {
   const scheduledAt = parseAnnouncementTime(timeText);
   if (!scheduledAt) return invalidTime(message);
 
   if (scheduledAt.getTime() <= Date.now()) {
     return message.reply(`${E.warning} The announcement time must be later today.`);
+  }
+
+  if (!hasAnnouncementPersistence()) {
+    return message.reply(`${E.warning} MongoDB is not connected, so scheduled announcements cannot be saved.`);
+  }
+
+  const existing = await getStoredAnnouncement(message.guild.id, message.channel.id);
+  if (existing) {
+    const shouldReplace = await confirmOverwrite(message, existing);
+    if (!shouldReplace) {
+      return message.reply(`${E.warning} Existing announcement left unchanged.`);
+    }
+
+    cancelScheduledAnnouncement(message.channel.id);
+    await deleteStoredAnnouncement(message.guild.id, message.channel.id);
   }
 
   const teamNames = teamText.split(/\s+vs\.?\s+/i).map(value => value.trim()).filter(Boolean);
@@ -64,17 +128,24 @@ async function announce(message, timeText, teamText) {
   const roleMentions = roles.map(role => `<@&${role.id}>`).join(' vs ');
   const allowedRoleIds = roles.map(role => role.id);
 
-  const scheduled = scheduleAnnouncement(message.channel, scheduledAt, async () => {
-    await setLocked(message.channel, false, 'HandFootball announcement time reached');
-    await message.channel.send({
-      content: roleMentions,
-      allowedMentions: { roles: allowedRoleIds }
+  try {
+    // Scheduling an announcement also locks this channel until the match time.
+    await setLocked(message.channel, true, `Scheduled by ${message.author.tag}`);
+    await saveStoredAnnouncement({
+      guildId: message.guild.id,
+      channelId: message.channel.id,
+      scheduledAt,
+      teamNames: teams.map(team => team.team),
+      roleIds: allowedRoleIds,
+      createdBy: message.author.id
     });
-    await message.channel.send(`🎮 Match announced for **${formatAnnouncementTime(scheduledAt)}**\n\nChannel Unlocked`);
-  });
-
-  if (!scheduled) {
-    return message.reply(`${E.warning} That time has already passed today.`);
+    scheduleAnnouncement(message.channel, scheduledAt, async () => {
+      await completeAnnouncement(message.channel, scheduledAt, allowedRoleIds);
+    });
+  } catch (error) {
+    await setLocked(message.channel, false, 'Announcement scheduling rollback').catch(() => null);
+    await deleteStoredAnnouncement(message.guild.id, message.channel.id).catch(() => null);
+    return message.reply(`${E.wrong} Could not schedule the announcement: ${error.message}`);
   }
 
   return message.reply([
@@ -91,6 +162,10 @@ module.exports = {
   async execute(message, args) {
     if (!hasHFResultRole(message)) {
       return message.reply(`${E.wrong} Only members with the configured HF result role can use this command.`);
+    }
+
+    if (args[0]?.toLowerCase() === 'cancel') {
+      return cancelAnnouncement(message);
     }
 
     if (args.length) {
