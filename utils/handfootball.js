@@ -56,7 +56,8 @@ function parseTeams(rows) {
       roleId: cleanId(row[1]),
       stadium: String(row[2] || '').trim(),
       logoUrl: String(row[3] || '').trim(),
-      color: String(row[4] || '').trim()
+      color: String(row[4] || '').trim(),
+      stadiumChannelId: cleanId(row[5])
     }))
     .filter(team => team.team);
 }
@@ -106,7 +107,7 @@ async function loadHandFootballData() {
   const spreadsheetId = getHFSpreadsheetId();
   const [playerRows, teamRows, fixtureRows] = await Promise.all([
     getData('Team_Data!A:D', { spreadsheetId }),
-    getData('Teams!A:E', { spreadsheetId }),
+    getData('Teams!A:F', { spreadsheetId }),
     getData('Fixtures!A:K', { spreadsheetId }).catch(() => [])
   ]);
 
@@ -166,7 +167,8 @@ function findTeamMeta(teams, teamName) {
     roleId: '',
     stadium: '',
     logoUrl: '',
-    color: ''
+    color: '',
+    stadiumChannelId: ''
   };
 }
 
