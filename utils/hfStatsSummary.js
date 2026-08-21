@@ -62,19 +62,21 @@ function buildStatsSummaryEmbed(rows, sourceMessage, players) {
 }
 
 async function getRoleMembers(guild) {
+  const roleIds = getResultRoleIds();
   const members = new Map();
-  for (const roleId of getResultRoleIds()) {
+  for (const roleId of roleIds) {
     const role = guild.roles.cache.get(roleId)
       || await guild.roles.fetch(roleId).catch(() => null);
     if (!role) continue;
     for (const member of role.members.values()) members.set(member.id, member);
   }
 
-  if (!members.size) {
-    await guild.members.fetch().catch(() => null);
-    for (const roleId of getResultRoleIds()) {
-      const role = guild.roles.cache.get(roleId);
-      for (const member of role?.members?.values?.() || []) members.set(member.id, member);
+  const fetchedMembers = await guild.members.fetch().catch(() => null);
+  if (fetchedMembers) {
+    for (const member of fetchedMembers.values()) {
+      if (roleIds.some(roleId => member.roles.cache.has(roleId))) {
+        members.set(member.id, member);
+      }
     }
   }
 
@@ -83,7 +85,13 @@ async function getRoleMembers(guild) {
 
 async function sendStatsSummaryDMs(message, rows, sourceMessage) {
   const members = await getRoleMembers(message.guild);
-  if (!members.length) return { sent: 0, reason: 'No members with HF_RESULT_ROLE_ID were found.' };
+  if (!members.length) {
+    return {
+      sent: 0,
+      attempted: 0,
+      reason: 'No guild members with HF_RESULT_ROLE_ID/HF_RESULT_ROLE_IDS were found.'
+    };
+  }
 
   const data = await loadHandFootballData().catch(() => ({ players: [] }));
   const embed = buildStatsSummaryEmbed(rows, sourceMessage, data.players || []);
@@ -102,7 +110,13 @@ async function sendStatsSummaryDMs(message, rows, sourceMessage) {
     );
   }
 
-  return { sent: dmMessages.length, attempted: members.length };
+  return {
+    sent: dmMessages.length,
+    attempted: members.length,
+    reason: dmMessages.length < members.length
+      ? 'Some members have DMs disabled or blocked the bot.'
+      : ''
+  };
 }
 
 async function deleteStatsSummaryDMs(message, sourceMessageId) {
