@@ -4,11 +4,13 @@ const {
   findPlayerByUserId,
   getFirstIdArg,
   getMentionedUserId,
+  findPlayerByName,
   loadHandFootballData,
   mentionUser
 } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
 const E = require('../utils/emojis');
+const MOTM_BOT_ID = '1370319982470365224';
 
 function collectMessageText(targetMessage) {
   const parts = [];
@@ -38,8 +40,14 @@ function extractMvpUserId(text) {
   const arrowMatch = raw.match(/(?:->|=>|→)\s*<@!?(\d{5,25})>/);
   if (arrowMatch) return arrowMatch[1];
 
-  const idMatch = raw.match(/\b\d{5,25}\b/);
-  return idMatch ? idMatch[0] : '';
+  return '';
+}
+
+function extractMvpPlayerText(text) {
+  const match = String(text || '').match(
+    /man\s+of\s+the\s+match[\s\S]*?(?:->|=>|:|→)\s*(.*?)\s*\(\s*\d+(?:\.\d+)?\s*\/\s*10\s*\)/i
+  );
+  return match ? match[1].replace(/<@!?\d{5,25}>/g, '').trim() : '';
 }
 
 function getMentionIds(users) {
@@ -63,7 +71,18 @@ async function getReferenceContext(message) {
   // The submitter is commonly mentioned before the MOTM player in the embed.
   // Prefer the final mention when the embed text cannot expose raw <@id> markup.
   const mentionedUserIds = getMentionIds(targetMessage?.mentions?.users);
-  const userId = extractMvpUserId(text) || mentionedUserIds.at(-1) || '';
+  let userId = extractMvpUserId(text);
+
+  if (!userId && targetMessage?.author?.id === MOTM_BOT_ID) {
+    const data = await loadHandFootballData().catch(() => ({ players: [] }));
+    const player = findPlayerByName(data.players || [], extractMvpPlayerText(text));
+    userId = player?.userId || '';
+  }
+
+  // For the known MOTM bot, never guess from unrelated mentions in the post.
+  if (!userId && targetMessage?.author?.id !== MOTM_BOT_ID) {
+    userId = mentionedUserIds.at(-1) || '';
+  }
 
   return {
     text,
