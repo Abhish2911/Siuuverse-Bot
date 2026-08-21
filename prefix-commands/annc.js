@@ -20,6 +20,12 @@ function invalidTime(message) {
   ].join('\n'));
 }
 
+async function removeSetupMessages(messages) {
+  await Promise.all(messages.map(setupMessage => (
+    setupMessage?.delete?.().catch(() => null)
+  )));
+}
+
 async function announce(message, timeText, teamText) {
   const scheduledAt = parseAnnouncementTime(timeText);
   if (!scheduledAt) return invalidTime(message);
@@ -97,6 +103,7 @@ module.exports = {
     }
 
     const prompt = await message.reply(`${E.calendar} What time should the match be announced? Example: \`8:15 PM\``);
+    const setupMessages = [prompt];
     const collector = message.channel.createMessageCollector({
       filter: response => response.author.id === message.author.id,
       time: 60000,
@@ -108,22 +115,29 @@ module.exports = {
     collector.on('collect', async response => {
       if (step === 0) {
         timeText = response.content.trim();
+        setupMessages.push(response);
         if (!parseAnnouncementTime(timeText)) {
           await invalidTime(message);
           collector.stop('invalid-time');
+          await removeSetupMessages(setupMessages);
           return;
         }
         step = 1;
-        await message.channel.send(`${E.team} Enter both HandFootball team names, for example: \`Team One vs Team Two\``);
+        const teamPrompt = await message.channel.send(`${E.team} Enter both HandFootball team names, for example: \`Team One vs Team Two\``);
+        setupMessages.push(teamPrompt);
         return;
       }
 
+      setupMessages.push(response);
       collector.stop('complete');
       await announce(message, timeText, response.content.trim());
+      await removeSetupMessages(setupMessages);
     });
 
     collector.on('end', (_, reason) => {
-      if (reason === 'time') prompt.edit(`${prompt.content}\n${E.warning} Announcement setup timed out.`).catch(() => null);
+      if (reason === 'time') {
+        removeSetupMessages(setupMessages);
+      }
     });
   }
 };
