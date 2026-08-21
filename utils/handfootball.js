@@ -69,19 +69,32 @@ function toNumber(value) {
 
 function parseFixtures(rows) {
   const header = (rows[0] || []).map(value => compactKey(value));
-  const hasMatchNo = ['matchno', 'matchnumber', 'match'].includes(header[0]);
+  const findColumn = (...names) => {
+    const index = header.findIndex(value => names.includes(value));
+    return index === -1 ? null : index;
+  };
+  const matchNoIndex = findColumn('matchno', 'matchnumber', 'match');
+  const matchdayIndex = findColumn('matchday', 'md', 'round') ?? (matchNoIndex === null ? 0 : 1);
+  const homeIndex = findColumn('home', 'hometeam', 'hometeamname') ?? (matchNoIndex === null ? 2 : 2);
+  const awayIndex = findColumn('away', 'awayteam', 'awayteamname') ?? (matchNoIndex === null ? 3 : 3);
+  const homeGoalsIndex = findColumn('homegoals', 'hg', 'homescore') ?? (matchNoIndex === null ? 4 : 4);
+  const awayGoalsIndex = findColumn('awaygoals', 'ag', 'awayscore') ?? (matchNoIndex === null ? 5 : 5);
+  const resultIndex = findColumn('result', 'winner');
+  const statusIndex = findColumn('status', 'state') ?? (matchNoIndex === null ? 9 : 6);
+  const venueIndex = findColumn('venue', 'stadium', 'stadiumchannel', 'stadiumchannelid');
+  const noteIndex = findColumn('note', 'notes', 'remarks', 'comment');
 
   return rows
     .slice(1)
     .map((row, index) => {
-      const matchNo = hasMatchNo ? row[0] : index + 1;
-      const matchday = hasMatchNo ? row[1] : row[0];
-      const home = hasMatchNo ? row[2] : row[1];
-      const away = hasMatchNo ? row[3] : row[2];
-      const homeGoals = String((hasMatchNo ? row[4] : row[3]) || '').trim();
-      const awayGoals = String((hasMatchNo ? row[5] : row[4]) || '').trim();
-      const status = String((hasMatchNo ? row[6] : row[5]) || '').trim();
-      const venue = String((hasMatchNo ? row[9] || row[7] : row[6]) || '').trim();
+      const matchNo = matchNoIndex === null ? index + 1 : row[matchNoIndex];
+      const matchday = row[matchdayIndex];
+      const home = row[homeIndex];
+      const away = row[awayIndex];
+      const homeGoals = String(row[homeGoalsIndex] || '').trim();
+      const awayGoals = String(row[awayGoalsIndex] || '').trim();
+      const status = String(row[statusIndex] || '').trim();
+      const venue = String((venueIndex === null ? '' : row[venueIndex]) || '').trim();
       const hasScore = homeGoals !== '' && awayGoals !== '';
 
       return {
@@ -96,11 +109,103 @@ function parseFixtures(rows) {
         date: '',
         time: '',
         venue,
-        note: String(row[10] || '').trim(),
+        note: String((noteIndex === null ? '' : row[noteIndex]) || '').trim(),
+        sheetRow: index + 2,
+        columns: {
+          matchNo: matchNoIndex,
+          matchday: matchdayIndex,
+          home: homeIndex,
+          away: awayIndex,
+          homeGoals: homeGoalsIndex,
+          awayGoals: awayGoalsIndex,
+          result: resultIndex,
+          status: statusIndex,
+          venue: venueIndex,
+          note: noteIndex
+        },
         played: hasScore || ['played', 'done', 'complete', 'completed'].includes(normalize(status))
       };
     })
     .filter(fixture => fixture.home && fixture.away);
+}
+
+function findHFFixtureRow(rows, matchNo) {
+  const fixtures = parseFixtures(rows);
+  const target = String(matchNo || '').replace(/^#/, '').trim().toLowerCase();
+
+  return fixtures.find(fixture => String(fixture.matchNo).trim().toLowerCase() === target) || null;
+}
+
+async function updateHFFixtureStatus(matchNo, status) {
+  const spreadsheetId = getHFSpreadsheetId();
+  const rows = await getData('Fixtures!A:K', { spreadsheetId, cache: false });
+  const fixture = findHFFixtureRow(rows, matchNo);
+
+  if (!fixture) return null;
+
+  const row = [...(rows[fixture.sheetRow - 1] || [])];
+  while (row.length <= fixture.columns.status) row.push('');
+  row[fixture.columns.status] = status;
+  rows[fixture.sheetRow - 1] = row;
+
+  await updateData('Fixtures!A:K', rows, { spreadsheetId });
+  clearCacheByPrefixes(['Fixtures']);
+  return fixture;
+}
+
+async function updateHFFixtureResult(matchNo, homeGoals, awayGoals) {
+  const spreadsheetId = getHFSpreadsheetId();
+  const rows = await getData('Fixtures!A:K', { spreadsheetId, cache: false });
+  const fixture = findHFFixtureRow(rows, matchNo);
+
+  if (!fixture) return null;
+
+  const row = [...(rows[fixture.sheetRow - 1] || [])];
+  const requiredColumns = [fixture.columns.homeGoals, fixture.columns.awayGoals, fixture.columns.status];
+  const resultColumn = fixture.columns.result;
+  if (resultColumn !== null) requiredColumns.push(resultColumn);
+  while (row.length <= Math.max(...requiredColumns)) row.push('');
+
+  row[fixture.columns.homeGoals] = String(homeGoals);
+  row[fixture.columns.awayGoals] = String(awayGoals);
+  if (resultColumn !== null) {
+    row[resultColumn] = homeGoals > awayGoals ? 'H' : homeGoals < awayGoals ? 'A' : 'D';
+  }
+  row[fixture.columns.status] = 'Played';
+  rows[fixture.sheetRow - 1] = row;
+
+  await updateData('Fixtures!A:K', rows, { spreadsheetId });
+  clearCacheByPrefixes(['Fixtures']);
+  return {
+    ...fixture,
+    homeGoals: String(homeGoals),
+    awayGoals: String(awayGoals),
+    status: 'Played',
+    played: true
+  };
+}
+
+async function clearHFFixtureResult(matchNo) {
+  const spreadsheetId = getHFSpreadsheetId();
+  const rows = await getData('Fixtures!A:K', { spreadsheetId, cache: false });
+  const fixture = findHFFixtureRow(rows, matchNo);
+
+  if (!fixture) return null;
+
+  const row = [...(rows[fixture.sheetRow - 1] || [])];
+  const requiredColumns = [fixture.columns.homeGoals, fixture.columns.awayGoals, fixture.columns.status];
+  if (fixture.columns.result !== null) requiredColumns.push(fixture.columns.result);
+  while (row.length <= Math.max(...requiredColumns)) row.push('');
+
+  row[fixture.columns.homeGoals] = '';
+  row[fixture.columns.awayGoals] = '';
+  row[fixture.columns.status] = '';
+  if (fixture.columns.result !== null) row[fixture.columns.result] = '';
+  rows[fixture.sheetRow - 1] = row;
+
+  await updateData('Fixtures!A:K', rows, { spreadsheetId });
+  clearCacheByPrefixes(['Fixtures']);
+  return fixture;
 }
 
 async function loadHandFootballData() {
@@ -517,6 +622,9 @@ async function isHFRegistrationOpen() {
 module.exports = {
   getHFSpreadsheetId,
   loadHandFootballData,
+  updateHFFixtureStatus,
+  updateHFFixtureResult,
+  clearHFFixtureResult,
   normalize,
   compactKey,
   cleanId,
