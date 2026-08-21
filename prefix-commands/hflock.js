@@ -16,7 +16,7 @@ module.exports = {
 
     try {
       const role = await setLocked(message.channel, true, `Locked by ${message.author.tag}`);
-      return message.reply(`${E.lock} <@&${role.id}> can no longer send messages in this channel.`);
+      return message.reply(`${E.lock} The configured HF lock role can no longer send messages here and is now non-mentionable.`);
     } catch (error) {
       return message.reply(`${E.wrong} ${error.message}`);
     }
