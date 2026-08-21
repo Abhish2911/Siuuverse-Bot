@@ -1,4 +1,6 @@
 const { PermissionFlagsBits } = require('discord.js');
+const mongoose = require('mongoose');
+const HFAnnouncementSchedule = require('../models/HFAnnouncementSchedule');
 
 const announcementTimers = new Map();
 
@@ -69,8 +71,7 @@ function scheduleAnnouncement(channel, scheduledAt, callback) {
   const previous = announcementTimers.get(key);
   if (previous) clearTimeout(previous);
 
-  const delay = scheduledAt.getTime() - Date.now();
-  if (delay <= 0) return false;
+  const delay = Math.max(0, scheduledAt.getTime() - Date.now());
 
   const timer = setTimeout(async () => {
     announcementTimers.delete(key);
@@ -83,6 +84,88 @@ function scheduleAnnouncement(channel, scheduledAt, callback) {
 
   announcementTimers.set(key, timer);
   return true;
+}
+
+function cancelScheduledAnnouncement(channelId) {
+  const timer = announcementTimers.get(channelId);
+  if (!timer) return false;
+
+  clearTimeout(timer);
+  announcementTimers.delete(channelId);
+  return true;
+}
+
+function hasAnnouncementPersistence() {
+  return mongoose.connection.readyState === 1;
+}
+
+async function getStoredAnnouncement(guildId, channelId) {
+  if (!hasAnnouncementPersistence()) return null;
+
+  return HFAnnouncementSchedule.findOne({ guildId, channelId });
+}
+
+async function saveStoredAnnouncement(data) {
+  if (!hasAnnouncementPersistence()) {
+    throw new Error('MongoDB is not connected, so this announcement cannot be saved.');
+  }
+
+  return HFAnnouncementSchedule.findOneAndUpdate(
+    { guildId: data.guildId, channelId: data.channelId },
+    { $set: data },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+}
+
+async function deleteStoredAnnouncement(guildId, channelId) {
+  if (!hasAnnouncementPersistence()) return false;
+
+  await HFAnnouncementSchedule.deleteOne({ guildId, channelId });
+  return true;
+}
+
+async function completeAnnouncement(channel, scheduledAt, roleIds) {
+  const allowedRoleIds = [...new Set((roleIds || []).filter(Boolean))];
+  const roleMentions = allowedRoleIds.map(roleId => `<@&${roleId}>`).join(' vs ');
+
+  await setLocked(channel, false, 'HandFootball announcement time reached');
+
+  if (roleMentions) {
+    await channel.send({
+      content: roleMentions,
+      allowedMentions: { roles: allowedRoleIds }
+    });
+  }
+
+  await channel.send(`🎮 Match announced for **${formatAnnouncementTime(scheduledAt)}**\n\nChannel Unlocked`);
+  await deleteStoredAnnouncement(channel.guild.id, channel.id);
+}
+
+function scheduleStoredAnnouncement(client, record) {
+  const guild = client.guilds.cache.get(record.guildId);
+  if (!guild) return false;
+
+  const channel = guild.channels.cache.get(record.channelId);
+  if (!channel || typeof channel.send !== 'function') return false;
+
+  return scheduleAnnouncement(channel, new Date(record.scheduledAt), async () => {
+    await completeAnnouncement(channel, new Date(record.scheduledAt), record.roleIds);
+  });
+}
+
+async function restoreStoredAnnouncements(client) {
+  if (!hasAnnouncementPersistence()) return 0;
+
+  const records = await HFAnnouncementSchedule.find({});
+  let restored = 0;
+
+  for (const record of records) {
+    if (scheduleStoredAnnouncement(client, record)) {
+      restored += 1;
+    }
+  }
+
+  return restored;
 }
 
 async function setLocked(channel, locked, reason) {
@@ -115,5 +198,13 @@ module.exports = {
   parseAnnouncementTime,
   formatAnnouncementTime,
   scheduleAnnouncement,
+  cancelScheduledAnnouncement,
+  hasAnnouncementPersistence,
+  getStoredAnnouncement,
+  saveStoredAnnouncement,
+  deleteStoredAnnouncement,
+  completeAnnouncement,
+  scheduleStoredAnnouncement,
+  restoreStoredAnnouncements,
   setLocked
 };

@@ -193,8 +193,8 @@ async function sendAuditLog(interaction, payload = {}) {
     const channel = await interaction.client.channels.fetch(channelId);
     if (!channel || typeof channel.send !== 'function') return false;
 
-    const actorTag = interaction?.user?.tag || 'Unknown User';
-    const actorId = interaction?.user?.id || 'Unknown ID';
+    const actorTag = interaction?.user?.tag || interaction?.author?.tag || 'Unknown User';
+    const actorId = interaction?.user?.id || interaction?.author?.id || 'Unknown ID';
     const guildName = interaction?.guild?.name || 'Unknown';
     const extraFields = Array.isArray(payload.fields) ? payload.fields.filter(Boolean) : [];
 
