@@ -45,6 +45,12 @@ function extractMvpUserId(text) {
   return idMatch ? idMatch[0] : '';
 }
 
+function getMentionIds(users) {
+  if (!users) return [];
+  if (typeof users.map === 'function') return users.map(user => user?.id).filter(Boolean);
+  return Array.from(users.values?.() || users).map(user => user?.id).filter(Boolean);
+}
+
 function extractRating(text) {
   const match = String(text || '').match(/\((\d+(?:\.\d+)?)\s*\/\s*10\)/);
   return match ? match[1] : '';
@@ -57,7 +63,10 @@ async function getReferenceContext(message) {
 
   const targetMessage = await message.fetchReference().catch(() => null);
   const text = collectMessageText(targetMessage);
-  const userId = extractMvpUserId(text) || targetMessage?.mentions?.users?.first()?.id || '';
+  // The submitter is commonly mentioned before the MOTM player in the embed.
+  // Prefer the final mention when the embed text cannot expose raw <@id> markup.
+  const mentionedUserIds = getMentionIds(targetMessage?.mentions?.users);
+  const userId = extractMvpUserId(text) || mentionedUserIds.at(-1) || '';
 
   return {
     text,
