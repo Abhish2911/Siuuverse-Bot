@@ -8,7 +8,7 @@ const {
   mentionUser
 } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
-const { getReferenceContext } = require('./setmvp');
+const { getReferenceContext, getExplicitCommandUserId } = require('./setmvp');
 const E = require('../utils/emojis');
 
 module.exports = {
@@ -20,7 +20,7 @@ module.exports = {
       return message.reply(`${E.wrong} Only the configured HandFootball result submitter role can use \.unsetmvp\.`);
     }
 
-    const directUserId = getMentionedUserId(message) || getFirstIdArg(args);
+    const directUserId = getExplicitCommandUserId(message) || getFirstIdArg(args);
     const reference = directUserId ? null : await getReferenceContext(message);
     const userId = directUserId || reference?.userId;
     if (!userId) {

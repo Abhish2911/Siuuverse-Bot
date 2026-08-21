@@ -57,6 +57,13 @@ function getMentionIds(users) {
   return Array.from(users.values?.() || users).map(user => user?.id).filter(Boolean);
 }
 
+function getExplicitCommandUserId(message) {
+  const repliedUserId = message.mentions?.repliedUser?.id;
+  const explicitUser = Array.from(message.mentions?.users?.values?.() || [])
+    .find(user => user.id !== repliedUserId);
+  return explicitUser?.id || '';
+}
+
 function extractRating(text) {
   const match = String(text || '').match(/\((\d+(?:\.\d+)?)\s*\/\s*10\)/);
   return match ? match[1] : '';
@@ -104,7 +111,7 @@ module.exports = {
       return message.reply(`${E.wrong} Only the configured HandFootball result submitter role can use \`.setmvp\`.`);
     }
 
-    const directUserId = getMentionedUserId(message) || getFirstIdArg(args);
+    const directUserId = getExplicitCommandUserId(message) || getFirstIdArg(args);
     const reference = directUserId ? null : await getReferenceContext(message);
     const userId = directUserId || reference?.userId;
 
@@ -137,3 +144,4 @@ module.exports = {
 };
 
 module.exports.getReferenceContext = getReferenceContext;
+module.exports.getExplicitCommandUserId = getExplicitCommandUserId;
