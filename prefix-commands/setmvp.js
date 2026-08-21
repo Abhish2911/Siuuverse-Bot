@@ -20,6 +20,7 @@ function collectMessageText(targetMessage) {
   }
 
   for (const embed of targetMessage?.embeds || []) {
+    if (embed.author?.name) parts.push(embed.author.name);
     if (embed.title) parts.push(embed.title);
     if (embed.description) parts.push(embed.description);
 
@@ -62,11 +63,14 @@ function extractRating(text) {
 }
 
 async function getReferenceContext(message) {
-  if (!message.reference?.messageId) {
+  const referenceId = message.reference?.messageId || message.reference?.message_id;
+  if (!referenceId) {
     return { text: '', userId: '', rating: '' };
   }
 
-  const targetMessage = await message.fetchReference().catch(() => null);
+  const targetMessage = await message.fetchReference().catch(() => (
+    message.channel?.messages?.fetch(referenceId).catch(() => null)
+  ));
   const text = collectMessageText(targetMessage);
   // The submitter is commonly mentioned before the MOTM player in the embed.
   // Prefer the final mention when the embed text cannot expose raw <@id> markup.
@@ -131,3 +135,5 @@ module.exports = {
     return message.reply(`${E.mvp} MVP updated for ${playerText}${ratingText}.`);
   }
 };
+
+module.exports.getReferenceContext = getReferenceContext;
