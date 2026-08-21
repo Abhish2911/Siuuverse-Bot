@@ -10,6 +10,21 @@ function getConfiguredLockRoleId() {
   ).replace(/[<@&>]/g, '').trim();
 }
 
+function getConfiguredResultRoleIds() {
+  return [
+    ...String(process.env.HF_RESULT_ROLE_ID || '').split(','),
+    ...String(process.env.HF_RESULT_ROLE_IDS || '').split(',')
+  ].map(value => value.replace(/[<@&>]/g, '').trim()).filter(Boolean);
+}
+
+function canManageHFChannel(message) {
+  const resultRoleIds = getConfiguredResultRoleIds();
+  const hasResultRole = resultRoleIds.some(roleId => message.member?.roles?.cache?.has(roleId));
+  const canManageChannel = message.member?.permissions?.has(PermissionFlagsBits.ManageChannels);
+
+  return hasResultRole && canManageChannel;
+}
+
 function parseAnnouncementTime(value, now = new Date()) {
   const input = String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
   let match = input.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/);
@@ -93,6 +108,8 @@ async function setLocked(channel, locked, reason) {
 
 module.exports = {
   getConfiguredLockRoleId,
+  getConfiguredResultRoleIds,
+  canManageHFChannel,
   parseAnnouncementTime,
   formatAnnouncementTime,
   scheduleAnnouncement,
