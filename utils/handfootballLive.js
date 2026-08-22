@@ -59,7 +59,7 @@ function signed(value) {
 }
 
 function topList(rows, label, valueGetter) {
-  const list = rows
+  const rankedRows = rows
     .map(row => ({
       ...row,
       value: valueGetter(row.stats)
@@ -69,8 +69,17 @@ function topList(rows, label, valueGetter) {
       if (right.value !== left.value) return right.value - left.value;
       return left.name.localeCompare(right.name);
     })
-    .slice(0, 5)
-    .map((row, index) => `${index + 1}. **${row.name}** - **${row.value}**`)
+    .slice(0, 5);
+
+  const nameWidth = Math.max(...rankedRows.map(row => String(row.name).length), 1);
+  const valueWidth = Math.max(...rankedRows.map(row => String(row.value).length), 1);
+  const list = rankedRows
+    .map((row, index) => {
+      const rank = `${index + 1}.`.padEnd(3, ' ');
+      const name = String(row.name).padEnd(nameWidth, ' ');
+      const value = String(row.value).padStart(valueWidth, ' ');
+      return `\`${rank} ${name}  ${value}\``;
+    })
     .join('\n');
 
   return list || `No ${label} yet.`;
