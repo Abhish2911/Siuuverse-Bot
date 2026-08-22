@@ -154,10 +154,14 @@ async function buildLeaderboardPayload({ statInput, page = 0, ownerId }) {
   const currentPage = Math.max(0, Math.min(Number(page) || 0, totalPages - 1));
   const start = currentPage * PER_PAGE;
   const pageRows = ranked.slice(start, start + PER_PAGE);
+  const playerWidth = Math.max(...pageRows.map(row => String(row.player?.player || 'Unknown Player').length), 1);
+  const valueWidth = Math.max(...pageRows.map(row => String(row.value).length), 1);
   const lines = pageRows.map((row, index) => {
     const playerName = row.player?.player || 'Unknown Player';
     const rank = start + index + 1;
-    return `**#${rank}** ${playerName} ${mentionUser(row.stats.userId)} — **${row.value}**`;
+    const name = playerName.padEnd(playerWidth, ' ');
+    const value = String(row.value).padStart(valueWidth, ' ');
+    return `\`#${String(rank).padEnd(2, ' ')} ${name}  ${value}\` ${mentionUser(row.stats.userId)}`;
   });
 
   const embed = new EmbedBuilder()
