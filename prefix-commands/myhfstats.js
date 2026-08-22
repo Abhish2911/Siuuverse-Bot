@@ -16,6 +16,7 @@ const ZERO_STATS = {
   goals: 0,
   assists: 0,
   mvps: 0,
+  hattricks: 0,
   interceptions: 0,
   tackles: 0,
   saves: 0
@@ -28,6 +29,26 @@ function safeEmoji(value, fallback = '') {
 function toNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function calculatePerformanceRating(stats) {
+  const matches = toNumber(stats.matches);
+  if (matches <= 0) return 0;
+
+  const performancePoints =
+    toNumber(stats.goals) * 4 +
+    toNumber(stats.assists) * 3 +
+    toNumber(stats.hattricks) * 2 +
+    toNumber(stats.mvps) * 3 +
+    toNumber(stats.interceptions) +
+    toNumber(stats.tackles) +
+    toNumber(stats.saves);
+
+  return Math.min(10, Math.max(0, Number((3 + (performancePoints / matches) * 0.8).toFixed(2))));
+}
+
+function buildStatLine(emoji, label, value) {
+  return `${emoji || '•'} ${label.padEnd(16, ' ')} ${String(value).padStart(3, ' ')}`;
 }
 
 function resolvePlayer(data, message, args) {
@@ -82,69 +103,37 @@ module.exports = {
 
     const goals = toNumber(stats.goals);
     const assists = toNumber(stats.assists);
-    const ga = goals + assists;
+    const rating = calculatePerformanceRating(stats);
     const avatarUrl = await getAvatarUrl(client, player.userId, message.author);
     const leagueName = process.env.HF_LEAGUE_NAME || 'Siuuverse HandFootball League';
 
     const embed = new EmbedBuilder()
-      .setTitle(`${safeEmoji(E.profile, 'Profile')} ${player.team} Profile`)
+      .setTitle(`${safeEmoji(E.profile, '👤')} ${player.player}'s Player Stats`)
       .setDescription(
-        `**PLAYER CARD: ${player.player.toUpperCase()}**\n` +
-        `Tournament: **${leagueName}**`
+        `**Period:** Current Season\n` +
+        `**Tournament:** ${leagueName}\n\n` +
+        `**Performance Breakdown**\n` +
+        '```\n' +
+        [
+          buildStatLine(safeEmoji(E.goal, '⚽'), 'Goals:', goals),
+          buildStatLine(safeEmoji(E.assist, '🎯'), 'Assists:', assists),
+          buildStatLine(safeEmoji(E.interception, '🧠'), 'Interceptions:', toNumber(stats.interceptions)),
+          buildStatLine(safeEmoji(E.tackle, '🛡️'), 'Tackles:', toNumber(stats.tackles)),
+          buildStatLine(safeEmoji(E.save, '🧤'), 'Saves:', toNumber(stats.saves)),
+          buildStatLine(safeEmoji(E.trophy, '🎩'), 'Hattricks:', toNumber(stats.hattricks)),
+          buildStatLine(safeEmoji(E.mvp, '⭐'), 'MVPs:', toNumber(stats.mvps)),
+          buildStatLine(safeEmoji(E.played, '📊'), 'Matches:', toNumber(stats.matches)),
+          buildStatLine('⭐', 'Rating:', `${rating}/10`)
+        ].join('\n') +
+        '\n```'
       )
       .setColor(0xF1C40F)
       .setThumbnail(avatarUrl)
-      .addFields(
-        {
-          name: 'Player Info',
-          value: [
-            `User: ${mentionUser(player.userId)}`,
-            `Team: **${player.team}**`,
-            `Captain: **${player.isCaptain ? 'Yes' : 'No'}**`
-          ].join('\n'),
-          inline: false
-        },
-        {
-          name: `${safeEmoji(E.played, 'Matches')} Matches Played`,
-          value: String(toNumber(stats.matches)),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.goal, 'Goals')} Goals`,
-          value: String(goals),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.assist, 'Assists')} Assists`,
-          value: String(assists),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.mvp, 'MVPs')} MVPs`,
-          value: String(toNumber(stats.mvps)),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.save, 'Saves')} Saves`,
-          value: String(toNumber(stats.saves)),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.tackle, 'Tackles')} Tackles`,
-          value: String(toNumber(stats.tackles)),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.interception, 'Interceptions')} Interceptions`,
-          value: String(toNumber(stats.interceptions)),
-          inline: true
-        },
-        {
-          name: `${safeEmoji(E.fire, 'G+A')} G+A`,
-          value: String(ga),
-          inline: true
-        }
-      )
+      .addFields({
+        name: 'Player',
+        value: `${mentionUser(player.userId)}${player.isCaptain ? ` • ${safeEmoji(E.captain, '👑')} Captain` : ''}`,
+        inline: false
+      })
       .setFooter({
         text: `${message.author.username} • HandFootball stats`
       })
@@ -153,3 +142,5 @@ module.exports = {
     return message.reply({ embeds: [embed] });
   }
 };
+
+module.exports.calculatePerformanceRating = calculatePerformanceRating;

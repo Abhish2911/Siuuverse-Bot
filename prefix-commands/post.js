@@ -78,7 +78,7 @@ async function sendFixturePost(message, content, roleIds) {
     };
 
     if (index === 0) {
-      await message.reply(payload);
+      await message.channel.send(payload);
     } else {
       await message.channel.send(payload);
     }

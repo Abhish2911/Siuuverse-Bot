@@ -46,6 +46,12 @@ const STAT_DEFS = {
     aliases: ['mvp', 'motm', 'manofthematch'],
     value: stats => toNumber(stats.mvps)
   },
+  hattricks: {
+    label: 'Hattricks',
+    emoji: E.trophy,
+    aliases: ['hattrick', 'hat-tricks', 'hat-trick'],
+    value: stats => toNumber(stats.hattricks)
+  },
   saves: {
     label: 'Saves',
     emoji: E.save,
@@ -150,9 +156,8 @@ async function buildLeaderboardPayload({ statInput, page = 0, ownerId }) {
   const pageRows = ranked.slice(start, start + PER_PAGE);
   const lines = pageRows.map((row, index) => {
     const playerName = row.player?.player || 'Unknown Player';
-    const teamName = row.player?.team || 'No Team';
     const rank = start + index + 1;
-    return `**#${rank}** ${playerName} (${teamName}) ${mentionUser(row.stats.userId)} — **${row.value}**`;
+    return `**#${rank}** ${playerName} ${mentionUser(row.stats.userId)} — **${row.value}**`;
   });
 
   const embed = new EmbedBuilder()

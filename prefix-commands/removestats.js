@@ -1,6 +1,7 @@
 const TournamentStats = require('../models/TournamentStats');
 const { canSubmitHFResult } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
+const { deleteStatsSummaryDMs } = require('../utils/hfStatsSummary');
 const E = require('../utils/emojis');
 
 const STAT_PATTERN = /(^|[^\d])(\d{5,25})\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
@@ -9,6 +10,7 @@ const STAT_FIELDS = [
   'matches',
   'goals',
   'assists',
+  'hattricks',
   'interceptions',
   'tackles',
   'saves'
@@ -46,8 +48,8 @@ function getInlineStatsText(message) {
 }
 
 async function getStatsText(message) {
-  if (message.reference?.messageId) {
-    const targetMessage = await message.fetchReference().catch(() => null);
+  const targetMessage = await getReferencedMessage(message);
+  if (targetMessage) {
     const targetText = collectMessageText(targetMessage).trim();
 
     if (targetText) {
@@ -56,6 +58,14 @@ async function getStatsText(message) {
   }
 
   return getInlineStatsText(message);
+}
+
+async function getReferencedMessage(message) {
+  const referenceId = message.reference?.messageId || message.reference?.message_id;
+  if (!referenceId) return null;
+  return message.fetchReference().catch(() => (
+    message.channel?.messages?.fetch(referenceId).catch(() => null)
+  ));
 }
 
 function toStatNumber(value) {
@@ -142,9 +152,23 @@ module.exports = {
 
     await TournamentStats.bulkWrite(operations, { ordered: false });
 
+    const sourceMessage = await getReferencedMessage(message);
+    const deletedSummaryCount = await deleteStatsSummaryDMs(
+      message,
+      sourceMessage?.id || message.reference?.messageId || message.reference?.message_id
+    ).catch(error => {
+      console.error('❌ Failed to delete HF stats summary DMs:', error);
+      return 0;
+    });
+
     refreshAllHFLiveMessages(message.client, 'stats')
       .catch(error => console.error('HF live stats refresh after .rs failed:', error));
 
-    return message.reply(`${E.correct} Stats removed for **${operations.length}** player${operations.length === 1 ? '' : 's'}.`);
+    return message.reply(
+      `${E.correct} Stats removed for **${operations.length}** player${operations.length === 1 ? '' : 's'}.` +
+      (deletedSummaryCount ? ` Deleted ${deletedSummaryCount} summary DM${deletedSummaryCount === 1 ? '' : 's'}.` : '')
+    );
   }
 };
+
+module.exports.getReferencedMessage = getReferencedMessage;

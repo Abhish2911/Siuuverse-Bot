@@ -75,12 +75,14 @@ function parseRawStats(text) {
       matches: 1,
       goals: 0,
       assists: 0,
+      hattricks: 0,
       interceptions: 0,
       tackles: 0,
       saves: 0
     };
 
     current.goals += toStatNumber(match[3]);
+    current.hattricks = current.goals >= 3 ? 1 : 0;
     current.assists += toStatNumber(match[4]);
     current.interceptions += toStatNumber(match[5]);
     current.tackles += toStatNumber(match[6]);
@@ -120,6 +122,7 @@ module.exports = {
               matches: row.matches,
               goals: row.goals,
               assists: row.assists,
+              hattricks: row.hattricks,
               interceptions: row.interceptions,
               tackles: row.tackles,
               saves: row.saves
