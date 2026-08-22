@@ -82,7 +82,7 @@ async function getAvatarUrl(client, userId, fallbackUser) {
 
 module.exports = {
   name: 'myhfstats',
-  aliases: ['hfstats', 'hfprofile'],
+  aliases: ['hfstats', 'hfprofile', 'mystats'],
 
   async execute(message, args, client) {
     const data = await loadHandFootballData();
