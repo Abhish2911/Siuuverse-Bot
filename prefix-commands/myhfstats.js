@@ -35,20 +35,26 @@ function calculatePerformanceRating(stats) {
   const matches = toNumber(stats.matches);
   if (matches <= 0) return 0;
 
-  const performancePoints =
+  const attackingPoints =
     toNumber(stats.goals) * 4 +
     toNumber(stats.assists) * 3 +
     toNumber(stats.hattricks) * 2 +
-    toNumber(stats.mvps) * 3 +
+    toNumber(stats.mvps) * 3;
+  const defensivePoints =
     toNumber(stats.interceptions) +
     toNumber(stats.tackles) +
     toNumber(stats.saves);
 
-  return Math.min(10, Math.max(0, Number((3 + (performancePoints / matches) * 0.8).toFixed(2))));
+  const rating = 3 +
+    (attackingPoints / matches) * 0.6 +
+    (defensivePoints / matches) * 0.9;
+
+  return Math.min(10, Math.max(0, Number(rating.toFixed(2))));
 }
 
 function buildStatLine(emoji, label, value) {
-  return `${emoji || '•'} ${label.padEnd(16, ' ')} ${String(value).padStart(3, ' ')}`;
+  const spacing = '\u00a0';
+  return `${emoji || '•'} ${label.padEnd(16, spacing)}${String(value).padStart(3, spacing)}`;
 }
 
 function resolvePlayer(data, message, args) {
@@ -113,7 +119,6 @@ module.exports = {
         `**Period:** Current Season\n` +
         `**Tournament:** ${leagueName}\n\n` +
         `**Performance Breakdown**\n` +
-        '```\n' +
         [
           buildStatLine(safeEmoji(E.goal, '⚽'), 'Goals:', goals),
           buildStatLine(safeEmoji(E.assist, '🎯'), 'Assists:', assists),
@@ -124,8 +129,7 @@ module.exports = {
           buildStatLine(safeEmoji(E.mvp, '⭐'), 'MVPs:', toNumber(stats.mvps)),
           buildStatLine(safeEmoji(E.played, '📊'), 'Matches:', toNumber(stats.matches)),
           buildStatLine('⭐', 'Rating:', `${rating}/10`)
-        ].join('\n') +
-        '\n```'
+        ].join('\n')
       )
       .setColor(0xF1C40F)
       .setThumbnail(avatarUrl)
