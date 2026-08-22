@@ -54,7 +54,7 @@ function calculatePerformanceRating(stats) {
 
 function buildStatLine(emoji, label, value) {
   const spacing = '\u00a0';
-  return `${emoji || '•'} ${label.padEnd(16, spacing)}${String(value).padStart(3, spacing)}`;
+  return `${emoji || '•'} \`${label.padEnd(16, spacing)}${String(value).padStart(5, spacing)}\``;
 }
 
 function resolvePlayer(data, message, args) {
