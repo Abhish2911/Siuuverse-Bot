@@ -6,6 +6,7 @@ const { findPlayerByUserId, loadHandFootballData } = require('./handfootball');
 const STAT_FIELDS = [
   ['goals', E.goal, 'Goals'],
   ['assists', E.assist, 'Assists'],
+  ['hattricks', E.trophy, 'Hattricks'],
   ['interceptions', E.interception, 'Interceptions'],
   ['tackles', E.tackle, 'Tackles'],
   ['saves', E.save, 'Saves'],
