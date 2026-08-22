@@ -118,6 +118,7 @@ module.exports = {
       .setDescription(
         `**Period:** Current Season\n` +
         `**Tournament:** ${leagueName}\n\n` +
+        `**Team:** ${player.team}\n\n` +
         `**Performance Breakdown**\n` +
         [
           buildStatLine(safeEmoji(E.goal, '⚽'), 'Goals:', goals),
