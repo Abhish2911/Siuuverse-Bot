@@ -7,6 +7,7 @@ const {
 } = require('discord.js');
 const TournamentStats = require('../models/TournamentStats');
 const E = require('../utils/emojis');
+const { calculatePerformanceRating } = require('../utils/hfStatsRating');
 const {
   loadHandFootballData,
   findPlayerByUserId,
@@ -51,6 +52,12 @@ const STAT_DEFS = {
     emoji: E.trophy,
     aliases: ['hattrick', 'hat-tricks', 'hat-trick'],
     value: stats => toNumber(stats.hattricks)
+  },
+  rating: {
+    label: 'Rating',
+    emoji: '⭐',
+    aliases: ['ratings', 'rate', 'rtg'],
+    value: stats => calculatePerformanceRating(stats)
   },
   saves: {
     label: 'Saves',
