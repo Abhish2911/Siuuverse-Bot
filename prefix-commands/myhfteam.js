@@ -80,7 +80,7 @@ function resolveTeam(data, message, args) {
 
 module.exports = {
   name: 'myhfteam',
-  aliases: ['hfteam', 'hfsquad'],
+  aliases: ['hfteam', 'hfsquad', 'myteam'],
 
   async execute(message, args) {
     const data = await loadHandFootballData();
