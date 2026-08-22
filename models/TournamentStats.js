@@ -31,6 +31,11 @@ module.exports = mongoose.model(
       default: 0
     },
 
+    hattricks: {
+      type: Number,
+      default: 0
+    },
+
     interceptions: {
       type: Number,
       default: 0
