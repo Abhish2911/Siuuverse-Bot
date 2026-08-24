@@ -1,6 +1,7 @@
 const {
   findPlayerByName,
   findPlayerByUserId,
+  findTeamMeta,
   getFirstIdArg,
   getMentionedUserId,
   isBotOwner,
@@ -50,8 +51,26 @@ module.exports = {
 
     await removeHFPlayer(player.userId);
 
+    // Remove the Discord team role at the same time as the sheet entry so a
+    // later sync does not depend on the member already being cached.
+    let teamRoleRemoved = false;
+    let teamRoleRemovalFailed = false;
+    const teamRoleId = findTeamMeta(data.teams, player.team).roleId;
+    if (teamRoleId) {
+      const member = await message.guild.members.fetch(player.userId).catch(() => null);
+      if (member?.roles.cache.has(teamRoleId)) {
+        try {
+          await member.roles.remove(teamRoleId, 'HandFootball player removed');
+          teamRoleRemoved = true;
+        } catch (error) {
+          teamRoleRemovalFailed = true;
+          console.error(`HF team role removal failed for ${player.userId}:`, error);
+        }
+      }
+    }
+
     return message.reply(
-      `${E.correct} Removed **${player.player}** (<@${player.userId}>) from **${player.team}**.`
+      `${E.correct} Removed **${player.player}** (<@${player.userId}>) from **${player.team}**${teamRoleRemoved ? ' and removed their team role' : teamRoleRemovalFailed ? ', but I could not remove their team role' : ''}.`
     );
   }
 };

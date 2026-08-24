@@ -132,7 +132,13 @@ module.exports = {
         .setTitle(`${E.loading || '⏳'} HF Role Sync In Progress`)
         .setDescription(`${E.loading || '⏳'} Scanning team roles for removed players...`)
         .setTimestamp()]
-    }).catch(() => null);
+      }).catch(() => null);
+
+    // Populate the member cache before reading role.members. Without this,
+    // members who have not interacted recently can be missed by the scan.
+    await message.guild.members.fetch().catch(error => {
+      console.error('HF role sync member cache fetch failed:', error);
+    });
 
     for (const roleId of knownTeamRoleIds) {
       const role = message.guild.roles.cache.get(roleId)
