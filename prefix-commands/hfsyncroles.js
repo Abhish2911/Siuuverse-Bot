@@ -33,6 +33,16 @@ module.exports = {
       failed: 0
     };
 
+    // Keep the roster keyed by role so we can also detect members that are
+    // still in Discord's team role but have been removed from the sheet.
+    const expectedUserIdsByRole = new Map();
+    for (const player of data.players) {
+      const roleId = findTeamMeta(data.teams, player.team).roleId;
+      if (!roleId) continue;
+      if (!expectedUserIdsByRole.has(roleId)) expectedUserIdsByRole.set(roleId, new Set());
+      expectedUserIdsByRole.get(roleId).add(player.userId);
+    }
+
     if (!knownTeamRoleIds.size && !tournamentRoleId) {
       return message.reply(`${E.missing} No team Role IDs or Tournament Role ID were found in the sheets.`);
     }
@@ -113,6 +123,34 @@ module.exports = {
 
       completed += 1;
       if (completed % 3 === 0 || completed === total) await updateProgress();
+    }
+
+    // A player removed from Team_Data is absent from the loop above. Scan the
+    // actual Discord team roles so those stale assignments are removed too.
+    await progressMessage.edit({
+      embeds: [new EmbedBuilder()
+        .setTitle(`${E.loading || '⏳'} HF Role Sync In Progress`)
+        .setDescription(`${E.loading || '⏳'} Scanning team roles for removed players...`)
+        .setTimestamp()]
+    }).catch(() => null);
+
+    for (const roleId of knownTeamRoleIds) {
+      const role = message.guild.roles.cache.get(roleId)
+        || await message.guild.roles.fetch(roleId).catch(() => null);
+      if (!role) continue;
+
+      const expectedUserIds = expectedUserIdsByRole.get(roleId) || new Set();
+      for (const member of role.members.values()) {
+        if (expectedUserIds.has(member.id) || !member.roles.cache.has(roleId)) continue;
+
+        try {
+          await member.roles.remove(roleId, 'HandFootball role sync - removed from sheet');
+          summary.removed += 1;
+        } catch (error) {
+          summary.failed += 1;
+          console.error(`HF stale role removal failed for ${member.id}:`, error);
+        }
+      }
     }
 
     return progressMessage.edit({
