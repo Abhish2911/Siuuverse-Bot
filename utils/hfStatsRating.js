@@ -20,13 +20,13 @@ function calculatePerformanceRating(stats = {}, options = {}) {
   // inflate a player's rating. Defensive actions are intentionally worth
   // less than goals, assists and MVPs because they occur more frequently.
   const impact =
-    toNumber(stats.goals) * 2.2 +
-    toNumber(stats.assists) * 1.7 +
-    toNumber(stats.hattricks) * 1.7 +
-    toNumber(stats.mvps) * 2.5 +
-    toNumber(stats.interceptions) * 0.75 +
-    toNumber(stats.tackles) * 0.60 +
-    toNumber(stats.saves) * 0.7;
+    toNumber(stats.goals) * 2.4 +
+    toNumber(stats.assists) * 2.0 +
+    toNumber(stats.hattricks) * 2.0 +
+    toNumber(stats.mvps) * 2.7 +
+    toNumber(stats.interceptions) * 0.95 +
+    toNumber(stats.tackles) * 0.80 +
+    toNumber(stats.saves) * 0.9;
   const impactPerMatch = Math.max(0, impact / matches);
 
   // Diminishing returns keep the middle of the scale useful instead of
