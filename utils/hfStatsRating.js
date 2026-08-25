@@ -31,7 +31,9 @@ function calculatePerformanceRating(stats = {}, options = {}) {
 
   // Diminishing returns keep the middle of the scale useful instead of
   // allowing a few high-volume stats to push most players straight to 10.
-  const performanceRating = 6 + 3.5 * (1 - Math.exp(-impactPerMatch / 5));
+  // Use a wider scoring span so genuinely strong performances separate from
+  // the neutral range instead of clustering most players around 7.x.
+  const performanceRating = 6 + 4.5 * (1 - Math.exp(-impactPerMatch / 5));
 
   // Per-match production alone is too noisy for players with only one game.
   // Shrink early ratings toward the neutral baseline until more matches are
