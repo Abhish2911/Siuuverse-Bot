@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const TournamentStats = require('../models/TournamentStats');
 const E = require('../utils/emojis');
-const { calculatePerformanceRating } = require('../utils/hfStatsRating');
+const { calculatePerformanceRating, getPlayedMatchdayCount } = require('../utils/hfStatsRating');
 const {
   loadHandFootballData,
   findPlayerByUserId,
@@ -89,7 +89,9 @@ module.exports = {
 
     const goals = toNumber(stats.goals);
     const assists = toNumber(stats.assists);
-    const rating = calculatePerformanceRating(stats);
+    const rating = calculatePerformanceRating(stats, {
+      expectedMatches: getPlayedMatchdayCount(data.fixtures)
+    });
     const avatarUrl = await getAvatarUrl(client, player.userId, message.author);
     const leagueName = process.env.HF_LEAGUE_NAME || 'Siuuverse HandFootball League';
 

@@ -7,7 +7,7 @@ const {
 } = require('discord.js');
 const TournamentStats = require('../models/TournamentStats');
 const E = require('../utils/emojis');
-const { calculatePerformanceRating } = require('../utils/hfStatsRating');
+const { calculatePerformanceRating, getPlayedMatchdayCount } = require('../utils/hfStatsRating');
 const {
   loadHandFootballData,
   findPlayerByUserId,
@@ -136,12 +136,15 @@ async function buildLeaderboardPayload({ statInput, page = 0, ownerId }) {
     loadHandFootballData(),
     TournamentStats.find({}).lean()
   ]);
+  const expectedMatches = getPlayedMatchdayCount(data.fixtures);
 
   const ranked = statsRows
     .map(stats => ({
       stats,
       player: findPlayerByUserId(data.players, stats.userId),
-      value: stat.value(stats)
+      value: stat.key === 'rating'
+        ? calculatePerformanceRating(stats, { expectedMatches })
+        : stat.value(stats)
     }))
     .filter(row => row.value > 0)
     .sort((left, right) => {
