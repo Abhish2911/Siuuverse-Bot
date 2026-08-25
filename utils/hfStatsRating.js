@@ -3,7 +3,16 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function calculatePerformanceRating(stats = {}) {
+function getPlayedMatchdayCount(fixtures = []) {
+  return new Set(
+    fixtures
+      .filter(fixture => fixture?.played)
+      .map(fixture => String(fixture.matchday || fixture.matchNo || '').trim())
+      .filter(Boolean)
+  ).size;
+}
+
+function calculatePerformanceRating(stats = {}, options = {}) {
   const matches = toNumber(stats.matches);
   if (matches <= 0) return 0;
 
@@ -22,7 +31,20 @@ function calculatePerformanceRating(stats = {}) {
 
   // Diminishing returns keep the middle of the scale useful instead of
   // allowing a few high-volume stats to push most players straight to 10.
-  const rating = 6 + 3.5 * (1 - Math.exp(-impactPerMatch / 5));
+  const performanceRating = 6 + 3.5 * (1 - Math.exp(-impactPerMatch / 5));
+
+  // Per-match production alone is too noisy for players with only one game.
+  // Shrink early ratings toward the neutral baseline until more matches are
+  // available. The base prior gives 1 match 33% confidence, 3 matches 60%,
+  // and 5 matches 71%; completed matchdays add a participation factor so a
+  // player who has missed most of the season is penalized further.
+  const baseConfidence = matches / (matches + 2);
+  const expectedMatches = toNumber(options.expectedMatches);
+  const participationConfidence = expectedMatches > 0
+    ? Math.min(1, matches / expectedMatches)
+    : 1;
+  const sampleConfidence = baseConfidence * participationConfidence;
+  const rating = 6 + (performanceRating - 6) * sampleConfidence;
 
   // A perfect score requires both exceptional production and a meaningful
   // sample size. The normal curve tops out below 10 by design.
@@ -31,7 +53,7 @@ function calculatePerformanceRating(stats = {}) {
 
   if (perfectScore) return 10;
 
-  return Math.min(10, Math.max(0, Number((rating + eliteBonus).toFixed(2))));
+  return Math.min(10, Math.max(0, Number((rating + eliteBonus * sampleConfidence).toFixed(2))));
 }
 
-module.exports = { calculatePerformanceRating };
+module.exports = { calculatePerformanceRating, getPlayedMatchdayCount };
