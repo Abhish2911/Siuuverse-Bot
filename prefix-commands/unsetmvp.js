@@ -31,10 +31,16 @@ module.exports = {
       { userId, mvps: { $gt: 0 } },
       { $inc: { mvps: -1 } },
       { returnDocument: 'after' }
-    ).lean();
+    );
 
     if (!updated) {
       return message.reply(`${E.warning} No MVP was recorded for ${mentionUser(userId)}.`);
+    }
+
+    if (updated.matchHistory?.length) {
+      const latest = updated.matchHistory[updated.matchHistory.length - 1];
+      latest.mvps = Math.max(0, (Number(latest.mvps) || 0) - 1);
+      await updated.save();
     }
 
     refreshAllHFLiveMessages(message.client, 'stats')

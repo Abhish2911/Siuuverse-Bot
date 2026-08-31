@@ -85,12 +85,14 @@ function parseRawStats(text) {
       matches: 1,
       goals: 0,
       assists: 0,
+      hattricks: 0,
       interceptions: 0,
       tackles: 0,
       saves: 0
     };
 
     current.goals += toStatNumber(match[3]);
+    current.hattricks = current.goals >= 3 ? 1 : 0;
     current.assists += toStatNumber(match[4]);
     current.interceptions += toStatNumber(match[5]);
     current.tackles += toStatNumber(match[6]);
@@ -110,6 +112,17 @@ function subtractStats(existingStats, row) {
     nextStats[field] = Math.max(0, currentValue - removeValue);
     return nextStats;
   }, {});
+}
+
+function removeLatestHistoryEntry(history = [], row = {}) {
+  const nextHistory = [...history];
+  const fields = ['matches', 'goals', 'assists', 'hattricks', 'interceptions', 'tackles', 'saves'];
+  const index = nextHistory.findLastIndex(entry => fields.every(field => (
+    Number(entry?.[field]) || 0
+  ) === (Number(row?.[field]) || 0)));
+
+  if (index !== -1) nextHistory.splice(index, 1);
+  return nextHistory;
 }
 
 module.exports = {
@@ -141,7 +154,13 @@ module.exports = {
         updateOne: {
           filter: { userId: row.userId },
           update: {
-            $set: subtractStats(savedStatsByUser.get(row.userId), row)
+            $set: {
+              ...subtractStats(savedStatsByUser.get(row.userId), row),
+              matchHistory: removeLatestHistoryEntry(
+                savedStatsByUser.get(row.userId).matchHistory,
+                row
+              )
+            }
           }
         }
       }));
