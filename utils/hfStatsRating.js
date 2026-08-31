@@ -12,51 +12,21 @@ function getPlayedMatchdayCount(fixtures = []) {
   ).size;
 }
 
-function getRecentStats(stats = {}) {
-  const history = Array.isArray(stats.matchHistory)
-    ? stats.matchHistory.filter(match => match && toNumber(match.matches) > 0)
-    : [];
-
-  if (!history.length) return stats;
-
-  const recent = [...history]
-    .sort((left, right) => new Date(left.recordedAt || 0) - new Date(right.recordedAt || 0))
-    .slice(-5);
-
-  return recent.reduce((totals, match) => {
-    Object.keys(totals).forEach(field => {
-      totals[field] += toNumber(match[field]);
-    });
-    return totals;
-  }, {
-    matches: 0,
-    goals: 0,
-    assists: 0,
-    mvps: 0,
-    hattricks: 0,
-    interceptions: 0,
-    tackles: 0,
-    saves: 0
-  });
-}
-
 function calculatePerformanceRating(stats = {}, options = {}) {
-  const hasMatchHistory = Array.isArray(stats.matchHistory) && stats.matchHistory.length > 0;
-  const recentStats = getRecentStats(stats);
-  const matches = toNumber(recentStats.matches);
+  const matches = toNumber(stats.matches);
   if (matches <= 0) return 0;
 
   // Convert totals into per-match impact so playing more matches does not
   // inflate a player's rating. Defensive actions are intentionally worth
   // less than goals, assists and MVPs because they occur more frequently.
   const impact =
-    toNumber(recentStats.goals) * 2.4 +
-    toNumber(recentStats.assists) * 2.0 +
-    toNumber(recentStats.hattricks) * 2.0 +
-    toNumber(recentStats.mvps) * 2.7 +
-    toNumber(recentStats.interceptions) * 0.95 +
-    toNumber(recentStats.tackles) * 0.80 +
-    toNumber(recentStats.saves) * 0.9;
+    toNumber(stats.goals) * 2.4 +
+    toNumber(stats.assists) * 2.0 +
+    toNumber(stats.hattricks) * 2.0 +
+    toNumber(stats.mvps) * 2.7 +
+    toNumber(stats.interceptions) * 0.95 +
+    toNumber(stats.tackles) * 0.80 +
+    toNumber(stats.saves) * 0.9;
   const impactPerMatch = Math.max(0, impact / matches);
 
   // Diminishing returns keep the middle of the scale useful instead of
@@ -72,7 +42,7 @@ function calculatePerformanceRating(stats = {}, options = {}) {
   // player who has missed most of the season is penalized further.
   const baseConfidence = matches / (matches + 2);
   const expectedMatches = toNumber(options.expectedMatches);
-  const participationConfidence = !hasMatchHistory && expectedMatches > 0
+  const participationConfidence = expectedMatches > 0
     ? Math.min(1, matches / expectedMatches)
     : 1;
   const sampleConfidence = baseConfidence * participationConfidence;
