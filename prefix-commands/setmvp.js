@@ -131,14 +131,6 @@ module.exports = {
       }
     );
 
-    // Keep the latest match entry aligned with the aggregate MVP total so the
-    // rolling five-match rating includes MVP awards recorded after the result.
-    if (updated?.matchHistory?.length) {
-      const latest = updated.matchHistory[updated.matchHistory.length - 1];
-      latest.mvps = (Number(latest.mvps) || 0) + 1;
-      await updated.save();
-    }
-
     refreshAllHFLiveMessages(message.client, 'stats')
       .catch(error => console.error('HF live stats refresh after .setmvp failed:', error));
 

@@ -125,20 +125,7 @@ module.exports = {
               hattricks: row.hattricks,
               interceptions: row.interceptions,
               tackles: row.tackles,
-              saves: row.saves,
-              matchHistory: {
-                $each: [{
-                  recordedAt: new Date(),
-                  matches: row.matches,
-                  goals: row.goals,
-                  assists: row.assists,
-                  hattricks: row.hattricks,
-                  interceptions: row.interceptions,
-                  tackles: row.tackles,
-                  saves: row.saves
-                }],
-                $slice: -20
-              }
+              saves: row.saves
             }
           },
           upsert: true
