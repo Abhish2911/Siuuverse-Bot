@@ -54,7 +54,7 @@ const STAT_DEFS = {
     value: stats => toNumber(stats.hattricks)
   },
   rating: {
-    label: 'Last 5 Form Rating',
+    label: 'Rating',
     emoji: '⭐',
     aliases: ['ratings', 'rate', 'rtg'],
     value: stats => calculatePerformanceRating(stats)
