@@ -80,6 +80,7 @@ const penaltyRoyaleGameSchema = new mongoose.Schema({
   fakeShotActive: { type: Boolean, default: false },
   fakeShotDirection: { type: String, enum: ['', 'left', 'center', 'right'], default: '' },
   reboundArmedBy: { type: String, default: '' },
+  superSaveArmedBy: { type: String, default: '' },
   chaosMode: { type: String, enum: ['', 'golden', 'sudden', 'blind'], default: '' },
   chaosRound: { type: Number, default: 0 },
   roundDeadlineAt: { type: Date, default: null },
