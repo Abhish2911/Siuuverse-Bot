@@ -15,6 +15,19 @@ const DIRECTIONS = {
   right: 'Right'
 };
 
+// Keep the player-facing DM numbering explicit instead of deriving it from
+// object position: 1 is always Left, 2 Center, and 3 Right.
+const NUMBERED_DIRECTIONS = {
+  1: 'left',
+  2: 'center',
+  3: 'right'
+};
+const DIRECTION_NUMBERS = {
+  left: 1,
+  center: 2,
+  right: 3
+};
+
 const ABILITY_DEFS = {
   read: {
     label: 'Read',
@@ -1103,6 +1116,10 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
   // outside-the-embed corner GIF returned below.
   const resolvedShot = game.shot;
   const blindPenalty = chaosMode === 'blind';
+  const goalkeeperChoice = game.predictions.find(prediction => prediction.userId === goalkeeper.userId)?.choice;
+  const mainChoicesText = blindPenalty
+    ? ''
+    : `\n${mention(shooter.userId)}: **${DIRECTION_NUMBERS[resolvedShot] || '—'}** | ${mention(goalkeeper.userId)}: **${DIRECTION_NUMBERS[goalkeeperChoice] || '—'}**\n`;
   const predictorPointsText = correctPredictors.length
     ? ` ${correctPredictors.map(player => mention(player.userId)).join(', ')} earned **+1 Prediction Point**.`
     : '';
@@ -1113,12 +1130,12 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
     const savedShotText = blindPenalty
       ? `${E.prBlind} The shot corner stays hidden.`
       : `${mention(shooter.userId)} shot ${shotLabel}.`;
-    game.lastRoundSummary = `${E.save} **SAVED!** ${savedShotText} ${mention(goalkeeper.userId)} made the save and earned a shield.${predictorPointsText}${precisionText}${suddenDeath ? ` ${E.prSudden} Sudden Death eliminates ${mention(shooter.userId)}!` : shieldUsed ? ` ${E.prShield} A shield absorbed the life loss.` : lifeLost ? ` ${mention(shooter.userId)} loses ${E.prHeart}.` : ''}${reboundActivated ? ` ${E.prRebound} Rebound! The shooter gets another attempt.` : ''}`;
+    game.lastRoundSummary = `${E.save} **SAVED!** ${savedShotText} ${mention(goalkeeper.userId)} made the save and earned a shield.${mainChoicesText}${predictorPointsText}${precisionText}${suddenDeath ? ` ${E.prSudden} Sudden Death eliminates ${mention(shooter.userId)}!` : shieldUsed ? ` ${E.prShield} A shield absorbed the life loss.` : lifeLost ? ` ${mention(shooter.userId)} loses ${E.prHeart}.` : ''}${reboundActivated ? ` ${E.prRebound} Rebound! The shooter gets another attempt.` : ''}`;
   } else {
     const goalShotText = blindPenalty
       ? `${mention(shooter.userId)} scored, but the shot corner stays hidden.`
       : `${mention(shooter.userId)} scored ${shotLabel}`;
-    game.lastRoundSummary = `${E.goal} **GOAL!** ${goalShotText}${goalValue > 1 ? ' for **2 goals**' : ''}.${predictorPointsText}${precisionText}${rewardText}`;
+    game.lastRoundSummary = `${E.goal} **GOAL!** ${goalShotText}${goalValue > 1 ? ' for **2 goals**' : ''}.${mainChoicesText}${predictorPointsText}${precisionText}${rewardText}`;
   }
 
   game.roundHistory.push({
@@ -1346,14 +1363,14 @@ async function handlePenaltyRoyaleDm(client, message) {
       if (ability) {
         notice = useAbility(game, message.author.id, ability).notice;
       } else {
-        const direction = ['left', 'center', 'right'][choice - 1];
+        const direction = NUMBERED_DIRECTIONS[choice];
         if (!direction) throw new GameActionError('Reply with 1, 2, or 3. Ability numbers begin at 4 when shown.');
         if (game.shooterId === message.author.id) {
           lockShot(game, message.author.id, direction);
-          notice = `${E.lock} Your shot choice is locked.`;
+          notice = `${E.success} Your shot is locked: **${choice} — ${DIRECTIONS[direction]}**.`;
         } else {
           lockGoalkeeperChoice(game, message.author.id, direction);
-          notice = `${E.lock} Your goalkeeper choice is locked.`;
+          notice = `${E.success} Your goalkeeper choice is locked: **${choice} — ${DIRECTIONS[direction]}**.`;
         }
       }
     } else {
@@ -1362,14 +1379,15 @@ async function handlePenaltyRoyaleDm(client, message) {
       if (ability) {
         notice = useAbility(game, message.author.id, ability).notice;
       } else {
-        const direction = ['left', 'center', 'right'][choice - 1];
+        const direction = NUMBERED_DIRECTIONS[choice];
         if (!direction) throw new GameActionError('Reply with 1, 2, or 3. Ability number 4 is available when shown.');
         lockPrediction(game, message.author.id, direction);
-        notice = `${E.lock} Your predictor choice is locked.`;
+        notice = `${E.success} Your predictor choice is locked: **${choice} — ${DIRECTIONS[direction]}**.`;
       }
     }
 
     await game.save();
+    await message.react(E.success).catch(() => null);
     await message.reply(notice).catch(() => null);
 
     if (previousStatus === 'shooting' && game.status === 'predicting') {
