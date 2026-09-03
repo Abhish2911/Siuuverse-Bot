@@ -67,7 +67,7 @@ function calculatePerformanceRating(stats = {}) {
 
   // Small samples are useful but cannot claim an elite rating. This is based
   // only on the number of recorded form entries, never league appearances.
-  const formCap = legacy ? 7.5
+  const formCap = legacy ? 8.75
     : entries.length === 1 ? 8.25
     : entries.length === 2 ? 8.75
       : entries.length < 5 ? 9.3
@@ -79,6 +79,14 @@ function calculatePerformanceRating(stats = {}) {
   // one-off stat line. The ordinary curve deliberately stops at 9.75.
   if (!legacy && entries.length === 5 && everyMatchElite && averageImpact >= 30) {
     return 10;
+  }
+
+  if (legacy) {
+    // Historic totals can only provide an approximation, so keep them in a
+    // healthy-but-not-elite band. This raises the old season's ratings above
+    // 8 without allowing missing match-by-match form to compete with 9–10.
+    const historicalRating = 8 + Math.min(0.75, Math.max(0.05, (weightedRating - 4.5) * 0.2));
+    return Number(Math.min(formCap, historicalRating).toFixed(2));
   }
 
   return Number(Math.min(formCap, Math.max(0, weightedRating)).toFixed(2));
