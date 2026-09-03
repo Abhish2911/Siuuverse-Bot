@@ -1,4 +1,4 @@
-module.exports = {
+const emojis = {
   // Awards / stats
   goal: '<:goal:1500789713307439104>',
   goldenBoot: '<:GoldenBoot:1500762228058488862>',
@@ -96,3 +96,22 @@ module.exports = {
   hot: '<:fire:1500838844696625315>',
   locked: '<:lock:1500805293754290217>'
 };
+
+// Penalty Royale reuses the server's established emoji set rather than
+// introducing standalone Unicode icons.
+emojis.prRead = emojis.interception;
+emojis.prPrecision = emojis.goal;
+emojis.prFakeShot = emojis.duel;
+emojis.prRebound = emojis.doubleArrow;
+emojis.prGolden = emojis.golden;
+emojis.prSudden = emojis.red;
+emojis.prBlind = emojis.missing;
+emojis.prHeart = emojis.redIcon;
+emojis.prEmptyHeart = emojis.unavailable;
+emojis.prShield = emojis.defense;
+emojis.prPrediction = emojis.goalkeeper;
+emojis.prAbility = emojis.badge;
+emojis.prTimer = emojis.calendar;
+emojis.prDraw = emojis.draw;
+
+module.exports = emojis;
