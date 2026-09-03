@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +14,7 @@ const {
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
 const TrainCooldown = require('./models/TrainCooldown');
 const { restoreStoredAnnouncements } = require('./utils/hfAnnouncements');
-const { restorePenaltyRoyaleTimers } = require('./utils/penaltyRoyale');
+const { restorePenaltyRoyaleTimers, handlePenaltyRoyaleDm } = require('./utils/penaltyRoyale');
 
 function startHealthServer() {
   const app = express();
@@ -79,8 +79,12 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+  // DM channels are partial until Discord sends a message through them.
+  // Keeping the Channel partial lets Penalty Royale receive numbered DM replies.
+  partials: [Partials.Channel]
 });
 
 async function connectMongo() {
@@ -1080,7 +1084,14 @@ client.on('interactionCreate', async interaction => {
 
 client.on('messageCreate', async message => {
   try {
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot) return;
+
+    // Penalty Royale accepts numbered replies privately by DM. Handle this
+    // before guild-only prefix command processing.
+    if (!message.guild) {
+      await handlePenaltyRoyaleDm(client, message);
+      return;
+    }
 
     // =========================
     // Prefix Commands
