@@ -1387,7 +1387,8 @@ async function handlePenaltyRoyaleDm(client, message) {
     }
 
     await game.save();
-    await message.react(E.success).catch(() => null);
+    // Use Unicode here: server custom emoji reactions are not reliable in DMs.
+    await message.react('✅').catch(() => null);
     await message.reply(notice).catch(() => null);
 
     if (previousStatus === 'shooting' && game.status === 'predicting') {
