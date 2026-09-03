@@ -15,12 +15,6 @@ const DIRECTIONS = {
   right: 'Right'
 };
 
-const DIRECTION_EMOJIS = {
-  left: E.leftArrow,
-  center: E.up,
-  right: E.rightArrow
-};
-
 const ABILITY_DEFS = {
   read: {
     label: 'Read',
@@ -32,7 +26,7 @@ const ABILITY_DEFS = {
     label: 'Super Save',
     emoji: E.save,
     aliases: ['supersave', 'super-save', 'super'],
-    description: 'Use while predicting to lock in a guaranteed correct prediction.'
+    description: 'Use during the shooter/GK phase to guarantee the save.'
   },
   precision: {
     label: 'Precision',
@@ -72,10 +66,16 @@ const CHAOS_DEFS = {
   }
 };
 
-const GOAL_GIF_URL = process.env.PR_GOAL_GIF_URL
-  || 'https://cdn.discordapp.com/attachments/848199446139371530/1544963309743251456/Zidane-Panenka.gif?ex=6a9a6ab5&is=6a991935&hm=5d3d95ac1cdc6d40eea8a48cd51f21279df774eec1ed30d05d3510786a70f3d9&';
-const SAVE_GIF_URL = process.env.PR_SAVE_GIF_URL
-  || 'https://klipy.com/gifs/gianluigi-buffon-gigi-buffon';
+const GOAL_GIFS = {
+  left: 'https://klipy.com/gifs/ishowspeed-first-goal',
+  center: 'https://klipy.com/gifs/penalty-kicks',
+  right: 'https://klipy.com/gifs/ronaldo-penalty-ronaldo-penalty-vs-roma-1'
+};
+const SAVE_GIFS = {
+  left: 'https://klipy.com/gifs/neuer-manuel-neuer-3',
+  center: 'https://klipy.com/gifs/kepa-save',
+  right: 'https://klipy.com/gifs/gianluigi-buffon-gigi-buffon'
+};
 
 const ACTIVE_STATUSES = ['lobby', 'shooting', 'predicting'];
 const DEFAULT_ROUND_TIMEOUT_MS = Math.max(10_000, Number(process.env.PR_ROUND_TIMEOUT_MS) || 30_000);
@@ -418,26 +418,6 @@ function assignGoalkeeper(game, shooter) {
   return goalkeeper;
 }
 
-function directionButtons(game, action) {
-  return new ActionRowBuilder().addComponents(
-    Object.entries(DIRECTIONS).map(([direction, label]) => new ButtonBuilder()
-      .setCustomId(`pr_${action}_${game._id}_${direction}`)
-      .setLabel(label)
-      .setEmoji(DIRECTION_EMOJIS[direction])
-      .setStyle(direction === 'center' ? ButtonStyle.Primary : ButtonStyle.Secondary))
-  );
-}
-
-function abilityButtons(game, abilities) {
-  return new ActionRowBuilder().addComponents(
-    abilities.map(ability => new ButtonBuilder()
-      .setCustomId(`pr_ability_${game._id}_${ability}`)
-      .setLabel(ABILITY_DEFS[ability].label)
-      .setEmoji(ABILITY_DEFS[ability].emoji)
-      .setStyle(ButtonStyle.Secondary))
-  );
-}
-
 function buildLobbyButtons(game) {
   if (game.mode === 'teams') {
     return new ActionRowBuilder().addComponents(
@@ -511,7 +491,7 @@ function buildGamePayload(game, options = {}) {
     baseDescription.push(
       `**Round ${game.round}${game.teamTiebreaker ? ' — SUDDEN-DEATH TIEBREAKER' : ''}**\n${E.scorer} Shooter: ${mention(shooter.userId)}\n` +
       `${E.goalkeeper} Goalkeeper: ${goalkeeper ? mention(goalkeeper.userId) : '—'}\n` +
-      `${mention(shooter.userId)}, choose your corner. Your choice stays secret until the round resolves.`
+      `${mention(shooter.userId)} and ${goalkeeper ? mention(goalkeeper.userId) : 'the goalkeeper'} have been sent a private numbered prompt.`
     );
   } else if (game.status === 'predicting') {
     const defenders = getDefenders(game);
@@ -523,7 +503,7 @@ function buildGamePayload(game, options = {}) {
       `**Round ${game.round}${game.teamTiebreaker ? ' — SUDDEN-DEATH TIEBREAKER' : ''}**\n${E.scorer} Shooter: ${mention(shooter.userId)}\n` +
       `${E.goalkeeper} Goalkeeper: ${goalkeeper ? mention(goalkeeper.userId) : '—'}\n` +
       `${E.prPrediction} Choices locked in: **${game.predictions.length}/${defenders.length}** (${predictors.length} predictor${predictors.length === 1 ? '' : 's'})\n` +
-      `${defenders.map(player => mention(player.userId)).join(' ') || 'No defenders remain'} — choose a corner.` +
+      `${defenders.map(player => mention(player.userId)).join(' ') || 'No defenders remain'} — predictors have been sent a private numbered prompt.` +
       fakeShot
     );
   } else if (game.status === 'finished') {
@@ -575,12 +555,6 @@ function buildGamePayload(game, options = {}) {
   const components = [];
   if (controls && game.status === 'lobby') {
     components.push(buildLobbyButtons(game));
-  } else if (controls && game.status === 'shooting') {
-    components.push(directionButtons(game, 'shot'));
-    components.push(abilityButtons(game, ['precision', 'fakeShot', 'rebound']));
-  } else if (controls && game.status === 'predicting') {
-    components.push(directionButtons(game, 'predict'));
-    components.push(abilityButtons(game, ['read', 'superSave']));
   }
 
   return { embeds: [embed], components };
@@ -701,6 +675,7 @@ function clearRoundAbilities(game) {
   game.fakeShotActive = false;
   game.fakeShotDirection = '';
   game.reboundArmedBy = '';
+  game.superSaveArmedBy = '';
 }
 
 function clearChaosRound(game) {
@@ -737,8 +712,8 @@ function useAbility(game, userId, ability) {
 
   if (ability === 'read') {
     if (game.status !== 'predicting') throw new GameActionError('Read can only be used while defenders are predicting.');
-    if (!getDefenders(game).some(defender => defender.userId === player.userId)) {
-      throw new GameActionError('Only a defender can use Read this round.');
+    if (!getPredictors(game).some(predictor => predictor.userId === player.userId)) {
+      throw new GameActionError('Only a predictor can use Read this round.');
     }
     if (game.predictions.some(prediction => prediction.userId === player.userId)) {
       throw new GameActionError('Use Read before locking in your prediction.');
@@ -754,7 +729,7 @@ function useAbility(game, userId, ability) {
   }
 
   if (ability === 'superSave') {
-    if (game.status !== 'predicting') throw new GameActionError('Super Save can only be used while defenders are predicting.');
+    if (game.status !== 'shooting') throw new GameActionError('Super Save can only be used during the shooter/GK phase.');
     if (game.goalkeeperId !== player.userId) {
       throw new GameActionError('Only the assigned goalkeeper can use Super Save this round.');
     }
@@ -763,9 +738,10 @@ function useAbility(game, userId, ability) {
     }
     consumeAbility(player, ability);
     recordAbilityUse(player);
-    lockPrediction(game, player.userId, game.shot);
+    game.superSaveArmedBy = player.userId;
+    if (game.shot) lockGoalkeeperChoice(game, player.userId, game.shot);
     return {
-      notice: `${E.save} **Super Save:** your goalkeeper save is locked in.`,
+      notice: `${E.save} **Super Save:** your guaranteed save is armed.`,
       autoPrediction: true
     };
   }
@@ -829,31 +805,61 @@ function lockShot(game, userId, direction) {
     const fakeChoices = Object.keys(DIRECTIONS).filter(directionKey => directionKey !== game.shot);
     game.fakeShotDirection = fakeChoices[Math.floor(Math.random() * fakeChoices.length)];
   }
+  if (game.superSaveArmedBy && game.goalkeeperId) {
+    lockGoalkeeperChoice(game, game.goalkeeperId, game.shot);
+  }
+  moveToPredictingIfReady(game);
+  game.lastRoundSummary = game.status === 'predicting'
+    ? `${E.lock} Shooter and goalkeeper are ready. Predictors, check your DMs and choose a corner!`
+    : `${E.lock} The shooter has locked in a choice. Waiting for the goalkeeper's private reply.`;
+}
+
+function moveToPredictingIfReady(game) {
+  const hasGoalkeeperChoice = game.predictions.some(prediction => prediction.userId === game.goalkeeperId);
+  if (!game.shot || !hasGoalkeeperChoice) return false;
   game.status = 'predicting';
   game.phase = 'predicting';
-  game.predictions = [];
   setRoundDeadline(game);
-  game.lastRoundSummary = `${E.lock} The shooter has locked in a choice. ${E.goalkeeper} Goalkeeper and predictors, choose your corner!`;
+  return true;
+}
+
+function lockGoalkeeperChoice(game, userId, direction) {
+  if (game.status !== 'shooting') {
+    throw new GameActionError('The goalkeeper can only choose during the shooter/GK phase.');
+  }
+  if (game.goalkeeperId !== String(userId)) {
+    throw new GameActionError('Only the assigned goalkeeper can make the save choice.');
+  }
+  if (!parseDirection(direction)) {
+    throw new GameActionError('Choose 1, 2, or 3.');
+  }
+  if (game.predictions.some(prediction => prediction.userId === String(userId))) {
+    throw new GameActionError('Your goalkeeper choice is already locked in.');
+  }
+  game.predictions.push({ userId: String(userId), choice: parseDirection(direction) });
+  const goalkeeper = getPlayer(game, userId);
+  if (goalkeeper) goalkeeper.predictions += 1;
+  return moveToPredictingIfReady(game);
 }
 
 function lockPrediction(game, userId, direction) {
   if (game.status !== 'predicting') {
-    throw new GameActionError('The game is not waiting for predictions.');
+    throw new GameActionError('The game is not waiting for predictor choices.');
   }
   if (!parseDirection(direction)) {
     throw new GameActionError('Choose Left, Center, or Right.');
   }
 
-  const defender = getDefenders(game).find(player => player.userId === String(userId));
-  if (!defender) {
-    throw new GameActionError('Only an active defender can make a prediction this round.');
+  const predictor = getPredictors(game).find(player => player.userId === String(userId));
+  if (!predictor) {
+    throw new GameActionError('Only an active predictor can make a choice this round.');
   }
   if (game.predictions.some(prediction => prediction.userId === String(userId))) {
     throw new GameActionError('Your prediction is already locked in.');
   }
 
   game.predictions.push({ userId: String(userId), choice: parseDirection(direction) });
-  defender.predictions += 1;
+  predictor.predictions += 1;
 }
 
 function allDefendersPredicted(game) {
@@ -1093,6 +1099,9 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
   }
 
   const shotLabel = DIRECTIONS[game.shot];
+  // The next round clears `game.shot`, so keep the resolved direction for the
+  // outside-the-embed corner GIF returned below.
+  const resolvedShot = game.shot;
   const blindPenalty = chaosMode === 'blind';
   const predictorPointsText = correctPredictors.length
     ? ` ${correctPredictors.map(player => mention(player.userId)).join(', ')} earned **+1 Prediction Point**.`
@@ -1142,7 +1151,7 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
   return {
     saved,
     finished,
-    mediaUrl: saved ? SAVE_GIF_URL : GOAL_GIF_URL,
+    mediaUrl: saved ? SAVE_GIFS[resolvedShot] : GOAL_GIFS[resolvedShot],
     earnedAbilities
   };
 }
@@ -1224,6 +1233,162 @@ async function sendRoundMedia(channel, resolution) {
   }
 }
 
+function abilityNumberLines(player, keys) {
+  return keys
+    .filter(key => getAbilityCount(player, key) > 0)
+    .map((key, index) => `${index + 4} — ${ABILITY_DEFS[key].emoji} ${ABILITY_DEFS[key].label}`);
+}
+
+function abilityForNumber(player, keys, number) {
+  const available = keys.filter(key => getAbilityCount(player, key) > 0);
+  return available[number - 4] || '';
+}
+
+function numberedChoiceLines(player, abilityKeys) {
+  const abilityLines = abilityNumberLines(player, abilityKeys);
+  return [
+    '1 — Left',
+    '2 — Center',
+    '3 — Right',
+    ...(abilityLines.length ? ['', '**Special ability:**', ...abilityLines, 'Some abilities ask you to send 1–3 afterwards; a Super Save resolves on its own.'] : [])
+  ].join('\n');
+}
+
+async function sendDmPrompt(client, player, title, abilityKeys) {
+  const user = await client?.users?.fetch(player.userId).catch(() => null);
+  if (!user) return false;
+  return user.send(
+    `${E.trophy} **Penalty Royale — ${title}**\n` +
+    `Reply to this DM with a number within the round timer:\n${numberedChoiceLines(player, abilityKeys)}`
+  ).then(() => true).catch(() => false);
+}
+
+async function sendRoundPrompts(client, game) {
+  const channel = await client?.channels?.fetch(game.channelId).catch(() => null);
+  const shooter = getPlayer(game, game.shooterId);
+  const goalkeeper = getGoalkeeper(game);
+  if (!channel || !shooter || !goalkeeper || !['shooting', 'predicting'].includes(game.status)) return false;
+
+  const seconds = getRoundTimeoutSeconds(game);
+  if (game.status === 'shooting') {
+    const [shooterDm, goalkeeperDm] = await Promise.all([
+      sendDmPrompt(client, shooter, `ROUND ${game.round} — SHOOTER`, ['precision', 'fakeShot', 'rebound']),
+      sendDmPrompt(client, goalkeeper, `ROUND ${game.round} — GOALKEEPER`, ['superSave'])
+    ]);
+    await channel.send(
+      `${mention(shooter.userId)} ${mention(goalkeeper.userId)}\n` +
+      `**ROUND ${game.round}${game.teamTiebreaker ? ' — SUDDEN-DEATH TIEBREAKER' : ''}**\n` +
+      `${E.scorer} Shooter and ${E.goalkeeper} goalkeeper: check your DMs and reply **1, 2, or 3** — **${seconds}s** to reply.`
+    ).catch(() => null);
+    const failed = [!shooterDm && shooter, !goalkeeperDm && goalkeeper].filter(Boolean);
+    if (failed.length) {
+      await channel.send(`${E.warning} ${failed.map(player => mention(player.userId)).join(' ')}, I could not DM you. Enable DMs from server members to play this round.`).catch(() => null);
+    }
+    return true;
+  }
+
+  const predictors = getPredictors(game);
+  if (!predictors.length) return false;
+  const dmResults = await Promise.all(predictors.map(player => sendDmPrompt(client, player, `ROUND ${game.round} — PREDICTOR`, ['read'])));
+  await channel.send(
+    `${predictors.map(player => mention(player.userId)).join(' ')}\n` +
+    `**PREDICTORS — ROUND ${game.round}**\n` +
+    `${E.prPrediction} Check your DMs and reply **1, 2, or 3** to predict the shot — **${seconds}s** to reply. Correct calls earn **+1 Prediction Point**.`
+  ).catch(() => null);
+  const failed = predictors.filter((_, index) => !dmResults[index]);
+  if (failed.length) {
+    await channel.send(`${E.warning} ${failed.map(player => mention(player.userId)).join(' ')}, I could not DM you. Enable DMs from server members to predict.`).catch(() => null);
+  }
+  return true;
+}
+
+async function resolveAndPublishRound(client, game, channel) {
+  const resolution = resolveRound(game, { fillMissingPredictions: true });
+  await game.save();
+  if (game.status === 'finished') await applyGameStats(game);
+  if (game.lastRoundSummary) await channel?.send(game.lastRoundSummary).catch(() => null);
+  await sendRoundMedia(channel, resolution);
+  if (resolution.earnedAbilities?.length) {
+    const dmResults = await notifyAbilityAssignments(client, resolution.earnedAbilities);
+    await sendDmFallback(channel, dmResults.failedAssignments);
+  }
+  if (game.status !== 'finished') await sendRoundPrompts(client, game);
+  scheduleRoundTimer(client, game);
+  return resolution;
+}
+
+async function handlePenaltyRoyaleDm(client, message) {
+  const choice = Number(String(message.content || '').trim());
+  if (!Number.isInteger(choice) || choice < 1) return false;
+
+  const candidates = await PenaltyRoyaleGame.find({
+    status: { $in: ['shooting', 'predicting'] },
+    'players.userId': String(message.author.id)
+  }).sort({ updatedAt: -1 }).limit(10);
+  const game = candidates.find(candidate => {
+    if (candidate.status === 'shooting') {
+      return candidate.shooterId === message.author.id || candidate.goalkeeperId === message.author.id;
+    }
+    return getPredictors(candidate).some(player => player.userId === message.author.id);
+  });
+  if (!game) return false;
+
+  const channel = await client?.channels?.fetch(game.channelId).catch(() => null);
+  const previousStatus = game.status;
+  try {
+    let notice = '';
+    if (game.status === 'shooting') {
+      const player = getPlayer(game, message.author.id);
+      const abilityKeys = game.shooterId === message.author.id
+        ? ['precision', 'fakeShot', 'rebound']
+        : ['superSave'];
+      const ability = abilityForNumber(player, abilityKeys, choice);
+      if (ability) {
+        notice = useAbility(game, message.author.id, ability).notice;
+      } else {
+        const direction = ['left', 'center', 'right'][choice - 1];
+        if (!direction) throw new GameActionError('Reply with 1, 2, or 3. Ability numbers begin at 4 when shown.');
+        if (game.shooterId === message.author.id) {
+          lockShot(game, message.author.id, direction);
+          notice = `${E.lock} Your shot choice is locked.`;
+        } else {
+          lockGoalkeeperChoice(game, message.author.id, direction);
+          notice = `${E.lock} Your goalkeeper choice is locked.`;
+        }
+      }
+    } else {
+      const player = getPlayer(game, message.author.id);
+      const ability = abilityForNumber(player, ['read'], choice);
+      if (ability) {
+        notice = useAbility(game, message.author.id, ability).notice;
+      } else {
+        const direction = ['left', 'center', 'right'][choice - 1];
+        if (!direction) throw new GameActionError('Reply with 1, 2, or 3. Ability number 4 is available when shown.');
+        lockPrediction(game, message.author.id, direction);
+        notice = `${E.lock} Your predictor choice is locked.`;
+      }
+    }
+
+    await game.save();
+    await message.reply(notice).catch(() => null);
+
+    if (previousStatus === 'shooting' && game.status === 'predicting') {
+      if (allDefendersPredicted(game)) await resolveAndPublishRound(client, game, channel);
+      else {
+        await sendRoundPrompts(client, game);
+        scheduleRoundTimer(client, game);
+      }
+    } else if (game.status === 'predicting' && allDefendersPredicted(game)) {
+      await resolveAndPublishRound(client, game, channel);
+    }
+    return true;
+  } catch (error) {
+    const text = error instanceof GameActionError ? error.message : 'That Penalty Royale reply could not be processed.';
+    await message.reply(`${E.warning} ${text}`).catch(() => null);
+    return true;
+  }
+}
+
 async function handleRoundTimeout(client, gameId, expectedRound, expectedStatus) {
   const game = await PenaltyRoyaleGame.findById(gameId);
   if (!game || !ACTIVE_STATUSES.includes(game.status)) {
@@ -1243,25 +1408,26 @@ async function handleRoundTimeout(client, gameId, expectedRound, expectedStatus)
 
   const channel = await client?.channels?.fetch(game.channelId).catch(() => null);
   if (game.status === 'shooting') {
-    const direction = Object.keys(DIRECTIONS)[Math.floor(Math.random() * Object.keys(DIRECTIONS).length)];
-    lockShot(game, game.shooterId, direction);
-    game.lastRoundSummary = `${E.prTimer} ${mention(game.shooterId)} ran out of time, so the bot locked a random corner. Defenders have ${getRoundTimeoutSeconds(game)} seconds.`;
+    if (!game.shot) {
+      const direction = Object.keys(DIRECTIONS)[Math.floor(Math.random() * Object.keys(DIRECTIONS).length)];
+      lockShot(game, game.shooterId, direction);
+    }
+    if (!game.predictions.some(prediction => prediction.userId === game.goalkeeperId)) {
+      game.predictions.push({ userId: game.goalkeeperId, choice: 'missed' });
+    }
+    moveToPredictingIfReady(game);
+    game.lastRoundSummary = `${E.prTimer} Shooter/GK time expired. Missing choices were counted as no choice; predictors have ${getRoundTimeoutSeconds(game)} seconds.`;
     await game.save();
-    await refreshGameMessage(client, game).catch(() => null);
-    scheduleRoundTimer(client, game);
+    if (allDefendersPredicted(game)) await resolveAndPublishRound(client, game, channel);
+    else {
+      await sendRoundPrompts(client, game);
+      scheduleRoundTimer(client, game);
+    }
     return true;
   }
 
-  const resolution = resolveRound(game, { fillMissingPredictions: true });
-  game.lastRoundSummary = `${E.prTimer} Timer expired. ${game.lastRoundSummary}`;
-  await game.save();
-  if (game.status === 'finished') await applyGameStats(game);
-  await refreshGameMessage(client, game).catch(() => null);
-  await sendRoundMedia(channel, resolution);
-  if (resolution.earnedAbilities?.length) {
-    await notifyAbilityAssignments(client, resolution.earnedAbilities);
-  }
-  scheduleRoundTimer(client, game);
+  await channel?.send(`${E.prTimer} Predictor time expired. Missing choices count as no prediction.`).catch(() => null);
+  await resolveAndPublishRound(client, game, channel);
   return true;
 }
 
@@ -1338,6 +1504,7 @@ async function restorePenaltyRoyaleTimers(client) {
       await game.save();
     }
     scheduleRoundTimer(client, game);
+    await sendRoundPrompts(client, game);
   }
   return games.length;
 }
@@ -1382,45 +1549,14 @@ async function handleButton(interaction) {
       const dmResults = await notifyAbilityAssignments(interaction.client, assignments);
       await sendDmFallback(interaction.channel, dmResults.failedAssignments);
       scheduleRoundTimer(interaction.client, game);
+      await sendRoundPrompts(interaction.client, game);
       return {
         payload: buildGamePayload(game),
         notice: `The game has started. Starting abilities were DM'd to ${dmResults.delivered}/${assignments.length} player(s); extra abilities require a 3-streak.`
       };
     }
-    if (parsed.action === 'shot') {
-      lockShot(game, interaction.user.id, parsed.value);
-      await game.save();
-      scheduleRoundTimer(interaction.client, game);
-      return { payload: buildGamePayload(game), notice: 'Your shot is locked in.' };
-    }
-    if (parsed.action === 'predict' || parsed.action === 'ability') {
-      let abilityResult = null;
-      let predictionNotice = '';
-      if (parsed.action === 'predict') {
-        const isBlindPenalty = getActiveChaos(game) === 'blind';
-        lockPrediction(game, interaction.user.id, parsed.value);
-        if (isBlindPenalty) {
-          predictionNotice = `${E.prBlind} Blind Penalty: your private prediction is **${DIRECTIONS[parsed.value]}**.`;
-        }
-      } else {
-        abilityResult = useAbility(game, interaction.user.id, parsed.value);
-      }
-      let resolution = null;
-      if (allDefendersPredicted(game)) {
-        resolution = resolveRound(game);
-      }
-      await game.save();
-      if (game.status === 'finished') await applyGameStats(game);
-      await sendRoundMedia(interaction.channel, resolution);
-      if (resolution?.earnedAbilities?.length) {
-        const dmResults = await notifyAbilityAssignments(interaction.client, resolution.earnedAbilities);
-        await sendDmFallback(interaction.channel, dmResults.failedAssignments);
-      }
-      scheduleRoundTimer(interaction.client, game);
-      return {
-        payload: buildGamePayload(game),
-        notice: abilityResult?.notice || predictionNotice || 'Your prediction is locked in.'
-      };
+    if (['shot', 'predict', 'ability'].includes(parsed.action)) {
+      return { notice: 'In-game choices now use numbered DM replies. Check the latest Penalty Royale DM.' };
     }
     return { notice: 'That Penalty Royale action is not recognized.' };
   } catch (error) {
@@ -1457,6 +1593,9 @@ module.exports = {
   startGame,
   armChaosRound,
   lockShot,
+  lockGoalkeeperChoice,
+  lockPrediction,
+  moveToPredictingIfReady,
   useAbility,
   resolveRound,
   applyGameStats,
@@ -1467,7 +1606,11 @@ module.exports = {
   clearLobbyTimer,
   restorePenaltyRoyaleTimers,
   sendRoundMedia,
+  sendRoundPrompts,
+  resolveAndPublishRound,
+  handlePenaltyRoyaleDm,
   buildGamePayload,
-  SAVE_GIF_URL,
+  GOAL_GIFS,
+  SAVE_GIFS,
   handleButton
 };
