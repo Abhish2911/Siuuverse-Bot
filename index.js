@@ -14,6 +14,7 @@ const {
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
 const TrainCooldown = require('./models/TrainCooldown');
 const { restoreStoredAnnouncements } = require('./utils/hfAnnouncements');
+const { restorePenaltyRoyaleTimers } = require('./utils/penaltyRoyale');
 
 function startHealthServer() {
   const app = express();
@@ -273,7 +274,8 @@ for (const commandsPath of commandFolders) {
 
 const prefixCommandFolders = [
   path.join(__dirname, 'prefix'),
-  path.join(__dirname, 'prefix-commands')
+  path.join(__dirname, 'prefix-commands'),
+  path.join(__dirname, 'penalty-royale-commands')
 ];
 
 // Load prefix commands and aliases
@@ -552,6 +554,33 @@ client.on('interactionCreate', async interaction => {
         return;
       }
 
+      // =========================
+      // Penalty Royale prefix-command buttons
+      // =========================
+      if (interaction.customId.startsWith('pr_')) {
+        const command = client.prefixCommands.get('prcreate');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(interaction);
+
+        if (result?.payload) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result.payload
+          });
+        }
+        if (result?.notice) {
+          await interaction.followUp({
+            content: result.notice,
+            ephemeral: true
+          }).catch(() => null);
+        }
+        return;
+      }
+
       const parts = interaction.customId.split('_');
       const cmd = parts.shift();
       const action = parts.shift();
@@ -786,6 +815,26 @@ client.on('interactionCreate', async interaction => {
     // Dropdowns
     // =========================
     if (interaction.isStringSelectMenu()) {
+      // =========================
+      // Penalty Royale help menu
+      // =========================
+      if (interaction.customId === 'prhelp_topic') {
+        const command = client.prefixCommands.get('prhelp');
+        if (!command || !command.buttonHandler) return;
+
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        const result = await command.buttonHandler(interaction);
+        if (result) {
+          await safeEditMessage(interaction.message, {
+            content: null,
+            ...result
+          });
+        }
+        return;
+      }
+
       // =========================
       // rpstats dropdown
       // =========================
@@ -1165,6 +1214,9 @@ client.on('messageCreate', async message => {
     if (mongoConnected) {
       const restoredAnnouncements = await restoreStoredAnnouncements(client);
       console.log(`✅ Restored ${restoredAnnouncements} scheduled HandFootball announcements`);
+
+      const restoredPenaltyRoyaleTimers = await restorePenaltyRoyaleTimers(client);
+      console.log(`✅ Restored ${restoredPenaltyRoyaleTimers} Penalty Royale timers`);
     }
   } catch (error) {
     console.error('❌ Bot startup failed:', error);
