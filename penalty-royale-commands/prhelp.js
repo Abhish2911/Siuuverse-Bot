@@ -43,12 +43,12 @@ function createEmbed(topic) {
       .addFields(
         {
           name: `1. ${E.scorer} Shooter chooses`,
-          value: 'The current shooter picks Left, Center, or Right with a private button. The choice is hidden until the round resolves.',
+          value: 'The shooter receives a DM and replies with a number: **1 = Left**, **2 = Center**, **3 = Right**. The choice stays hidden until the round resolves.',
           inline: false
         },
         {
           name: `2. ${E.goalkeeper} GK & predictors choose`,
-          value: 'One defender is the rotating **goalkeeper**. Everyone else is a predictor. They all choose the corner they think the shooter selected; choices stay private until the result.',
+          value: 'The rotating **goalkeeper** gets the first DM prompt and replies **1–3** to save a corner. Once both main choices are locked, every other defender receives a predictor DM. Their **1–3** calls remain private until the result.',
           inline: false
         },
         {
@@ -58,7 +58,7 @@ function createEmbed(topic) {
         },
         {
           name: `${E.prTimer} Timers`,
-          value: 'The host chooses **10–120 seconds** per choice at lobby creation (30 seconds by default). A shooter who times out gets a random corner. Missing defenders count as no prediction when their timer expires. The host can also use `.prresolve`.',
+          value: 'The host chooses **10–120 seconds** per phase at lobby creation (30 seconds by default). Shooter and GK act first; predictors get their own full timer afterwards. A timed-out shooter gets a random corner, while missing saves/predictions count as no choice. The host can also use `.prresolve` after the main choices are locked.',
           inline: false
         }
       )
@@ -68,7 +68,7 @@ function createEmbed(topic) {
   if (topic === 'abilities') {
     return embed
       .setTitle(`${E.prAbility} PENALTY ROYALE — SECRET ABILITIES`)
-      .setDescription('Every player receives **one random secret ability** by DM when the match starts. Extra abilities are earned only for a streak of **3 personal goals**, **3 goalkeeper saves**, or **3 correct predictor calls** in a row.')
+      .setDescription('Every player receives **one random secret ability** by DM when the match starts. Extra abilities are earned only for a streak of **3 personal goals**, **3 goalkeeper saves**, or **3 correct predictor calls** in a row. During a round, the DM lists corner choices as **1–3** and any usable ability as **4 or higher**; reply with the listed ability number first.')
       .addFields(
         { name: `${E.prRead} Read`, value: 'While predicting, privately reveals one corner the shooter did not choose.', inline: true },
         { name: `${E.save} Super Save`, value: 'For the assigned goalkeeper, locks in a guaranteed save.', inline: true },
