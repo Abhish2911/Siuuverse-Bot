@@ -122,13 +122,13 @@ async function buildHFStatsEmbed() {
       { name: `${safeEmoji(E.fire, 'G+A')} G+A`, value: topList(rows, 'G+A', stats => toNumber(stats.goals) + toNumber(stats.assists)), inline: true },
       { name: `${safeEmoji(E.mvp, 'MVP')} MVPs`, value: topList(rows, 'MVPs', stats => toNumber(stats.mvps)), inline: true },
       { name: `${safeEmoji(E.trophy, '🎩')} Hattricks`, value: topList(rows, 'hattricks', stats => toNumber(stats.hattricks)), inline: true },
-      { name: '⭐ Last 5 Form', value: topList(rows, 'ratings', stats => calculatePerformanceRating(stats)), inline: true },
+      { name: '⭐ Rating', value: topList(rows, 'ratings', stats => calculatePerformanceRating(stats)), inline: true },
       { name: `${safeEmoji(E.save, 'Saves')} Saves`, value: topList(rows, 'saves', stats => toNumber(stats.saves)), inline: true },
       { name: `${safeEmoji(E.tackle, 'Tackles')} Tackles`, value: topList(rows, 'tackles', stats => toNumber(stats.tackles)), inline: true },
       { name: `${safeEmoji(E.interception, 'Interceptions')} Interceptions`, value: topList(rows, 'interceptions', stats => toNumber(stats.interceptions)), inline: true }
     )
     .setColor(0xF1C40F)
-    .setFooter({ text: 'HandFootball Stats - Rating uses each player’s last 5 recorded performances' })
+    .setFooter({ text: 'HandFootball Stats - Auto Updating' })
     .setTimestamp();
 }
 
