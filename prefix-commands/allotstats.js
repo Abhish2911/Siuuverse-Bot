@@ -94,6 +94,19 @@ function parseRawStats(text) {
   return [...rowsByUser.values()];
 }
 
+function toRecentForm(row, recordedAt) {
+  return {
+    goals: row.goals,
+    assists: row.assists,
+    mvps: 0,
+    hattricks: row.hattricks,
+    interceptions: row.interceptions,
+    tackles: row.tackles,
+    saves: row.saves,
+    recordedAt
+  };
+}
+
 module.exports = {
   name: 'as',
   aliases: ['allotstats', 'addstats'],
@@ -112,6 +125,7 @@ module.exports = {
       );
     }
 
+    const recordedAt = new Date();
     await TournamentStats.bulkWrite(
       rows.map(row => ({
         updateOne: {
@@ -126,6 +140,12 @@ module.exports = {
               interceptions: row.interceptions,
               tackles: row.tackles,
               saves: row.saves
+            },
+            $push: {
+              recentForm: {
+                $each: [toRecentForm(row, recordedAt)],
+                $slice: -5
+              }
             }
           },
           upsert: true

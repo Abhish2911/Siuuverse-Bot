@@ -131,6 +131,15 @@ module.exports = {
       }
     );
 
+    // .as creates one recent-form entry per player. Attach MVP credit to the
+    // newest entry so last-five ratings reflect the actual match award.
+    const latestForm = updated?.recentForm?.at(-1);
+    if (latestForm) {
+      latestForm.mvps = (Number(latestForm.mvps) || 0) + 1;
+      updated.markModified('recentForm');
+      await updated.save();
+    }
+
     refreshAllHFLiveMessages(message.client, 'stats')
       .catch(error => console.error('HF live stats refresh after .setmvp failed:', error));
 

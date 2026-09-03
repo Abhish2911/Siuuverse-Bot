@@ -31,10 +31,19 @@ module.exports = {
       { userId, mvps: { $gt: 0 } },
       { $inc: { mvps: -1 } },
       { returnDocument: 'after' }
-    ).lean();
+    );
 
     if (!updated) {
       return message.reply(`${E.warning} No MVP was recorded for ${mentionUser(userId)}.`);
+    }
+
+    const latestMvpForm = [...(updated.recentForm || [])]
+      .reverse()
+      .find(form => (Number(form.mvps) || 0) > 0);
+    if (latestMvpForm) {
+      latestMvpForm.mvps = Math.max(0, (Number(latestMvpForm.mvps) || 0) - 1);
+      updated.markModified('recentForm');
+      await updated.save();
     }
 
     refreshAllHFLiveMessages(message.client, 'stats')

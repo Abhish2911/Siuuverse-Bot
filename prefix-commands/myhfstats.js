@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const TournamentStats = require('../models/TournamentStats');
 const E = require('../utils/emojis');
-const { calculatePerformanceRating, getPlayedMatchdayCount } = require('../utils/hfStatsRating');
+const { calculatePerformanceRating, getRecentFormRatings } = require('../utils/hfStatsRating');
 const {
   loadHandFootballData,
   findPlayerByUserId,
@@ -89,9 +89,9 @@ module.exports = {
 
     const goals = toNumber(stats.goals);
     const assists = toNumber(stats.assists);
-    const rating = calculatePerformanceRating(stats, {
-      expectedMatches: getPlayedMatchdayCount(data.fixtures)
-    });
+    const rating = calculatePerformanceRating(stats);
+    const form = getRecentFormRatings(stats);
+    const formText = form.length ? form.map(value => value.toFixed(1)).join(' → ') : 'No form recorded';
     const avatarUrl = await getAvatarUrl(client, player.userId, message.author);
     const leagueName = process.env.HF_LEAGUE_NAME || 'Siuuverse HandFootball League';
 
@@ -111,7 +111,8 @@ module.exports = {
           buildStatLine(safeEmoji(E.trophy, '🎩'), 'Hattricks:', toNumber(stats.hattricks)),
           buildStatLine(safeEmoji(E.mvp, '⭐'), 'MVPs:', toNumber(stats.mvps)),
           buildStatLine(safeEmoji(E.played, '📊'), 'Matches:', toNumber(stats.matches)),
-          buildStatLine('⭐', 'Rating:', `${rating}/10`)
+          buildStatLine('📈', 'Last 5 Form:', formText),
+          buildStatLine('⭐', 'Form Rating:', form.length ? `${rating}/10` : 'Unrated')
         ].join('\n')
       )
       .setColor(0xF1C40F)
@@ -122,7 +123,7 @@ module.exports = {
         inline: false
       })
       .setFooter({
-        text: `${message.author.username} • HandFootball stats`
+        text: `${message.author.username} • Rating uses the last 5 recorded performances`
       })
       .setTimestamp();
 

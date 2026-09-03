@@ -85,12 +85,14 @@ function parseRawStats(text) {
       matches: 1,
       goals: 0,
       assists: 0,
+      hattricks: 0,
       interceptions: 0,
       tackles: 0,
       saves: 0
     };
 
     current.goals += toStatNumber(match[3]);
+    current.hattricks = current.goals >= 3 ? 1 : 0;
     current.assists += toStatNumber(match[4]);
     current.interceptions += toStatNumber(match[5]);
     current.tackles += toStatNumber(match[6]);
@@ -110,6 +112,27 @@ function subtractStats(existingStats, row) {
     nextStats[field] = Math.max(0, currentValue - removeValue);
     return nextStats;
   }, {});
+}
+
+function formMatchesRow(form, row) {
+  return [
+    'goals',
+    'assists',
+    'hattricks',
+    'interceptions',
+    'tackles',
+    'saves'
+  ].every(field => (Number(form?.[field]) || 0) === (Number(row?.[field]) || 0));
+}
+
+function removeLatestMatchingForm(stats, row) {
+  const forms = Array.isArray(stats.recentForm) ? [...stats.recentForm] : [];
+  const index = forms.findLastIndex(form => formMatchesRow(form, row));
+  if (index === -1) return false;
+  forms.splice(index, 1);
+  stats.recentForm = forms;
+  stats.markModified('recentForm');
+  return true;
 }
 
 module.exports = {
@@ -132,25 +155,23 @@ module.exports = {
 
     const savedStats = await TournamentStats.find({
       userId: { $in: rows.map(row => row.userId) }
-    }).lean();
+    });
     const savedStatsByUser = new Map(savedStats.map(stats => [stats.userId, stats]));
 
-    const operations = rows
-      .filter(row => savedStatsByUser.has(row.userId))
-      .map(row => ({
-        updateOne: {
-          filter: { userId: row.userId },
-          update: {
-            $set: subtractStats(savedStatsByUser.get(row.userId), row)
-          }
-        }
-      }));
+    const updates = rows
+      .map(row => ({ row, stats: savedStatsByUser.get(row.userId) }))
+      .filter(item => item.stats);
 
-    if (!operations.length) {
+    if (!updates.length) {
       return message.reply(`${E.missing} No matching saved stats were found to remove.`);
     }
 
-    await TournamentStats.bulkWrite(operations, { ordered: false });
+    let removedFormEntries = 0;
+    for (const { row, stats } of updates) {
+      Object.assign(stats, subtractStats(stats, row));
+      if (removeLatestMatchingForm(stats, row)) removedFormEntries += 1;
+      await stats.save();
+    }
 
     const sourceMessage = await getReferencedMessage(message);
     const deletedSummaryCount = await deleteStatsSummaryDMs(
@@ -165,10 +186,12 @@ module.exports = {
       .catch(error => console.error('HF live stats refresh after .rs failed:', error));
 
     return message.reply(
-      `${E.correct} Stats removed for **${operations.length}** player${operations.length === 1 ? '' : 's'}.` +
+      `${E.correct} Stats removed for **${updates.length}** player${updates.length === 1 ? '' : 's'}.` +
+      (removedFormEntries ? ` Removed ${removedFormEntries} matching last-five form entr${removedFormEntries === 1 ? 'y' : 'ies'}.` : '') +
       (deletedSummaryCount ? ` Deleted ${deletedSummaryCount} summary DM${deletedSummaryCount === 1 ? '' : 's'}.` : '')
     );
   }
 };
 
 module.exports.getReferencedMessage = getReferencedMessage;
+module.exports.removeLatestMatchingForm = removeLatestMatchingForm;
