@@ -120,7 +120,7 @@ module.exports = {
         inline: false
       })
       .setFooter({
-        text: `${message.author.username} • HandFootball stats`
+        text: `${message.author.username} • Overall stats per match determine rating`
       })
       .setTimestamp();
 
