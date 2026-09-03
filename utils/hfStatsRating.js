@@ -3,105 +3,109 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function matchCount(stats = {}) {
+  return Math.max(0, toNumber(stats.matches));
+}
+
+// Values are deliberately balanced across roles. A defensive performance
+// (tackles, interceptions and saves) can rate as highly as a scoring one.
 function calculateMatchImpact(form = {}) {
   return Math.max(0,
-    toNumber(form.goals) * 3.0 +
-    toNumber(form.assists) * 2.2 +
+    toNumber(form.goals) * 2.5 +
+    toNumber(form.assists) * 2.0 +
     toNumber(form.hattricks) * 1.5 +
-    toNumber(form.mvps) * 2.7 +
-    toNumber(form.interceptions) * 0.4 +
-    toNumber(form.tackles) * 0.3 +
-    toNumber(form.saves) * 0.5
+    toNumber(form.mvps) * 2.5 +
+    toNumber(form.interceptions) * 1.25 +
+    toNumber(form.tackles) * 1.1 +
+    toNumber(form.saves) * 1.6
   );
 }
 
 function calculateMatchRating(form = {}) {
-  // A logarithmic curve rewards a great all-round match without allowing
-  // stat volume to turn ordinary form into an automatic 10/10.
-  const rating = 4.5 + 1.5 * Math.log1p(calculateMatchImpact(form));
-  return Math.min(9.75, Math.max(4.5, rating));
+  // Logarithmic scaling rewards large games but prevents stat volume from
+  // handing out effortless 10/10 ratings.
+  const rating = 4.8 + 1.55 * Math.log1p(calculateMatchImpact(form));
+  return Math.min(9.75, Math.max(4.8, rating));
 }
 
-function getRecentForm(stats = {}) {
-  const recorded = Array.isArray(stats.recentForm)
-    ? stats.recentForm.filter(entry => entry && typeof entry === 'object').slice(-5)
-    : [];
-
-  if (recorded.length) return { entries: recorded, legacy: false };
-
-  // Older seasons store aggregate totals only. Estimate one conservative
-  // performance from their historical average so existing players do not lose
-  // their ratings. This does not reward number of appearances: matches are
-  // used only to normalize totals into an average performance.
-  const matches = Math.max(0, toNumber(stats.matches));
-  if (!matches) return { entries: [], legacy: false };
+function getPerMatchOverall(stats = {}) {
+  const matches = matchCount(stats);
+  if (!matches) return null;
 
   return {
-    entries: [{
-      goals: toNumber(stats.goals) / matches,
-      assists: toNumber(stats.assists) / matches,
-      mvps: toNumber(stats.mvps) / matches,
-      hattricks: toNumber(stats.hattricks) / matches,
-      interceptions: toNumber(stats.interceptions) / matches,
-      tackles: toNumber(stats.tackles) / matches,
-      saves: toNumber(stats.saves) / matches
-    }],
-    legacy: true
+    goals: toNumber(stats.goals) / matches,
+    assists: toNumber(stats.assists) / matches,
+    mvps: toNumber(stats.mvps) / matches,
+    hattricks: toNumber(stats.hattricks) / matches,
+    interceptions: toNumber(stats.interceptions) / matches,
+    tackles: toNumber(stats.tackles) / matches,
+    saves: toNumber(stats.saves) / matches
   };
 }
 
-function calculatePerformanceRating(stats = {}) {
-  const { entries, legacy } = getRecentForm(stats);
+function getRecentForm(stats = {}) {
+  return Array.isArray(stats.recentForm)
+    ? stats.recentForm.filter(entry => entry && typeof entry === 'object').slice(-5)
+    : [];
+}
+
+function weightedRecentRating(entries) {
   if (!entries.length) return 0;
-
-  const matchRatings = entries.map(calculateMatchRating);
-  const weights = matchRatings.map((_, index) => {
-    if (matchRatings.length === 1) return 1;
-    return 0.7 + (0.3 * index) / (matchRatings.length - 1);
+  const ratings = entries.map(calculateMatchRating);
+  const weights = ratings.map((_, index) => {
+    if (ratings.length === 1) return 1;
+    return 0.7 + (0.3 * index) / (ratings.length - 1);
   });
-  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
-  const weightedRating = matchRatings.reduce(
-    (sum, rating, index) => sum + rating * weights[index],
-    0
-  ) / weightTotal;
+  const totalWeight = weights.reduce((total, weight) => total + weight, 0);
+  return ratings.reduce((total, rating, index) => total + rating * weights[index], 0) / totalWeight;
+}
 
-  // Small samples are useful but cannot claim an elite rating. This is based
-  // only on the number of recorded form entries, never league appearances.
-  const formCap = legacy ? 9.0
-    : entries.length === 1 ? 8.25
-    : entries.length === 2 ? 8.75
-      : entries.length < 5 ? 9.3
-        : 9.75;
-  const averageImpact = entries.reduce((sum, entry) => sum + calculateMatchImpact(entry), 0) / entries.length;
-  const everyMatchElite = entries.every(entry => calculateMatchImpact(entry) >= 20);
+function calculatePerformanceRating(stats = {}) {
+  const matches = matchCount(stats);
+  const overallPerMatch = getPerMatchOverall(stats);
+  if (!overallPerMatch) return 0;
 
-  // 10/10 is reserved for five exceptional consecutive performances, not a
-  // one-off stat line. The ordinary curve deliberately stops at 9.75.
-  if (!legacy && entries.length === 5 && everyMatchElite && averageImpact >= 30) {
+  const overallImpact = calculateMatchImpact(overallPerMatch);
+  const overallRating = calculateMatchRating(overallPerMatch);
+  const recentEntries = getRecentForm(stats);
+  const recentRating = weightedRecentRating(recentEntries);
+
+  // Overall totals divided by matches are the foundation. Last-five form is a
+  // modest trend adjustment, not a replacement for a player's full season.
+  const combinedRating = recentRating
+    ? (overallRating * 0.7) + (recentRating * 0.3)
+    : overallRating;
+
+  // More matches make a rating more trustworthy. This moderates a one-game
+  // outlier without making appearances themselves a source of rating.
+  const confidence = 0.55 + (0.45 * Math.min(matches, 5) / 5);
+  const sampleAdjusted = 6 + ((combinedRating - 6) * confidence);
+  const sampleCap = matches === 1 ? 8.5
+    : matches === 2 ? 9.0
+      : matches === 3 ? 9.35
+        : matches === 4 ? 9.6
+          : 9.75;
+
+  // A perfect rating requires sustained elite full-season contribution and
+  // five elite recorded performances; it cannot come from a short hot run.
+  const everyRecentMatchElite = recentEntries.length === 5
+    && recentEntries.every(entry => calculateMatchImpact(entry) >= 18);
+  if (matches >= 5 && overallImpact >= 18 && everyRecentMatchElite && combinedRating >= 9.6) {
     return 10;
   }
 
-  if (legacy) {
-    // Historic totals can only provide an approximation. Preserve meaningful
-    // separation instead of forcing every old player above 8: solid records
-    // reach 8+, exceptional ones approach 9, and low-impact records remain
-    // lower. Match count only normalizes totals; it never raises the rating.
-    const historicalRating = 6.2 + Math.max(0, (weightedRating - 4.5) * 0.7);
-    return Number(Math.min(formCap, historicalRating).toFixed(2));
-  }
-
-  return Number(Math.min(formCap, Math.max(0, weightedRating)).toFixed(2));
+  return Number(Math.min(sampleCap, Math.max(4.8, sampleAdjusted)).toFixed(2));
 }
 
 function getRecentFormRatings(stats = {}) {
-  const { entries } = getRecentForm(stats);
-  return entries.map(entry => Number(calculateMatchRating(entry).toFixed(1)));
+  return getRecentForm(stats).map(entry => Number(calculateMatchRating(entry).toFixed(1)));
 }
 
 module.exports = {
   calculatePerformanceRating,
   calculateMatchImpact,
   calculateMatchRating,
+  getPerMatchOverall,
   getRecentForm,
   getRecentFormRatings
 };
