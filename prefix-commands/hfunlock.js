@@ -29,10 +29,18 @@ module.exports = {
       await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
 
       const existing = await getStoredAnnouncement(message.guild.id, message.channel.id);
-      if (existing?.roleIds?.length) {
+      const channelRoleIds = [...new Set([
+        ...(existing?.roleIds || []),
+        ...message.channel.permissionOverwrites.cache
+          .filter(overwrite => overwrite.type === 'role' && overwrite.id !== message.guild.roles.everyone.id)
+          .map(overwrite => overwrite.id),
+        ...(require('../utils/hfAnnouncements').getConfiguredPlayerRoleId ? [require('../utils/hfAnnouncements').getConfiguredPlayerRoleId()] : [])
+      ])];
+
+      if (channelRoleIds.length) {
         await setAnnouncementRoleAccess(
           message.channel,
-          existing.roleIds,
+          channelRoleIds,
           true,
           `Unlocked by ${message.author.tag}`
         );
