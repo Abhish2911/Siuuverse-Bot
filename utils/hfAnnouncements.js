@@ -189,27 +189,29 @@ async function deleteStoredAnnouncement(guildId, channelId) {
 
 async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
   const playerRoleId = getConfiguredPlayerRoleId();
-  if (!playerRoleId) throw new Error('HF_PLAYER_ROLE_ID is missing in .env');
-
   const uniqueTeamRoleIds = [...new Set((teamRoleIds || []).filter(Boolean))];
-  const roleIds = [...new Set([playerRoleId, ...uniqueTeamRoleIds])];
+  const roleIds = [...new Set([
+    ...(playerRoleId ? [playerRoleId] : []),
+    ...uniqueTeamRoleIds
+  ])];
+
+  if (!roleIds.length) return;
+
   const roles = await Promise.all(roleIds.map(roleId => (
     channel.guild.roles.cache.get(roleId)
       || channel.guild.roles.fetch(roleId).catch(() => null)
   )));
-  const missingRoleIndex = roles.findIndex(role => !role);
-  if (missingRoleIndex !== -1) {
-    throw new Error(`The announcement role (${roleIds[missingRoleIndex]}) was not found.`);
-  }
 
   const botMember = channel.guild.members.me;
   if (botMember && !botMember.permissions.has(PermissionFlagsBits.ManageChannels)) {
     throw new Error('I need Manage Channels permission to update this channel.');
   }
 
-  await Promise.all(roles.map((role, index) => channel.permissionOverwrites.edit(role, {
-    SendMessages: index === 0 ? false : matchStarted
-  }, { reason })));
+  await Promise.all(roles
+    .filter(Boolean)
+    .map(role => channel.permissionOverwrites.edit(role, {
+      SendMessages: role.id === playerRoleId ? false : matchStarted
+    }, { reason })));
 }
 
 async function completeAnnouncement(channel, scheduledAt, roleIds) {
