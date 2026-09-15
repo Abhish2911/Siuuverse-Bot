@@ -191,13 +191,17 @@ async function deleteStoredAnnouncement(guildId, channelId) {
 async function getChannelTeamRoleIds(channel) {
   const data = await loadHandFootballData().catch(() => ({ teams: [] }));
   const sheetTeamRoleIds = new Set((data.teams || []).map(team => team.roleId).filter(Boolean));
-
-  return [...new Set(
+  const channelRoleIds = new Set(
     channel.permissionOverwrites.cache
       .filter(overwrite => overwrite.type === 'role' && overwrite.id !== channel.guild.roles.everyone.id)
       .map(overwrite => overwrite.id)
-      .filter(roleId => sheetTeamRoleIds.has(roleId))
-  )];
+  );
+  const guildRoleIds = new Set(channel.guild.roles.cache.map(role => role.id));
+
+  return [...new Set([
+    ...Array.from(sheetTeamRoleIds).filter(roleId => guildRoleIds.has(roleId)),
+    ...Array.from(channelRoleIds).filter(roleId => sheetTeamRoleIds.has(roleId))
+  ])];
 }
 
 async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
