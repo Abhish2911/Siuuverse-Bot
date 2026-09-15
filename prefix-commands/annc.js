@@ -15,7 +15,8 @@ const {
   cancelScheduledAnnouncement,
   completeAnnouncement,
   scheduleAnnouncement,
-  setLocked
+  setLocked,
+  setAnnouncementRoleAccess
 } = require('../utils/hfAnnouncements');
 
 const TIME_FORMATS = ['2:30 PM', '14:30', '2 PM', '2:30'];
@@ -72,6 +73,12 @@ async function cancelAnnouncement(message) {
 
   cancelScheduledAnnouncement(message.channel.id);
   await deleteStoredAnnouncement(message.guild.id, message.channel.id);
+  await setAnnouncementRoleAccess(
+    message.channel,
+    existing.roleIds,
+    true,
+    `Cancelled by ${message.author.tag}`
+  ).catch(() => null);
   await setLocked(message.channel, false, `Cancelled by ${message.author.tag}`).catch(() => null);
   return message.reply(`#${message.channel.name} announcement cancelled.`);
 }
@@ -96,6 +103,12 @@ async function announce(message, timeText, teamText) {
     }
 
     cancelScheduledAnnouncement(message.channel.id);
+    await setAnnouncementRoleAccess(
+      message.channel,
+      existing.roleIds,
+      true,
+      `Replacing announcement by ${message.author.tag}`
+    ).catch(() => null);
     await deleteStoredAnnouncement(message.guild.id, message.channel.id);
   }
 
@@ -132,6 +145,12 @@ async function announce(message, timeText, teamText) {
   try {
     // Scheduling an announcement also locks this channel until the match time.
     await setLocked(message.channel, true, `Scheduled by ${message.author.tag}`);
+    await setAnnouncementRoleAccess(
+      message.channel,
+      allowedRoleIds,
+      false,
+      `Scheduled by ${message.author.tag}`
+    );
     await saveStoredAnnouncement({
       guildId: message.guild.id,
       channelId: message.channel.id,
@@ -144,6 +163,12 @@ async function announce(message, timeText, teamText) {
       await completeAnnouncement(message.channel, scheduledAt, allowedRoleIds);
     });
   } catch (error) {
+    await setAnnouncementRoleAccess(
+      message.channel,
+      allowedRoleIds,
+      true,
+      'Announcement scheduling rollback'
+    ).catch(() => null);
     await setLocked(message.channel, false, 'Announcement scheduling rollback').catch(() => null);
     await deleteStoredAnnouncement(message.guild.id, message.channel.id).catch(() => null);
     return message.reply(`${E.wrong} Could not schedule the announcement: ${error.message}`);
