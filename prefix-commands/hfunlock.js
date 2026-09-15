@@ -1,10 +1,10 @@
 const E = require('../utils/emojis');
+const { loadHandFootballData } = require('../utils/handfootball');
 const {
   getConfiguredLockRoleId,
   getConfiguredResultRoleIds,
   canManageHFChannel,
-  getStoredAnnouncement,
-  setAnnouncementRoleAccess,
+  getConfiguredPlayerRoleId,
   setLocked
 } = require('../utils/hfAnnouncements');
 
@@ -28,18 +28,31 @@ module.exports = {
     try {
       await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
 
-      const existing = await getStoredAnnouncement(message.guild.id, message.channel.id);
-      const teamRoleIds = [...new Set(existing?.roleIds || [])];
-      const playerRoleId = require('../utils/hfAnnouncements').getConfiguredPlayerRoleId();
+      const data = await loadHandFootballData().catch(() => ({ teams: [] }));
+      const sheetTeamRoleIds = [...new Set(
+        (data.teams || []).map(team => team.roleId).filter(Boolean)
+      )];
 
-      if (teamRoleIds.length || playerRoleId) {
-        await setAnnouncementRoleAccess(
-          message.channel,
-          [...new Set([...(teamRoleIds || []), ...(playerRoleId ? [playerRoleId] : [])])],
-          true,
-          `Unlocked by ${message.author.tag}`
-        );
-      }
+      const channelRoleIds = [...new Set(
+        message.channel.permissionOverwrites.cache
+          .filter(overwrite => overwrite.type === 'role' && overwrite.id !== message.guild.roles.everyone.id)
+          .map(overwrite => overwrite.id)
+          .filter(roleId => sheetTeamRoleIds.includes(roleId))
+      )];
+
+      const playerRoleId = getConfiguredPlayerRoleId();
+      const roleIdsToUnlock = [...new Set([
+        ...(playerRoleId ? [playerRoleId] : []),
+        ...channelRoleIds
+      ])];
+
+      await Promise.all(roleIdsToUnlock.map(roleId => {
+        const role = message.guild.roles.cache.get(roleId)
+          || message.guild.roles.fetch(roleId).catch(() => null);
+        return role ? message.channel.permissionOverwrites.edit(role, {
+          SendMessages: true
+        }, { reason: `Unlocked by ${message.author.tag}` }) : null;
+      }));
 
       return message.reply(`#${message.channel.name} is unlocked.`);
     } catch (error) {
