@@ -1,9 +1,9 @@
 const E = require('../utils/emojis');
-const { loadHandFootballData } = require('../utils/handfootball');
 const {
   getConfiguredLockRoleId,
   getConfiguredResultRoleIds,
   canManageHFChannel,
+  getChannelTeamRoleIds,
   getConfiguredPlayerRoleId,
   setLocked
 } = require('../utils/hfAnnouncements');
@@ -28,18 +28,7 @@ module.exports = {
     try {
       await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
 
-      const data = await loadHandFootballData().catch(() => ({ teams: [] }));
-      const sheetTeamRoleIds = [...new Set(
-        (data.teams || []).map(team => team.roleId).filter(Boolean)
-      )];
-
-      const channelRoleIds = [...new Set(
-        message.channel.permissionOverwrites.cache
-          .filter(overwrite => overwrite.type === 'role' && overwrite.id !== message.guild.roles.everyone.id)
-          .map(overwrite => overwrite.id)
-          .filter(roleId => sheetTeamRoleIds.includes(roleId))
-      )];
-
+      const channelRoleIds = await getChannelTeamRoleIds(message.channel);
       const playerRoleId = getConfiguredPlayerRoleId();
       const roleIdsToUnlock = [...new Set([
         ...(playerRoleId ? [playerRoleId] : []),
