@@ -21,19 +21,21 @@ module.exports = {
       return message.reply(`${E.wrong} You need the configured HF result role and Manage Channels permission for this channel.`);
     }
 
-    if (!getConfiguredLockRoleId()) {
-      return message.reply(`${E.missing} Add \`HF_LOCK_ROLE_ID\` to your .env first.`);
-    }
-
     try {
-      await setLocked(message.channel, true, `Locked by ${message.author.tag}`);
-
       const channelRoleIds = await getChannelTeamRoleIds(message.channel);
       const playerRoleId = getConfiguredPlayerRoleId();
       const roleIdsToLock = [...new Set([
         ...(playerRoleId ? [playerRoleId] : []),
         ...channelRoleIds
       ])];
+
+      if (getConfiguredLockRoleId()) {
+        await setLocked(message.channel, true, `Locked by ${message.author.tag}`);
+      }
+
+      if (!roleIdsToLock.length && !getConfiguredLockRoleId()) {
+        return message.reply(`${E.missing} No HF team roles or lock role were found for this channel.`);
+      }
 
       await Promise.all(roleIdsToLock.map(roleId => {
         const role = message.guild.roles.cache.get(roleId)
