@@ -1,6 +1,7 @@
 const { PermissionFlagsBits } = require('discord.js');
 const mongoose = require('mongoose');
 const HFAnnouncementSchedule = require('../models/HFAnnouncementSchedule');
+const { loadHandFootballData } = require('./handfootball');
 const { getActiveHFTournament, runWithHFTournament } = require('./hfTournamentConfig');
 
 const announcementTimers = new Map();
@@ -187,6 +188,18 @@ async function deleteStoredAnnouncement(guildId, channelId) {
   return true;
 }
 
+async function getChannelTeamRoleIds(channel) {
+  const data = await loadHandFootballData().catch(() => ({ teams: [] }));
+  const sheetTeamRoleIds = new Set((data.teams || []).map(team => team.roleId).filter(Boolean));
+
+  return [...new Set(
+    channel.permissionOverwrites.cache
+      .filter(overwrite => overwrite.type === 'role' && overwrite.id !== channel.guild.roles.everyone.id)
+      .map(overwrite => overwrite.id)
+      .filter(roleId => sheetTeamRoleIds.has(roleId))
+  )];
+}
+
 async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
   const playerRoleId = getConfiguredPlayerRoleId();
   const uniqueTeamRoleIds = [...new Set((teamRoleIds || []).filter(Boolean))];
@@ -321,6 +334,7 @@ module.exports = {
   scheduleStoredAnnouncement,
   restoreStoredAnnouncements,
   getConfiguredPlayerRoleId,
+  getChannelTeamRoleIds,
   setAnnouncementRoleAccess,
   setLocked
 };
