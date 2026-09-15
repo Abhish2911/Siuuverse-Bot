@@ -1,26 +1,24 @@
 const { PermissionFlagsBits } = require('discord.js');
 const mongoose = require('mongoose');
 const HFAnnouncementSchedule = require('../models/HFAnnouncementSchedule');
+const { getActiveHFTournament, runWithHFTournament } = require('./hfTournamentConfig');
 
 const announcementTimers = new Map();
 
 function getConfiguredLockRoleId() {
-  return String(
-    process.env.HF_LOCK_ROLE_ID ||
-    process.env.HF_CHANNEL_LOCK_ROLE_ID ||
-    ''
-  ).replace(/[<@&>]/g, '').trim();
+  return getActiveHFTournament().lockRoleId;
+}
+
+function getConfiguredPlayerRoleId() {
+  return getActiveHFTournament().playerRoleId;
 }
 
 function getConfiguredResultRoleIds() {
-  return [
-    ...String(process.env.HF_RESULT_ROLE_ID || '').split(','),
-    ...String(process.env.HF_RESULT_ROLE_IDS || '').split(',')
-  ].map(value => value.replace(/[<@&>]/g, '').trim()).filter(Boolean);
+  return getActiveHFTournament().resultRoleIds;
 }
 
 function getHFTimezone() {
-  const timezone = String(process.env.HF_TIMEZONE || 'UTC').trim() || 'UTC';
+  const timezone = getActiveHFTournament().timezone;
 
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
@@ -178,7 +176,7 @@ async function saveStoredAnnouncement(data) {
   return HFAnnouncementSchedule.findOneAndUpdate(
     { guildId: data.guildId, channelId: data.channelId },
     { $set: data },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 }
 
@@ -189,16 +187,46 @@ async function deleteStoredAnnouncement(guildId, channelId) {
   return true;
 }
 
+async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
+  const playerRoleId = getConfiguredPlayerRoleId();
+  if (!playerRoleId) throw new Error('HF_PLAYER_ROLE_ID is missing in .env');
+
+  const uniqueTeamRoleIds = [...new Set((teamRoleIds || []).filter(Boolean))];
+  const roleIds = [...new Set([playerRoleId, ...uniqueTeamRoleIds])];
+  const roles = await Promise.all(roleIds.map(roleId => (
+    channel.guild.roles.cache.get(roleId)
+      || channel.guild.roles.fetch(roleId).catch(() => null)
+  )));
+  const missingRoleIndex = roles.findIndex(role => !role);
+  if (missingRoleIndex !== -1) {
+    throw new Error(`The announcement role (${roleIds[missingRoleIndex]}) was not found.`);
+  }
+
+  const botMember = channel.guild.members.me;
+  if (botMember && !botMember.permissions.has(PermissionFlagsBits.ManageChannels)) {
+    throw new Error('I need Manage Channels permission to update this channel.');
+  }
+
+  await Promise.all(roles.map((role, index) => channel.permissionOverwrites.edit(role, {
+    SendMessages: index === 0 ? false : matchStarted
+  }, { reason })));
+}
+
 async function completeAnnouncement(channel, scheduledAt, roleIds) {
   const allowedRoleIds = [...new Set((roleIds || []).filter(Boolean))];
   const roleMentions = allowedRoleIds.map(roleId => `<@&${roleId}>`).join(' vs ');
 
   let unlockError = null;
   try {
-    await setLocked(channel, false, 'HandFootball announcement time reached');
+    await setAnnouncementRoleAccess(
+      channel,
+      allowedRoleIds,
+      true,
+      'HandFootball announcement time reached'
+    );
   } catch (error) {
     unlockError = error;
-    console.error(`❌ Failed to unlock HandFootball announcement channel ${channel.id}:`, error);
+    console.error(`❌ Failed to open HandFootball announcement channel ${channel.id}:`, error);
   }
 
   if (roleMentions) {
@@ -226,9 +254,14 @@ function scheduleStoredAnnouncement(client, record) {
   const channel = guild.channels.cache.get(record.channelId);
   if (!channel || typeof channel.send !== 'function') return false;
 
-  return scheduleAnnouncement(channel, new Date(record.scheduledAt), async () => {
-    await completeAnnouncement(channel, new Date(record.scheduledAt), record.roleIds);
-  });
+  try {
+    return runWithHFTournament(record.guildId, () => scheduleAnnouncement(channel, new Date(record.scheduledAt), async () => {
+      await completeAnnouncement(channel, new Date(record.scheduledAt), record.roleIds);
+    }));
+  } catch (error) {
+    console.warn(`⚠️ Skipped HF announcement for unconfigured guild ${record.guildId}:`, error.message);
+    return false;
+  }
 }
 
 async function restoreStoredAnnouncements(client) {
@@ -285,5 +318,7 @@ module.exports = {
   completeAnnouncement,
   scheduleStoredAnnouncement,
   restoreStoredAnnouncements,
+  getConfiguredPlayerRoleId,
+  setAnnouncementRoleAccess,
   setLocked
 };

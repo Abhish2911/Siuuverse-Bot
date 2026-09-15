@@ -1179,7 +1179,7 @@ async function applyGameStats(game) {
   const claimed = await PenaltyRoyaleGame.findOneAndUpdate(
     { _id: game._id, statsApplied: false },
     { $set: { statsApplied: true } },
-    { new: true }
+    { returnDocument: 'after' }
   );
   if (!claimed) return false;
 
@@ -1218,7 +1218,7 @@ async function applyGameStats(game) {
     const profile = await PenaltyRoyaleProfile.findOneAndUpdate(
       { guildId: game.guildId, userId: player.userId },
       update,
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     const nextWinStreak = won ? (profile.currentWinStreak || 0) + 1 : 0;
