@@ -3,6 +3,8 @@ const {
   getConfiguredLockRoleId,
   getConfiguredResultRoleIds,
   canManageHFChannel,
+  getStoredAnnouncement,
+  setAnnouncementRoleAccess,
   setLocked
 } = require('../utils/hfAnnouncements');
 
@@ -25,6 +27,17 @@ module.exports = {
 
     try {
       await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
+
+      const existing = await getStoredAnnouncement(message.guild.id, message.channel.id);
+      if (existing?.roleIds?.length) {
+        await setAnnouncementRoleAccess(
+          message.channel,
+          existing.roleIds,
+          true,
+          `Unlocked by ${message.author.tag}`
+        );
+      }
+
       return message.reply(`#${message.channel.name} is unlocked.`);
     } catch (error) {
       return message.reply(`${E.wrong} ${error.message}`);
