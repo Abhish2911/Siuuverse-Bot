@@ -26,7 +26,6 @@ const playerSchema = new mongoose.Schema({
     read: { type: Number, default: 0 },
     superSave: { type: Number, default: 0 },
     precision: { type: Number, default: 0 },
-    fakeShot: { type: Number, default: 0 },
     rebound: { type: Number, default: 0 }
   },
   attempts: { type: Number, default: 0 }
@@ -77,8 +76,6 @@ const penaltyRoyaleGameSchema = new mongoose.Schema({
   shot: { type: String, enum: ['', 'left', 'center', 'right'], default: '' },
   predictions: { type: [predictionSchema], default: [] },
   precisionActive: { type: Boolean, default: false },
-  fakeShotActive: { type: Boolean, default: false },
-  fakeShotDirection: { type: String, enum: ['', 'left', 'center', 'right'], default: '' },
   reboundArmedBy: { type: String, default: '' },
   superSaveArmedBy: { type: String, default: '' },
   chaosMode: { type: String, enum: ['', 'golden', 'sudden', 'blind'], default: '' },
