@@ -47,12 +47,6 @@ const ABILITY_DEFS = {
     aliases: ['precision'],
     description: 'Use before shooting to ignore the goalkeeper’s correct read.'
   },
-  fakeShot: {
-    label: 'Fake Shot',
-    emoji: E.prFakeShot,
-    aliases: ['fakeshot', 'fake-shot', 'fake'],
-    description: 'Use before shooting to publicly display a false corner to defenders.'
-  },
   rebound: {
     label: 'Rebound',
     emoji: E.prRebound,
@@ -81,7 +75,7 @@ const CHAOS_DEFS = {
 
 const GOAL_GIFS = {
   left: 'https://klipy.com/gifs/ishowspeed-first-goal',
-  center: 'https://klipy.com/gifs/penalty-kicks',
+  center: 'https://media.discordapp.net/attachments/848199446139371530/1544963309743251456/Zidane-Panenka.gif?ex=6aab8e35&is=6aaa3cb5&hm=0216254cb52b47109647f248a06452d9fb1ea746f4871816648cb6c1e16ea873&=&width=1280&height=960',
   right: 'https://klipy.com/gifs/ronaldo-penalty-ronaldo-penalty-vs-roma-1'
 };
 const SAVE_GIFS = {
@@ -411,16 +405,17 @@ function chooseGoalkeeper(game, shooter) {
   if (!shooter) return null;
   if (game.mode === 'teams') {
     const defendingTeam = shooter.team === 'A' ? 'B' : 'A';
-    const keepers = teamPlayers(game, defendingTeam);
-    if (!game.lastGoalkeeperByTeam) game.lastGoalkeeperByTeam = { a: '', b: '' };
-    const previous = game.lastGoalkeeperByTeam?.[defendingTeam.toLowerCase()] || '';
-    const goalkeeper = nextPlayerAfter(keepers, previous);
-    if (goalkeeper) game.lastGoalkeeperByTeam[defendingTeam.toLowerCase()] = goalkeeper.userId;
+    const keepers = teamPlayers(game, defendingTeam).filter(player => player.userId !== shooter.userId);
+    const goalkeeper = keepers[Math.floor(Math.random() * keepers.length)];
+    if (goalkeeper) {
+      if (!game.lastGoalkeeperByTeam) game.lastGoalkeeperByTeam = { a: '', b: '' };
+      game.lastGoalkeeperByTeam[defendingTeam.toLowerCase()] = goalkeeper.userId;
+    }
     return goalkeeper;
   }
 
-  const goalkeeper = nextPlayerAfter(alivePlayers(game), game.lastGoalkeeperId || shooter.userId);
-  if (goalkeeper?.userId === shooter.userId) return null;
+  const keepers = alivePlayers(game).filter(player => player.userId !== shooter.userId);
+  const goalkeeper = keepers[Math.floor(Math.random() * keepers.length)];
   if (goalkeeper) game.lastGoalkeeperId = goalkeeper.userId;
   return goalkeeper;
 }
@@ -509,15 +504,11 @@ function buildGamePayload(game, options = {}) {
   } else if (game.status === 'predicting') {
     const defenders = getDefenders(game);
     const predictors = getPredictors(game);
-    const fakeShot = game.fakeShotDirection
-      ? `\n${E.prFakeShot} **Fake Shot shown:** ${DIRECTIONS[game.fakeShotDirection]}`
-      : '';
     baseDescription.push(
       `**Round ${game.round}${game.teamTiebreaker ? ' — SUDDEN-DEATH TIEBREAKER' : ''}**\n${E.scorer} Shooter: ${mention(shooter.userId)}\n` +
       `${E.goalkeeper} Goalkeeper: ${goalkeeper ? mention(goalkeeper.userId) : '—'}\n` +
       `${E.prPrediction} Choices locked in: **${game.predictions.length}/${defenders.length}** (${predictors.length} predictor${predictors.length === 1 ? '' : 's'})\n` +
-      `${defenders.map(player => mention(player.userId)).join(' ') || 'No defenders remain'} — predictors have been sent a private numbered prompt.` +
-      fakeShot
+      `${defenders.map(player => mention(player.userId)).join(' ') || 'No defenders remain'} — predictors have been sent a private numbered prompt.`
     );
   } else if (game.status === 'finished') {
     const winnerText = game.winnerIds.length
@@ -535,7 +526,7 @@ function buildGamePayload(game, options = {}) {
     .setFooter({
       text: game.mode === 'teams'
         ? 'Team mode • Use .prabilities to view your abilities'
-        : 'Royale mode • Correct predictions earn shields • Use .prabilities for abilities'
+        : 'Royale mode • Three consecutive GK saves earn an ability • Use .prabilities for abilities'
     })
     .setTimestamp();
 
@@ -685,8 +676,6 @@ function startGame(game, actor) {
 
 function clearRoundAbilities(game) {
   game.precisionActive = false;
-  game.fakeShotActive = false;
-  game.fakeShotDirection = '';
   game.reboundArmedBy = '';
   game.superSaveArmedBy = '';
 }
@@ -777,17 +766,6 @@ function useAbility(game, userId, ability) {
     };
   }
 
-  if (ability === 'fakeShot') {
-    if (game.fakeShotActive) throw new GameActionError('Fake Shot is already armed this round.');
-    consumeAbility(player, ability);
-    recordAbilityUse(player);
-    game.fakeShotActive = true;
-    return {
-      notice: `${E.prFakeShot} **Fake Shot armed:** defenders will see a false corner after you shoot.`,
-      autoPrediction: false
-    };
-  }
-
   if (ability === 'rebound') {
     if (game.reboundArmedBy) throw new GameActionError('Rebound is already armed this round.');
     consumeAbility(player, ability);
@@ -814,10 +792,6 @@ function lockShot(game, userId, direction) {
   }
 
   game.shot = parseDirection(direction);
-  if (game.fakeShotActive) {
-    const fakeChoices = Object.keys(DIRECTIONS).filter(directionKey => directionKey !== game.shot);
-    game.fakeShotDirection = fakeChoices[Math.floor(Math.random() * fakeChoices.length)];
-  }
   if (game.superSaveArmedBy && game.goalkeeperId) {
     lockGoalkeeperChoice(game, game.goalkeeperId, game.shot);
   }
@@ -1051,8 +1025,6 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
       if (correct && !precisionBlocked) {
         defender.saves += 1;
         defender.correctPredictions += 1;
-        defender.shields += 1;
-        defender.shieldsEarned += 1;
         defender.saveStreak += 1;
         defender.bestSaveStreak = Math.max(defender.bestSaveStreak, defender.saveStreak);
         if (defender.saveStreak % 3 === 0) {
@@ -1119,7 +1091,7 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
   const goalkeeperChoice = game.predictions.find(prediction => prediction.userId === goalkeeper.userId)?.choice;
   const mainChoicesText = blindPenalty
     ? ''
-    : `\n${mention(shooter.userId)}: **${DIRECTION_NUMBERS[resolvedShot] || '—'}** | ${mention(goalkeeper.userId)}: **${DIRECTION_NUMBERS[goalkeeperChoice] || '—'}**\n`;
+    : `\nShooter ${mention(shooter.userId)}: **${DIRECTION_NUMBERS[resolvedShot] || '—'}** | Goalkeeper ${mention(goalkeeper.userId)}: **${DIRECTION_NUMBERS[goalkeeperChoice] || '—'}**\n`;
   const predictorPointsText = correctPredictors.length
     ? ` ${correctPredictors.map(player => mention(player.userId)).join(', ')} earned **+1 Prediction Point**.`
     : '';
@@ -1129,12 +1101,15 @@ function resolveRound(game, { fillMissingPredictions = false } = {}) {
   if (saved) {
     const savedShotText = blindPenalty
       ? `${E.prBlind} The shot corner stays hidden.`
-      : `${mention(shooter.userId)} shot ${shotLabel}.`;
-    game.lastRoundSummary = `${E.save} **SAVED!** ${savedShotText} ${mention(goalkeeper.userId)} made the save and earned a shield.${mainChoicesText}${predictorPointsText}${precisionText}${suddenDeath ? ` ${E.prSudden} Sudden Death eliminates ${mention(shooter.userId)}!` : shieldUsed ? ` ${E.prShield} A shield absorbed the life loss.` : lifeLost ? ` ${mention(shooter.userId)} loses ${E.prHeart}.` : ''}${reboundActivated ? ` ${E.prRebound} Rebound! The shooter gets another attempt.` : ''}`;
+      : `Shooter ${mention(shooter.userId)} shot ${shotLabel}.`;
+    const saveStreakText = goalkeeper.saveStreak % 3 === 0
+      ? ` ${E.prAbility} Goalkeeper ${mention(goalkeeper.userId)} reached a 3-save streak and earned a secret ability.`
+      : '';
+    game.lastRoundSummary = `${E.save} **SAVED!** ${savedShotText} Goalkeeper ${mention(goalkeeper.userId)} made the save.${saveStreakText}${mainChoicesText}${predictorPointsText}${precisionText}${suddenDeath ? ` ${E.prSudden} Sudden Death eliminates Shooter ${mention(shooter.userId)}!` : shieldUsed ? ` ${E.prShield} A shield absorbed the life loss.` : lifeLost ? ` Shooter ${mention(shooter.userId)} loses ${E.prHeart}.` : ''}${reboundActivated ? ` ${E.prRebound} The shooter gets another attempt.` : ''}`;
   } else {
     const goalShotText = blindPenalty
-      ? `${mention(shooter.userId)} scored, but the shot corner stays hidden.`
-      : `${mention(shooter.userId)} scored ${shotLabel}`;
+      ? `Shooter ${mention(shooter.userId)} scored, but the shot corner stays hidden.`
+      : `Shooter ${mention(shooter.userId)} scored ${shotLabel}`;
     game.lastRoundSummary = `${E.goal} **GOAL!** ${goalShotText}${goalValue > 1 ? ' for **2 goals**' : ''}.${mainChoicesText}${predictorPointsText}${precisionText}${rewardText}`;
   }
 
@@ -1289,13 +1264,14 @@ async function sendRoundPrompts(client, game) {
   const seconds = getRoundTimeoutSeconds(game);
   if (game.status === 'shooting') {
     const [shooterDm, goalkeeperDm] = await Promise.all([
-      sendDmPrompt(client, shooter, `ROUND ${game.round} — SHOOTER`, ['precision', 'fakeShot', 'rebound']),
+      sendDmPrompt(client, shooter, `ROUND ${game.round} — SHOOTER`, ['precision', 'rebound']),
       sendDmPrompt(client, goalkeeper, `ROUND ${game.round} — GOALKEEPER`, ['superSave'])
     ]);
     await channel.send(
-      `${mention(shooter.userId)} ${mention(goalkeeper.userId)}\n` +
       `**ROUND ${game.round}${game.teamTiebreaker ? ' — SUDDEN-DEATH TIEBREAKER' : ''}**\n` +
-      `${E.scorer} Shooter and ${E.goalkeeper} goalkeeper: check your DMs and reply **1, 2, or 3** — **${seconds}s** to reply.`
+      `${E.scorer} Shooter: ${mention(shooter.userId)}\n` +
+      `${E.goalkeeper} Goalkeeper: ${mention(goalkeeper.userId)}\n` +
+      `Check your DMs and reply **1, 2, or 3** — **${seconds}s** to reply.`
     ).catch(() => null);
     const failed = [!shooterDm && shooter, !goalkeeperDm && goalkeeper].filter(Boolean);
     if (failed.length) {
@@ -1357,7 +1333,7 @@ async function handlePenaltyRoyaleDm(client, message) {
     if (game.status === 'shooting') {
       const player = getPlayer(game, message.author.id);
       const abilityKeys = game.shooterId === message.author.id
-        ? ['precision', 'fakeShot', 'rebound']
+        ? ['precision', 'rebound']
         : ['superSave'];
       const ability = abilityForNumber(player, abilityKeys, choice);
       if (ability) {
@@ -1387,6 +1363,7 @@ async function handlePenaltyRoyaleDm(client, message) {
     }
 
     await game.save();
+    await refreshGameMessage(client, game).catch(() => null);
     // Use Unicode here: server custom emoji reactions are not reliable in DMs.
     await message.react('✅').catch(() => null);
     await message.reply(notice).catch(() => null);

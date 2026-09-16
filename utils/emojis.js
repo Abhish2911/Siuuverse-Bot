@@ -101,7 +101,6 @@ const emojis = {
 // introducing standalone Unicode icons.
 emojis.prRead = emojis.interception;
 emojis.prPrecision = emojis.goal;
-emojis.prFakeShot = emojis.duel;
 emojis.prRebound = emojis.doubleArrow;
 emojis.prGolden = emojis.golden;
 emojis.prSudden = emojis.red;
