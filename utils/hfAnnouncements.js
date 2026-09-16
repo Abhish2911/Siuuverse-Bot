@@ -204,6 +204,20 @@ async function getChannelTeamRoleIds(channel) {
   ])];
 }
 
+async function getUnlockedTeamRoleIds(channel) {
+  const data = await loadHandFootballData();
+  const teamRoleIds = [...new Set((data.teams || []).map(team => team.roleId).filter(Boolean))];
+  const roles = await Promise.all(teamRoleIds.map(roleId => (
+    channel.guild.roles.cache.get(roleId)
+      || channel.guild.roles.fetch(roleId).catch(() => null)
+  )));
+
+  return roles
+    .filter(Boolean)
+    .filter(role => channel.permissionsFor(role)?.has(PermissionFlagsBits.SendMessages))
+    .map(role => role.id);
+}
+
 async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
   const playerRoleId = getConfiguredPlayerRoleId();
   const uniqueTeamRoleIds = [...new Set((teamRoleIds || []).filter(Boolean))];
@@ -339,6 +353,7 @@ module.exports = {
   restoreStoredAnnouncements,
   getConfiguredPlayerRoleId,
   getChannelTeamRoleIds,
+  getUnlockedTeamRoleIds,
   setAnnouncementRoleAccess,
   setLocked
 };
