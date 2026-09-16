@@ -53,7 +53,7 @@ function createEmbed(topic) {
         },
         {
           name: `3. Result`,
-          value: `${E.goal} **Goal:** the goalkeeper chose the wrong corner. Correct predictors still earn **+1 Prediction Point**.\n${E.save} **Saved:** only the goalkeeper’s correct choice saves the shot. The GK earns a save and ${E.prShield} shield; correct predictors still earn **+1 Prediction Point**.\n${E.prShield} In Royale, a shield blocks one life loss before being consumed.`,
+          value: `${E.goal} **Goal:** the goalkeeper chose the wrong corner. Correct predictors still earn **+1 Prediction Point**.\n${E.save} **Saved:** only the goalkeeper’s correct choice saves the shot. The GK records a save; correct predictors still earn **+1 Prediction Point**. Every third consecutive goalkeeper save awards a secret ability.`,
           inline: false
         },
         {
@@ -73,7 +73,6 @@ function createEmbed(topic) {
         { name: `${E.prRead} Read`, value: 'While predicting, privately reveals one corner the shooter did not choose.', inline: true },
         { name: `${E.save} Super Save`, value: 'For the assigned goalkeeper, locks in a guaranteed save.', inline: true },
         { name: `${E.prPrecision} Precision`, value: 'Before shooting, ignores the goalkeeper’s correct read.', inline: true },
-        { name: `${E.prFakeShot} Fake Shot`, value: 'Before shooting, displays a false corner to defenders.', inline: true },
         { name: `${E.prRebound} Rebound`, value: 'Before shooting, lets a surviving shooter try again after a save.', inline: true },
         {
           name: `${E.prAbility} Managing abilities`,

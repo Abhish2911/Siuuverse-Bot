@@ -29,7 +29,7 @@ module.exports = {
       scheduleRoundTimer(client, game);
       await sendRoundPrompts(client, game);
       return message.reply(
-        `${E.trophy} Penalty Royale has started! <@${game.shooterId}> shoots first. ` +
+        `${E.trophy} Penalty Royale has started! Shooter: <@${game.shooterId}>. Goalkeeper: <@${game.goalkeeperId}>. ` +
         `Starting abilities were DM'd to **${dmResults.delivered}/${assignments.length}** player(s); extra abilities require a 3-streak.`
       );
     } catch (error) {
