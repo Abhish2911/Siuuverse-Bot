@@ -188,43 +188,12 @@ async function deleteStoredAnnouncement(guildId, channelId) {
   return true;
 }
 
-async function getChannelTeamRoleIds(channel) {
-  const data = await loadHandFootballData().catch(() => ({ teams: [] }));
-  const sheetTeamRoleIds = new Set((data.teams || []).map(team => team.roleId).filter(Boolean));
-  const channelRoleIds = new Set(
-    channel.permissionOverwrites.cache
-      .filter(overwrite => overwrite.type === 'role' && overwrite.id !== channel.guild.roles.everyone.id)
-      .map(overwrite => overwrite.id)
-  );
-  const guildRoleIds = new Set(channel.guild.roles.cache.map(role => role.id));
-
-  return [...new Set([
-    ...Array.from(sheetTeamRoleIds).filter(roleId => guildRoleIds.has(roleId)),
-    ...Array.from(channelRoleIds).filter(roleId => sheetTeamRoleIds.has(roleId))
-  ])];
-}
-
-async function getUnlockedTeamRoleIds(channel) {
-  const data = await loadHandFootballData();
-  const teamRoleIds = [...new Set((data.teams || []).map(team => team.roleId).filter(Boolean))];
-  const roles = await Promise.all(teamRoleIds.map(roleId => (
-    channel.guild.roles.cache.get(roleId)
-      || channel.guild.roles.fetch(roleId).catch(() => null)
-  )));
-
-  return roles
-    .filter(Boolean)
-    .filter(role => channel.permissionsFor(role)?.has(PermissionFlagsBits.SendMessages))
-    .map(role => role.id);
-}
-
 async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, reason) {
   const playerRoleId = getConfiguredPlayerRoleId();
-  const uniqueTeamRoleIds = [...new Set((teamRoleIds || []).filter(Boolean))];
   const roleIds = [...new Set([
     ...(playerRoleId ? [playerRoleId] : []),
-    ...uniqueTeamRoleIds
-  ])];
+    ...((teamRoleIds || []).filter(Boolean))
+  ])].filter(roleId => roleId === playerRoleId);
 
   if (!roleIds.length) return;
 
@@ -241,7 +210,7 @@ async function setAnnouncementRoleAccess(channel, teamRoleIds, matchStarted, rea
   await Promise.all(roles
     .filter(Boolean)
     .map(role => channel.permissionOverwrites.edit(role, {
-      SendMessages: role.id === playerRoleId ? false : matchStarted
+      SendMessages: matchStarted
     }, { reason })));
 }
 
@@ -352,8 +321,6 @@ module.exports = {
   scheduleStoredAnnouncement,
   restoreStoredAnnouncements,
   getConfiguredPlayerRoleId,
-  getChannelTeamRoleIds,
-  getUnlockedTeamRoleIds,
   setAnnouncementRoleAccess,
   setLocked
 };
