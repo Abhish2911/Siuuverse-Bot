@@ -3,7 +3,6 @@ const {
   getConfiguredLockRoleId,
   getConfiguredResultRoleIds,
   canManageHFChannel,
-  getChannelTeamRoleIds,
   getConfiguredPlayerRoleId,
   setLocked
 } = require('../utils/hfAnnouncements');
@@ -22,28 +21,25 @@ module.exports = {
     }
 
     try {
-      const channelRoleIds = await getChannelTeamRoleIds(message.channel);
       const playerRoleId = getConfiguredPlayerRoleId();
-      const roleIdsToUnlock = [...new Set([
-        ...(playerRoleId ? [playerRoleId] : []),
-        ...channelRoleIds
-      ])];
+      if (!playerRoleId) {
+        return message.reply(`${E.missing} Add \`HF_PLAYER_ROLE_ID\` to your .env first.`);
+      }
 
       if (getConfiguredLockRoleId()) {
         await setLocked(message.channel, false, `Unlocked by ${message.author.tag}`);
       }
 
-      if (!roleIdsToUnlock.length && !getConfiguredLockRoleId()) {
-        return message.reply(`${E.missing} No HF team roles or lock role were found for this channel.`);
+      const role = message.guild.roles.cache.get(playerRoleId)
+        || await message.guild.roles.fetch(playerRoleId).catch(() => null);
+
+      if (!role) {
+        return message.reply(`${E.missing} The configured HF player role was not found in this server.`);
       }
 
-      await Promise.all(roleIdsToUnlock.map(roleId => {
-        const role = message.guild.roles.cache.get(roleId)
-          || message.guild.roles.fetch(roleId).catch(() => null);
-        return role ? message.channel.permissionOverwrites.edit(role, {
-          SendMessages: true
-        }, { reason: `Unlocked by ${message.author.tag}` }) : null;
-      }));
+      await message.channel.permissionOverwrites.edit(role, {
+        SendMessages: true
+      }, { reason: `Unlocked by ${message.author.tag}` });
 
       return message.reply(`#${message.channel.name} is unlocked.`);
     } catch (error) {

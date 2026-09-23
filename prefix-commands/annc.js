@@ -14,7 +14,6 @@ const {
   deleteStoredAnnouncement,
   cancelScheduledAnnouncement,
   completeAnnouncement,
-  getUnlockedTeamRoleIds,
   scheduleAnnouncement,
   setLocked,
   setAnnouncementRoleAccess
@@ -144,12 +143,11 @@ async function announce(message, timeText, teamText) {
   const allowedRoleIds = roles.map(role => role.id);
 
   try {
-    // Scheduling an announcement also locks this channel until the match time.
-    const unlockedTeamRoleIds = await getUnlockedTeamRoleIds(message.channel);
+    // Scheduling an announcement also locks the HF player role until the match time.
     await setLocked(message.channel, true, `Scheduled by ${message.author.tag}`);
     await setAnnouncementRoleAccess(
       message.channel,
-      unlockedTeamRoleIds,
+      [],
       false,
       `Scheduled by ${message.author.tag}`
     );
