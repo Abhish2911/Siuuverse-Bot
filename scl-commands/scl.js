@@ -648,19 +648,69 @@ async function syncTeamRoles(message, config, Team) {
     }
   }
 
+  const startedAt = Date.now();
+  const summary = { processed: 0, added: 0, removed: 0, missingMembers: 0, failed: 0 };
+  let totalMembers = 0;
+  const buildProgressPayload = (state = 'processing', detail = '') => {
+    const complete = state === 'complete';
+    const failed = state === 'failed';
+    const title = failed
+      ? `${E.error} SCL Role Sync Failed`
+      : complete
+        ? `${E.success} SCL Role Sync Complete`
+        : `${E.loading || '⏳'} SCL Role Sync In Progress`;
+    const description = detail || [
+      `${E.team} Mapped team roles: **${plan.roleIds.size}**`,
+      `${E.profile} Processed: **${summary.processed}/${totalMembers}** server members`,
+      `${E.success} Added: **${summary.added}**  •  Removed: **${summary.removed}**`,
+      `${E.missing} Roster members not found: **${summary.missingMembers}**  •  Failed updates: **${summary.failed}**`,
+      complete ? `Duration: **${((Date.now() - startedAt) / 1000).toFixed(1)}s**` : ''
+    ].filter(Boolean).join('\n');
+    return {
+      embeds: [new EmbedBuilder()
+        .setColor(failed ? 0xed4245 : complete ? 0x00b894 : 0xffd700)
+        .setAuthor({ name: 'Siuuverse Champions League' })
+        .setTitle(title)
+        .setDescription(description)
+        .setTimestamp()],
+      allowedMentions: { parse: [] }
+    };
+  };
+  let progressMessage = await safeReply(
+    message,
+    buildProgressPayload(
+      'processing',
+      `${E.team} Mapped team roles: **${plan.roleIds.size}**\n${E.loading || '⏳'} Loading server members and preparing updates...`
+    )
+  );
+  const updateProgress = async (payload = buildProgressPayload()) => {
+    try {
+      await progressMessage.edit(payload);
+    } catch (error) {
+      console.error('SCL role sync progress message update failed; sending a replacement:', error);
+      progressMessage = await safeReply(message, payload);
+    }
+  };
+
   let members;
   try {
     members = await message.guild.members.fetch();
   } catch (error) {
     console.error('SCL role sync member fetch failed:', error);
-    return safeReply(message, `${E.error} I could not load this server’s members, so no SCL roles were changed.`);
+    await updateProgress(buildProgressPayload(
+      'failed',
+      `${E.error} I could not load this server’s members, so no SCL roles were changed.`
+    ));
+    return progressMessage;
   }
 
-  const summary = { added: 0, removed: 0, missingMembers: 0, failed: 0 };
+  totalMembers = members.size;
   for (const userId of plan.expectedRoleByUser.keys()) {
     if (!members.has(userId)) summary.missingMembers += 1;
   }
 
+  await updateProgress();
+  const updateInterval = Math.max(1, Math.ceil(totalMembers / 20));
   for (const member of members.values()) {
     const expectedRoleId = plan.expectedRoleByUser.get(member.id);
     for (const roleId of plan.roleIds) {
@@ -682,13 +732,14 @@ async function syncTeamRoles(message, config, Team) {
         console.error(`SCL role sync could not add role ${expectedRoleId} to ${member.id}:`, error);
       }
     }
+    summary.processed += 1;
+    if (summary.processed % updateInterval === 0 || summary.processed === totalMembers) {
+      await updateProgress();
+    }
   }
 
-  return safeReply(message, [
-    `${E.success} SCL team role sync complete.`,
-    `Added: **${summary.added}**  •  Removed: **${summary.removed}**`,
-    `Roster members not found: **${summary.missingMembers}**  •  Failed updates: **${summary.failed}**`
-  ].join('\n'));
+  await updateProgress(buildProgressPayload('complete'));
+  return progressMessage;
 }
 
 async function toggle(message, args, config) {
