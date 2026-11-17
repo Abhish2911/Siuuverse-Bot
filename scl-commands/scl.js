@@ -661,7 +661,7 @@ async function syncTeamRoles(message, config, Team) {
         : `${E.loading || '⏳'} SCL Role Sync In Progress`;
     const description = detail || [
       `${E.team} Mapped team roles: **${plan.roleIds.size}**`,
-      `${E.profile} Processed: **${summary.processed}/${totalMembers}** server members`,
+      `${E.profile} Processed: **${summary.processed}/${totalMembers}** roster members`,
       `${E.success} Added: **${summary.added}**  •  Removed: **${summary.removed}**`,
       `${E.missing} Roster members not found: **${summary.missingMembers}**  •  Failed updates: **${summary.failed}**`,
       complete ? `Duration: **${((Date.now() - startedAt) / 1000).toFixed(1)}s**` : ''
@@ -680,7 +680,7 @@ async function syncTeamRoles(message, config, Team) {
     message,
     buildProgressPayload(
       'processing',
-      `${E.team} Mapped team roles: **${plan.roleIds.size}**\n${E.loading || '⏳'} Loading server members and preparing updates...`
+      `${E.team} Mapped team roles: **${plan.roleIds.size}**\n${E.loading || '⏳'} Loading roster members and preparing updates...`
     )
   );
   const updateProgress = async (payload = buildProgressPayload()) => {
@@ -692,44 +692,46 @@ async function syncTeamRoles(message, config, Team) {
     }
   };
 
-  let members;
-  try {
-    members = await message.guild.members.fetch();
-  } catch (error) {
-    console.error('SCL role sync member fetch failed:', error);
-    await updateProgress(buildProgressPayload(
-      'failed',
-      `${E.error} I could not load this server’s members, so no SCL roles were changed.`
-    ));
-    return progressMessage;
-  }
-
-  totalMembers = members.size;
-  for (const userId of plan.expectedRoleByUser.keys()) {
-    if (!members.has(userId)) summary.missingMembers += 1;
-  }
+  const userIds = [...plan.expectedRoleByUser.keys()];
+  totalMembers = userIds.length;
+  const members = new Map();
+  await Promise.all(userIds.map(async userId => {
+    try {
+      members.set(userId, await message.guild.members.fetch(userId));
+    } catch (error) {
+      if (Number(error?.code) === 10007) {
+        summary.missingMembers += 1;
+        return;
+      }
+      summary.failed += 1;
+      console.error(`SCL role sync could not fetch roster member ${userId}:`, error);
+    }
+  }));
 
   await updateProgress();
   const updateInterval = Math.max(1, Math.ceil(totalMembers / 20));
-  for (const member of members.values()) {
-    const expectedRoleId = plan.expectedRoleByUser.get(member.id);
-    for (const roleId of plan.roleIds) {
-      if (roleId === expectedRoleId || !member.roles.cache.has(roleId)) continue;
-      try {
-        await member.roles.remove(roleId, 'SCL team role sync');
-        summary.removed += 1;
-      } catch (error) {
-        summary.failed += 1;
-        console.error(`SCL role sync could not remove role ${roleId} from ${member.id}:`, error);
+  for (const userId of userIds) {
+    const member = members.get(userId);
+    if (member) {
+      const expectedRoleId = plan.expectedRoleByUser.get(member.id);
+      for (const roleId of plan.roleIds) {
+        if (roleId === expectedRoleId || !member.roles.cache.has(roleId)) continue;
+        try {
+          await member.roles.remove(roleId, 'SCL team role sync');
+          summary.removed += 1;
+        } catch (error) {
+          summary.failed += 1;
+          console.error(`SCL role sync could not remove role ${roleId} from ${member.id}:`, error);
+        }
       }
-    }
-    if (expectedRoleId && !member.roles.cache.has(expectedRoleId)) {
-      try {
-        await member.roles.add(expectedRoleId, 'SCL team role sync');
-        summary.added += 1;
-      } catch (error) {
-        summary.failed += 1;
-        console.error(`SCL role sync could not add role ${expectedRoleId} to ${member.id}:`, error);
+      if (expectedRoleId && !member.roles.cache.has(expectedRoleId)) {
+        try {
+          await member.roles.add(expectedRoleId, 'SCL team role sync');
+          summary.added += 1;
+        } catch (error) {
+          summary.failed += 1;
+          console.error(`SCL role sync could not add role ${expectedRoleId} to ${member.id}:`, error);
+        }
       }
     }
     summary.processed += 1;
