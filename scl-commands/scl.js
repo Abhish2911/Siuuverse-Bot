@@ -9,7 +9,7 @@ const CONTROL_ACTIONS = new Set(['help', 'setup', 'toggle', 'status']);
 const ROUTES = {
   scl: 'help', sclhelp: 'help', sclsetup: 'setup', scltoggle: 'toggle', sclregistration: 'registration',
   sclcreateteam: 'teamcreate', sclteam: 'team', sclteams: 'teams',
-  sclprofile: 'profile', sclapprove: 'approve',
+  sclprofile: 'profile', sclmyteam: 'myteam', sclapprove: 'approve',
   sclreject: 'reject', sclpoints: 'points', sclstandings: 'standings', sclindividuals: 'individuals', sclstatus: 'status',
   sclsetteamrole: 'setteamrole', sclsyncroles: 'syncroles'
 };
@@ -27,16 +27,16 @@ async function safeReply(message, payload) {
   }
 }
 function mentionId(message, args = []) { return message.mentions?.users?.first()?.id || args.map(cleanId).find(value => /^\d{15,25}$/.test(value)) || ''; }
-function customPlayerName(args, userId) {
-  return args
-    .filter(arg => !/<@!?\d+>/.test(arg) && cleanId(arg) !== userId && !/^\d{15,25}$/.test(cleanId(arg)))
-    .join(' ')
-    .trim();
-}
 function visibleName(message, userId) {
   const member = message.guild?.members?.cache?.get(userId);
   const user = message.mentions?.users?.get(userId);
   return member?.displayName || user?.username || `Player ${userId.slice(-4)}`;
+}
+function requestedPlayerName(args, userId) {
+  return args
+    .filter(arg => !/<@!?\d+>/.test(arg) && cleanId(arg) !== userId && !/^\d{15,25}$/.test(cleanId(arg)))
+    .join(' ')
+    .trim();
 }
 function number(value) {
   const text = String(value ?? '').trim();
@@ -69,7 +69,7 @@ async function requireRef(message, config) {
   return true;
 }
 function commandGroup(action) {
-  return ({ teamcreate: 'team', teams: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
+  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
 }
 function disabled(config, action) {
   const group = commandGroup(action);
@@ -123,7 +123,7 @@ async function postReview(message, config, pending, modelsSet) {
   const channel = await message.guild.channels.fetch(config.approvalChannelId).catch(() => null);
   if (!channel?.isTextBased()) return false;
   const roster = pending.players.length
-    ? pending.players.map(player => `• **${player.displayName}**${player.userId ? ` (<@${player.userId}>)` : ''}`).join('\n')
+    ? pending.players.map(player => `• **${player.displayName || 'Unknown player'}**${player.userId ? ` (<@${player.userId}>)` : ''}`).join('\n')
     : '_No requested players yet_';
   const embed = new EmbedBuilder()
     .setColor(0xF1C40F)
@@ -150,7 +150,7 @@ function helpPayload(prefix = '.') {
     .setDescription('Everything you need to manage your player profile, team, and league.')
     .addFields(
       { name: `${E.profile} Player profile`, value: `\`${prefix}sclprofile\` · View team and points`, inline: true },
-      { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player`, inline: true },
+      { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player\n\`${prefix}sclmyteam\` · View your team roster`, inline: true },
       { name: `${E.Stats} League tables`, value: `\`${prefix}sclstandings\` · Team standings\n\`${prefix}sclindividuals\` · Player points\n\`${prefix}sclteams\` · Approved teams`, inline: true },
       { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
     )
@@ -207,7 +207,7 @@ async function setup(message, args, config) {
 async function profiles(message, args, Player, Team) {
   const targetId = mentionId(message, args) || message.author.id;
   const player = await Player.findOne({ guildId: message.guild.id, userId: targetId });
-  if (!player) return safeReply(message, `${E.error} You do not have an SCL profile yet. Ask a team captain to add you with \`.sclteam add @Player [Display Name]\`.`);
+  if (!player) return safeReply(message, `${E.error} You do not have an SCL profile yet. Ask a team captain to add you with \`.sclteam add @Player\`.`);
   const [team, user] = await Promise.all([
     player.teamId ? Team.findOne({ guildId: message.guild.id, teamId: player.teamId }).select('name teamPoints').lean() : null,
     message.client.users.fetch(targetId).catch(() => null)
@@ -265,9 +265,9 @@ async function teamCommand(message, args, config, modelsSet, directCreate = fals
   }
   if (sub === 'add') {
     const userId = mentionId(message, args);
-    if (!userId || userId === message.author.id) return safeReply(message, `${E.warning} Usage: \`.sclteam add @player [display name]\``);
-    const requestedName = customPlayerName(args, userId);
-    if (requestedName.length > 50) return safeReply(message, `${E.warning} Player display names must be 50 characters or fewer.`);
+    if (!userId || userId === message.author.id) return safeReply(message, `${E.warning} Usage: \`.sclteam add @player [name]\``);
+    const customName = requestedPlayerName(args, userId);
+    if (customName.length > 50) return safeReply(message, `${E.warning} A custom player name can be at most 50 characters.`);
     let pending = await PendingTeam.findOne({ guildId, captainUserId: message.author.id, status: 'pending' }).sort({ createdAt: -1 });
     const approvedTeam = await Team.findOne({ guildId, captainUserId: message.author.id });
     if (!pending && !approvedTeam) return safeReply(message, `${E.error} Create a team first with \`.sclcreateteam Team Name\`; its roster remains pending until referee approval.`);
@@ -288,7 +288,7 @@ async function teamCommand(message, args, config, modelsSet, directCreate = fals
     if (currentCount + pending.players.length >= config.playersPerTeam) return safeReply(message, `${E.error} **${pending.name}** has reached the ${config.playersPerTeam}-player team limit.`);
     let player = await Player.findOne({ guildId, userId });
     if (player?.teamId || player?.captain) return safeReply(message, `${E.error} That player is already assigned to a team or is a captain.`);
-    const displayName = requestedName || player?.displayName || visibleName(message, userId);
+    const displayName = customName || player?.displayName || visibleName(message, userId);
     if (!player) {
       player = await Player.create({ guildId, playerId: randomUUID(), userId, displayName });
     } else if (player.displayName !== displayName) {
@@ -323,7 +323,77 @@ async function teamCommand(message, args, config, modelsSet, directCreate = fals
     team.roster = team.roster.filter(player => player.userId !== userId); await team.save();
     await Player.updateOne({ guildId, userId }, { $set: { teamId: '' } }); return safeReply(message, `${E.success} Removed <@${userId}> from **${team.name}**.`);
   }
-  return safeReply(message, `${E.warning} Usage: \`.sclcreateteam Team Name\`, \`.sclteam add @player [display name]\`, \`.sclteam remove @player\`, or \`.sclteams\`.`);
+  return safeReply(message, `${E.warning} Usage: \`.sclcreateteam Team Name\`, \`.sclteam add @player [name]\`, \`.sclteam remove @player\`, or \`.sclteams\`.`);
+}
+
+function formatTeamRoster(team) {
+  const roster = [...(team.roster || [])];
+  if (team.captainUserId && !roster.some(player => player.userId === team.captainUserId)) {
+    roster.unshift({
+      userId: team.captainUserId,
+      displayName: team.captainName
+    });
+  }
+  if (!roster.length) return ['_No roster members listed_'];
+
+  return roster.map(player => {
+    const displayName = String(player.displayName || 'Unknown player').slice(0, 80);
+    const mention = player.userId ? ` (<@${player.userId}>)` : '';
+    const captain = player.userId === team.captainUserId ? ' — Captain' : '';
+    return `• **${displayName}**${mention}${captain}`;
+  });
+}
+
+function chunkLines(lines, maxLength = 3500) {
+  const chunks = [];
+  let current = '';
+  for (const line of lines) {
+    const next = current ? `${current}\n${line}` : line;
+    if (next.length > maxLength && current) {
+      chunks.push(current);
+      current = line;
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function myTeam(message, Team) {
+  const team = await Team.findOne({
+    guildId: message.guild.id,
+    $or: [
+      { captainUserId: message.author.id },
+      { 'roster.userId': message.author.id }
+    ]
+  }).select('name captainUserId captainName roster teamPoints roleId').lean();
+  if (!team) {
+    return safeReply(message, `${E.error} You are not currently on an approved SCL team. Pending roster requests do not appear here until approved.`);
+  }
+
+  const chunks = chunkLines(formatTeamRoster(team));
+  for (const [index, rosterText] of chunks.entries()) {
+    const embed = new EmbedBuilder()
+      .setColor(0xffd700)
+      .setAuthor({ name: 'Siuuverse Champions League' })
+      .setTitle(`${E.team} ${team.name}${index ? ' — Roster continued' : ''}`);
+    if (!index) {
+      embed.setDescription([
+        `**Captain:** ${team.captainName} (<@${team.captainUserId}>)`,
+        `**Team points:** ${team.teamPoints}`,
+        team.roleId ? `**Team role:** <@&${team.roleId}>` : '',
+        '',
+        '**Members**',
+        rosterText
+      ].filter(Boolean).join('\n'));
+    } else {
+      embed.setDescription(rosterText);
+    }
+    const payload = { embeds: [embed], allowedMentions: { parse: [] } };
+    if (!index) await safeReply(message, payload);
+    else await message.channel.send(payload);
+  }
 }
 
 async function approveRequest(message, args, config, modelsSet, reject = false) {
@@ -562,6 +632,7 @@ async function run(message, rawArgs, client, invokedName) {
     if (action === 'setteamrole') return setTeamRole(message, args, config, Team);
     if (action === 'syncroles') return syncTeamRoles(message, config, Team);
     if (action === 'profile') return profiles(message, args, Player, Team);
+    if (action === 'myteam') return myTeam(message, Team);
     if (action === 'teamcreate') return teamCommand(message, args, config, modelSet, true);
     if (action === 'team') return teamCommand(message, args, config, modelSet);
     if (action === 'teams') return teamCommand(message, [], config, modelSet);
@@ -578,7 +649,9 @@ module.exports = {
   aliases: [],
   usesHFTournamentContext: false,
   buildTeamRoleSyncPlan,
-  customPlayerName,
+  formatTeamRoster,
+  myTeam,
+  requestedPlayerName,
   syncTeamRoles,
   safeReply,
   execute: run,
