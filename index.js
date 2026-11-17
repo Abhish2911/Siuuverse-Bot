@@ -1038,6 +1038,7 @@ client.on('messageCreate', async message => {
           message.channel.id
         );
         if (!access.allowed) {
+          if (access.code === 'GROK_DISABLED') return;
           await message.reply(access.message);
           return;
         }
