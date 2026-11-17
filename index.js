@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, PermissionsBitField } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
@@ -12,9 +12,35 @@ const {
   startHFLiveUpdater
 } = require('./utils/handfootballLive');
 const { RoleCooldown, RolePing } = require('./models/rolehandler');
-const TrainCooldown = require('./models/TrainCooldown');
 const { restoreStoredAnnouncements } = require('./utils/hfAnnouncements');
+const { runWithHFTournament, getLegacyStatsMigrationGuildId } = require('./utils/hfTournamentConfig');
+const TournamentStats = require('./models/TournamentStats');
+require('./models/HFTournament');
 const { restorePenaltyRoyaleTimers, handlePenaltyRoyaleDm } = require('./utils/penaltyRoyale');
+const { getGuildPrefix } = require('./utils/guildPrefix');
+const { executeModerationPrefix } = require('./utils/moderation');
+const { authorizeGrokRequest } = require('./utils/grokControls');
+const GrokGuildSettings = require('./models/GrokGuildSettings');
+const GuildModuleSettings = require('./models/GuildModuleSettings');
+const { isGuildModuleEnabled } = require('./utils/guildModules');
+const {
+  askGrok,
+  getReplyContext,
+  getChatSystemPrompt,
+  getConfiguredOwnerIds,
+  neutralizeDiscordPings,
+  splitGrokResponse
+} = require('./utils/grok');
+
+// Keep unexpected failures visible to the host logs without exposing internal
+// details (tokens, database errors, stack traces, etc.) to Discord users.
+process.on('unhandledRejection', error => {
+  console.error('❌ Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', error => {
+  console.error('❌ Uncaught exception:', error);
+});
 
 function startHealthServer() {
   const app = express();
@@ -101,6 +127,28 @@ async function connectMongo() {
     await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000
     });
+    // Older versions stored one global stat row per player. Remove that
+    // constraint so the same Discord user can have independent HF stats in
+    // multiple servers, then create the guild + player unique index.
+    await TournamentStats.collection.dropIndex('userId_1').catch(error => {
+      if (error?.codeName !== 'IndexNotFound') throw error;
+    });
+    await TournamentStats.collection.dropIndex('guildId_1_userId_1').catch(error => {
+      if (error?.codeName !== 'IndexNotFound') throw error;
+    });
+    await TournamentStats.syncIndexes();
+    await GrokGuildSettings.syncIndexes();
+    await GuildModuleSettings.syncIndexes();
+    const legacyStatsGuildId = getLegacyStatsMigrationGuildId();
+    if (legacyStatsGuildId) {
+      const migrated = await TournamentStats.updateMany(
+        { $or: [{ guildId: 'legacy' }, { guildId: { $exists: false } }] },
+        { $set: { guildId: legacyStatsGuildId } }
+      );
+      if (migrated.modifiedCount) {
+        console.log(`✅ Moved ${migrated.modifiedCount} legacy HF stat rows to ${legacyStatsGuildId}`);
+      }
+    }
     console.log('✅ MongoDB connected');
     return true;
   } catch (error) {
@@ -112,7 +160,6 @@ async function connectMongo() {
 client.commands = new Collection();
 client.prefixCommands = new Collection();
 const PREFIX = process.env.PREFIX || '.';
-client.scheduleTrainReminder = scheduleTrainReminder;
 
 async function safeReply(interaction, payload) {
   try {
@@ -165,6 +212,25 @@ async function safeDeferUpdate(interaction) {
   }
 }
 
+async function ensureModuleEnabled(interaction, moduleKey) {
+  if (!moduleKey || !interaction.guildId) return true;
+  if (await isGuildModuleEnabled(interaction.guildId, moduleKey)) return true;
+
+  await safeReply(interaction, {
+    content: `${moduleKey.toUpperCase()} commands are disabled in this server.`,
+    ephemeral: true
+  });
+  return false;
+}
+
+function getComponentModule(customId) {
+  const commandName = String(customId || '').split(/[_:]/, 1)[0];
+  const normalizedName = commandName === 'md' ? 'fixtures' : commandName;
+  const command = client.commands.get(normalizedName)
+    || client.prefixCommands.get(normalizedName);
+  return command?.moduleKey;
+}
+
 async function safeEditMessage(message, payload) {
   try {
     const freshMessage = await message.fetch().catch(() => null);
@@ -179,75 +245,9 @@ async function safeEditMessage(message, payload) {
   }
 }
 
-const trainReminderTimers = new Map();
-
-function scheduleTrainReminder(userId) {
-  const existingTimer = trainReminderTimers.get(userId);
-
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    trainReminderTimers.delete(userId);
-  }
-
-  (async () => {
-    try {
-      const cooldown = await TrainCooldown.findOne({ userId });
-
-      if (!cooldown || !cooldown.lastTrain) {
-        return;
-      }
-
-      const reminderTime = new Date(cooldown.lastTrain).getTime() + (6 * 60 * 60 * 1000);
-      const delay = reminderTime - Date.now();
-
-      const runReminder = async () => {
-        try {
-          const freshCooldown = await TrainCooldown.findOne({ userId });
-
-          if (!freshCooldown || freshCooldown.notified) {
-            trainReminderTimers.delete(userId);
-            return;
-          }
-
-          try {
-            const user = await client.users.fetch(userId);
-
-            if (user) {
-              const reminderMessage = await user.send('🏋️ Your /trainrp cooldown has ended. You can train again now!');
-              freshCooldown.reminderMessageId = reminderMessage.id;
-            }
-          } catch (dmError) {
-            console.error(`❌ Failed to send training reminder to ${userId}:`, dmError);
-          }
-
-          // Ensure reminderMessageId assignment remains before notified = true
-          freshCooldown.notified = true;
-          await freshCooldown.save();
-        } catch (error) {
-          console.error('❌ Train reminder error:', error);
-        } finally {
-          trainReminderTimers.delete(userId);
-        }
-      };
-
-      if (delay <= 0) {
-        await runReminder();
-        return;
-      }
-
-      const timer = setTimeout(() => {
-        runReminder();
-      }, delay);
-
-      trainReminderTimers.set(userId, timer);
-    } catch (error) {
-      console.error('❌ Failed to schedule train reminder:', error);
-    }
-  })();
-}
-
 const commandFolders = [
   path.join(__dirname, 'commands'),
+  path.join(__dirname, 'coop-commands'),
   path.join(__dirname, 'eco-commands')
 ];
 
@@ -268,7 +268,9 @@ for (const commandsPath of commandFolders) {
         continue;
       }
 
+      if (path.basename(commandsPath) === 'coop-commands') command.moduleKey = 'coop';
       client.commands.set(command.data.name, command);
+      if (command.prefix) client.prefixCommands.set(command.data.name, command);
       console.log(`✅ Loaded: ${file}`);
     } catch (err) {
       console.log(`❌ ERROR in ${file}:`, err.message);
@@ -279,8 +281,10 @@ for (const commandsPath of commandFolders) {
 const prefixCommandFolders = [
   path.join(__dirname, 'prefix'),
   path.join(__dirname, 'prefix-commands'),
-  path.join(__dirname, 'penalty-royale-commands')
+  path.join(__dirname, 'penalty-royale-commands'),
+  path.join(__dirname, 'scl-commands')
 ];
+const sharedPrefixCommands = new Set(['setprefix', 'translate']);
 
 // Load prefix commands and aliases
 for (const prefixCommandsPath of prefixCommandFolders) {
@@ -299,6 +303,13 @@ for (const prefixCommandsPath of prefixCommandFolders) {
         console.log(`❌ Missing prefix command data in ${file}`);
         continue;
       }
+
+      command.isHandFootball = prefixCommandsPath.endsWith('prefix-commands');
+      if (path.basename(prefixCommandsPath) === 'prefix-commands'
+        && !sharedPrefixCommands.has(commandName.toLowerCase())) {
+        command.moduleKey = 'hf';
+      }
+      if (path.basename(prefixCommandsPath) === 'scl-commands') command.moduleKey = 'scl';
 
       client.prefixCommands.set(commandName.toLowerCase(), command);
 
@@ -391,22 +402,6 @@ client.once('clientReady', async () => {
   }
 
   try {
-    const pendingReminders = await TrainCooldown.find({
-      notified: { $ne: true }
-    });
-
-    for (const cooldown of pendingReminders) {
-      if (cooldown.userId) {
-        scheduleTrainReminder(cooldown.userId);
-      }
-    }
-
-    console.log(`✅ Restored ${pendingReminders.length} train reminders`);
-  } catch (error) {
-    console.error('❌ Failed to restore train reminders:', error);
-  }
-
-  try {
     await startHFLiveUpdater(client);
     await refreshAllHFLiveMessages(client);
     console.log('✅ HandFootball live messages restored');
@@ -427,6 +422,194 @@ client.on('shardReconnecting', shardId => {
   console.warn(`🔄 Discord shard ${shardId} reconnecting`);
 });
 
+function getButtonOwnerId(customId) {
+  const id = String(customId || '');
+
+  if (id.startsWith('rpstats_')) return id.split('__').pop();
+  if (id.startsWith('hfleaderboard_') || id.startsWith('hffixtures_')) return id.split('_').pop();
+  if (id.startsWith('hfprofile_')) return id.split('_')[3];
+  if (id.startsWith('myrpstats_') || id.startsWith('myrpprofile_')) return id.split('_')[1];
+  if (id.startsWith('myrpclubstats_') || id.startsWith('myrpclubdetails_')) return id.split('_')[1];
+  if (id.startsWith('myfixtures_')) return id.split('_').pop();
+  return null;
+}
+
+async function denyButtonAccess(interaction) {
+  await safeReply(interaction, {
+    content: 'Only the user who opened this control can use it.',
+    ephemeral: true
+  }).catch(() => null);
+}
+
+function canManageGuild(interaction) {
+  return interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild) ?? false;
+}
+
+// Buttons which do not encode their owner must be from the original interaction
+// author, or be used by a server manager. This also makes old, unowned controls
+// safe instead of silently trusting any clicker.
+function isOriginalInteractionUser(interaction) {
+  const ownerId = interaction.message?.interactionMetadata?.user?.id
+    || interaction.message?.interaction?.user?.id;
+  return Boolean(ownerId && ownerId === interaction.user.id);
+}
+
+async function authorizeButton(interaction, policy) {
+  if (policy === 'owner') {
+    const ownerId = getButtonOwnerId(interaction.customId);
+    if (ownerId && ownerId === interaction.user.id) return true;
+    await denyButtonAccess(interaction);
+    return false;
+  }
+
+  if (policy === 'ownerOrManageGuild' && (isOriginalInteractionUser(interaction) || canManageGuild(interaction))) {
+    return true;
+  }
+
+  await denyButtonAccess(interaction);
+  return false;
+}
+
+function editButtonMessage(interaction, result) {
+  if (!result) return null;
+  return safeEditMessage(interaction.message, { content: null, ...result });
+}
+
+// Every button is claimed here, with its access policy next to its route. Keep
+// specific patterns above broad ones so the first matching entry owns the ID.
+const buttonRegistry = [
+  {
+    match: id => id.startsWith('rpstats_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.commands.get('rpstats');
+      if (!command?.buttonHandler) return;
+      if (!await safeDeferUpdate(interaction)) return;
+      const [, action, ...rest] = interaction.customId.split('_');
+      return editButtonMessage(interaction, await command.buttonHandler(interaction, action, rest.join('_')));
+    }
+  },
+  {
+    match: id => id.startsWith('rpleaderboard_'), policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const command = client.commands.get('rpleaderboard');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, action, page] = interaction.customId.split('_');
+      return editButtonMessage(interaction, await command.buttonHandler(interaction, action, page));
+    }
+  },
+  {
+    match: id => id.startsWith('hfleaderboard_mode_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.prefixCommands.get('hfleaderboard');
+      if (!command?.modeButtonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, , mode, ownerId] = interaction.customId.split('_');
+      return editButtonMessage(interaction, await command.modeButtonHandler(interaction, mode, ownerId));
+    }
+  },
+  {
+    match: id => id.startsWith('hfleaderboard_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.prefixCommands.get('hfleaderboard');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, action, statKey, page, ownerId] = interaction.customId.split('_');
+      const result = await runWithHFTournament(interaction.guild, () => command.buttonHandler(interaction, action, statKey, page, ownerId));
+      return editButtonMessage(interaction, result);
+    }
+  },
+  {
+    match: id => id.startsWith('hfprofile_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.prefixCommands.get('hfprofile');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      return editButtonMessage(interaction, await command.buttonHandler(interaction));
+    }
+  },
+  {
+    match: id => id.startsWith('pr_'), policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const command = client.prefixCommands.get('prcreate');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const result = await command.buttonHandler(interaction);
+      if (result?.payload) await editButtonMessage(interaction, result.payload);
+      if (result?.notice) await interaction.followUp({ content: result.notice, ephemeral: true }).catch(() => null);
+    }
+  },
+  {
+    match: id => id.startsWith('captainpanel_resultformat:'), policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const command = client.commands.get('captainpanel');
+      if (!command?.buttonHandler) return;
+      const value = interaction.customId.replace('captainpanel_resultformat:', '').trim();
+      const result = await command.buttonHandler(interaction, 'resultformat', value);
+      if (result) await safeReply(interaction, result);
+    }
+  },
+  {
+    match: id => id.startsWith('myrpstats_') || id.startsWith('myrpprofile_'), policy: 'owner',
+    handler: interaction => client.commands.get('myrpplayer')?.handleButton?.(interaction)
+  },
+  {
+    match: id => id.startsWith('myrpclubstats_') || id.startsWith('myrpclubdetails_'), policy: 'owner',
+    handler: interaction => client.commands.get('myrpclub')?.handleButton?.(interaction)
+  },
+  {
+    match: id => id.startsWith('hffixtures_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.prefixCommands.get('fixtures');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, action, page, targetType, ...rest] = interaction.customId.split('_');
+      const ownerId = rest.pop();
+      const result = await runWithHFTournament(interaction.guild, () => command.buttonHandler(interaction, action, page, decodeURIComponent(targetType || ''), decodeURIComponent(rest.join('_')), ownerId));
+      return editButtonMessage(interaction, result);
+    }
+  },
+  {
+    match: id => id.startsWith('myfixtures_'), policy: 'owner',
+    handler: async interaction => {
+      const command = client.commands.get('myfixtures');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, action, page, targetType, targetValue] = interaction.customId.split('_');
+      const result = await command.buttonHandler(interaction, action, page, decodeURIComponent(targetType || ''), decodeURIComponent(targetValue || ''));
+      return editButtonMessage(interaction, result);
+    }
+  },
+  {
+    match: id => id.startsWith('mycareer_'), policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const command = client.commands.get('mycareer');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const [, action, targetType, ...targetParts] = interaction.customId.split('_');
+      return editButtonMessage(interaction, await command.buttonHandler(interaction, action, targetType, decodeURIComponent(targetParts.join('_'))));
+    }
+  },
+  {
+    match: id => id.startsWith('reserve_page_'), policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const command = client.commands.get('reserve');
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      return editButtonMessage(interaction, await command.buttonHandler(interaction, interaction.customId));
+    }
+  },
+  {
+    // The remaining slash-command buttons have no stable owner in their ID.
+    match: () => true, policy: 'ownerOrManageGuild',
+    handler: async interaction => {
+      const [cmd, action, ...valueParts] = interaction.customId.split('_');
+      const command = client.commands.get(cmd);
+      if (!command?.buttonHandler || !await safeDeferUpdate(interaction)) return;
+      const result = await command.buttonHandler(interaction, action, valueParts.join('_'), '');
+      return editButtonMessage(interaction, result);
+    }
+  }
+];
+
+async function routeButton(interaction) {
+  const entry = buttonRegistry.find(candidate => candidate.match(interaction.customId));
+  if (!await ensureModuleEnabled(interaction, entry?.moduleKey || getComponentModule(interaction.customId))) return;
+  if (!entry || !await authorizeButton(interaction, entry.policy)) return;
+  return entry.handler(interaction);
+}
+
 client.on('interactionCreate', async interaction => {
   try {
     // =========================
@@ -435,9 +618,22 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
+      if (!await ensureModuleEnabled(interaction, command.moduleKey)) return;
 
       // Commands that handle their own replies should not be auto-deferred.
-      if (interaction.commandName !== 'setrolecooldown') {
+      if (![
+        'setrolecooldown',
+        'groksettings',
+        'lock',
+        'unlock',
+        'timeout',
+        'untimeout',
+        'warn',
+        'warnings',
+        'purge',
+        'slowmode',
+        'modlog'
+      ].includes(interaction.commandName)) {
         const deferred = await safeDeferReply(interaction);
         if (!deferred) return;
       }
@@ -468,357 +664,14 @@ client.on('interactionCreate', async interaction => {
     // Buttons
     // =========================
     if (interaction.isButton()) {
-      // =========================
-      // rpstats buttons
-      // =========================
-      if (interaction.customId.startsWith('rpstats_')) {
-        const command = client.commands.get('rpstats');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        // Use improved parsing logic for rpstats buttons
-        const parts = interaction.customId.split('_');
-        const action = parts[1];
-        const value = parts.slice(2).join('_');
-
-        const result = await command.buttonHandler(interaction, action, value);
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // =========================
-      // rpleaderboard buttons
-      // =========================
-      if (interaction.customId.startsWith('rpleaderboard_')) {
-        const command = client.commands.get('rpleaderboard');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const [, action, page] = interaction.customId.split('_');
-
-        const result = await command.buttonHandler(
-          interaction,
-          action,
-          page
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // =========================
-      // HandFootball leaderboard buttons
-      // =========================
-      if (interaction.customId.startsWith('hfleaderboard_')) {
-        const command = client.prefixCommands.get('hfleaderboard');
-        if (!command || !command.buttonHandler) return;
-
-        const [, action, statKey, page, ownerId] = interaction.customId.split('_');
-
-        if (ownerId && ownerId !== interaction.user.id) {
-          await interaction.reply({
-            content: 'Only the user who opened this leaderboard can use these buttons.',
-            ephemeral: true
-          }).catch(() => null);
-          return;
-        }
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(
-          interaction,
-          action,
-          statKey,
-          page,
-          ownerId
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // =========================
-      // Penalty Royale prefix-command buttons
-      // =========================
-      if (interaction.customId.startsWith('pr_')) {
-        const command = client.prefixCommands.get('prcreate');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(interaction);
-
-        if (result?.payload) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result.payload
-          });
-        }
-        if (result?.notice) {
-          await interaction.followUp({
-            content: result.notice,
-            ephemeral: true
-          }).catch(() => null);
-        }
-        return;
-      }
-
-      const parts = interaction.customId.split('_');
-      const cmd = parts.shift();
-      const action = parts.shift();
-      const value = parts.join('_');
-      const extra = '';
-
-      // captainpanel result format button
-      if (interaction.customId.startsWith('captainpanel_resultformat:')) {
-        const command = client.commands.get('captainpanel');
-        if (!command || !command.buttonHandler) return;
-
-        const value = interaction.customId.replace('captainpanel_resultformat:', '').trim();
-        const result = await command.buttonHandler(interaction, 'resultformat', value);
-
-        if (result) {
-          await interaction.reply(result);
-        }
-        return;
-      }
-
-      // replaceteam buttons
-      if (cmd === 'replaceteam') {
-        const command = client.commands.get('replaceteam');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(interaction, action, value, extra);
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // addteamlogo buttons
-      if (cmd === 'addteamlogo') {
-        const command = client.commands.get('addteamlogo');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(interaction, action, value, extra);
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // myfixtures special button handler
-      if (cmd === 'myfixtures') {
-        const command = client.commands.get('myfixtures');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const [page, targetType, targetValue, ownerId] = parts;
-
-        const result = await command.buttonHandler(
-          interaction,
-          action,
-          page,
-          decodeURIComponent(targetType || ''),
-          decodeURIComponent(targetValue || '')
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // matchday special button handler
-      if (cmd === 'matchday') {
-        const command = client.commands.get('matchday');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(interaction, action, value, extra);
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // mycareer special button handler
-      if (cmd === 'mycareer') {
-        const command = client.commands.get('mycareer');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        // customId format:
-        // mycareer_<view>_<targetType>_<targetValue>
-        const [targetType, ...targetParts] = parts;
-        const targetValue = targetParts.join('_');
-
-        const result = await command.buttonHandler(
-          interaction,
-          action,
-          targetType,
-          decodeURIComponent(targetValue || '')
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // reserve pagination buttons
-      if (cmd === 'reserve' && action === 'page') {
-        const command = client.commands.get('reserve');
-        if (!command || !command.buttonHandler) return;
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(
-          interaction,
-          interaction.customId
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      // myrpplayer stats/profile button
-      if (
-        interaction.customId.startsWith('myrpstats_') ||
-        interaction.customId.startsWith('myrpprofile_')
-      ) {
-        const command = client.commands.get('myrpplayer');
-        if (!command || typeof command.handleButton !== 'function') return;
-
-        return await command.handleButton(interaction);
-      }
-
-      // myrpclub stats/details button
-      if (
-        interaction.customId.startsWith('myrpclubstats_') ||
-        interaction.customId.startsWith('myrpclubdetails_')
-      ) {
-        const command = client.commands.get('myrpclub');
-        if (!command || typeof command.handleButton !== 'function') return;
-
-        return await command.handleButton(interaction);
-      }
-
-      // HandFootball prefix fixture buttons
-      if (cmd === 'hffixtures') {
-        const command = client.prefixCommands.get('fixtures');
-        if (!command || !command.buttonHandler) return;
-
-        const [page, targetType, ...targetParts] = parts;
-        const ownerId = targetParts.pop();
-        const targetValue = targetParts.join('_');
-
-        if (ownerId && ownerId !== interaction.user.id) {
-          await interaction.reply({
-            content: 'Only the user who opened this fixtures menu can use these buttons.',
-            ephemeral: true
-          }).catch(() => null);
-          return;
-        }
-
-        const deferred = await safeDeferUpdate(interaction);
-        if (!deferred) return;
-
-        const result = await command.buttonHandler(
-          interaction,
-          action,
-          page,
-          decodeURIComponent(targetType || ''),
-          decodeURIComponent(targetValue || ''),
-          ownerId
-        );
-
-        if (result) {
-          await safeEditMessage(interaction.message, {
-            content: null,
-            ...result
-          });
-        }
-        return;
-      }
-
-      const command = client.commands.get(cmd);
-      if (!command || !command.buttonHandler) return;
-
-      const deferred = await safeDeferUpdate(interaction);
-      if (!deferred) return;
-
-      const result = await command.buttonHandler(interaction, action, value, extra);
-
-      if (result) {
-        await interaction.message.edit({
-          content: null,
-          ...result
-        });
-      }
-      return;
+      return routeButton(interaction);
     }
 
     // =========================
     // Dropdowns
     // =========================
     if (interaction.isStringSelectMenu()) {
+      if (!await ensureModuleEnabled(interaction, getComponentModule(interaction.customId))) return;
       // =========================
       // Penalty Royale help menu
       // =========================
@@ -878,11 +731,11 @@ client.on('interactionCreate', async interaction => {
         const deferred = await safeDeferUpdate(interaction);
         if (!deferred) return;
 
-        const result = await command.selectHandler(
+        const result = await runWithHFTournament(interaction.guild, () => command.selectHandler(
           interaction,
           interaction.values?.[0],
           ownerId
-        );
+        ));
 
         if (result) {
           await safeEditMessage(interaction.message, {
@@ -890,6 +743,28 @@ client.on('interactionCreate', async interaction => {
             ...result
           });
         }
+        return;
+      }
+
+      // Mongo-backed HF profile tournament selector
+      if (interaction.customId.startsWith('hfprofile_select_')) {
+        const command = client.prefixCommands.get('hfprofile');
+        if (!command || !command.selectHandler) return;
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+        const result = await command.selectHandler(interaction);
+        if (result) await safeEditMessage(interaction.message, { content: null, ...result });
+        return;
+      }
+
+      // Mongo-backed HF help category selector
+      if (interaction.customId === 'hfhelp_category') {
+        const command = client.prefixCommands.get('hfhelp');
+        if (!command || !command.selectHandler) return;
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+        const result = await command.selectHandler(interaction);
+        if (result) await safeEditMessage(interaction.message, { content: null, ...result });
         return;
       }
 
@@ -1055,7 +930,7 @@ client.on('interactionCreate', async interaction => {
     try {
       if (interaction.isChatInputCommand()) {
         const errorPayload = {
-          content: `❌ Error occurred while executing command\n\`${error.message || 'Unknown error'}\``
+          content: '❌ Something went wrong while executing that command. Please try again later.'
         };
 
         if (!interaction.replied && !interaction.deferred) {
@@ -1071,7 +946,7 @@ client.on('interactionCreate', async interaction => {
       } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
         if (interaction.deferred || interaction.replied) {
           await interaction.followUp({
-            content: `❌ Action failed: ${error.message || 'Unknown error'}`,
+            content: '❌ That action failed. Please try again later.',
             ephemeral: true
           }).catch(() => null);
         }
@@ -1096,18 +971,34 @@ client.on('messageCreate', async message => {
     // =========================
     // Prefix Commands
     // =========================
-    if (message.content.startsWith(PREFIX)) {
+    const guildPrefix = await getGuildPrefix(message.guild.id);
+    if (message.content.startsWith(guildPrefix)) {
       const args = message.content
-        .slice(PREFIX.length)
+        .slice(guildPrefix.length)
         .trim()
         .split(/\s+/);
       const commandName = args.shift()?.toLowerCase();
-      const command = client.prefixCommands.get(commandName);
+      const prefixCommand = client.prefixCommands.get(commandName);
+      const command = prefixCommand || client.commands.get(commandName);
 
-      if (!command) return;
+      if (!command || (!prefixCommand && !command.prefix)) return;
 
       try {
-        await command.execute(message, args, client);
+        if (command.moduleKey && !await isGuildModuleEnabled(message.guild.id, command.moduleKey)) {
+          await message.reply(`${command.moduleKey.toUpperCase()} commands are disabled in this server.`);
+          return;
+        }
+
+        if (command.prefix) {
+          await executeModerationPrefix(command, message, args, command.prefix);
+        } else if (command.isHandFootball && command.usesHFTournamentContext !== false) {
+          await runWithHFTournament(message.guild, () => command.execute(message, args, client));
+        } else {
+          // The invoked alias is passed as a fourth argument.  Older commands
+          // simply ignore it; grouped command modules can use it to expose
+          // short, collision-free prefix commands.
+          await command.execute(message, args, client, commandName);
+        }
         sendAuditLog(message, {
           title: '📝 Prefix Command Used',
           description:
@@ -1125,9 +1016,59 @@ client.on('messageCreate', async message => {
             `**Error:** ${String(err.message || 'Unknown error').slice(0, 1000)}`,
           color: 0xED4245
         }).catch(error => console.error('❌ Prefix failure audit log failed:', error));
+        await message.reply('❌ That command failed. Please try again later.').catch(() => {});
+      }
+
+      return;
+    }
+
+    if (client.user && message.mentions.users.has(client.user.id)) {
+      const prompt = message.content
+        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
+        .trim();
+
+      if (!prompt) {
+        await message.reply('Mention me with a question and I will try to help.');
+        return;
+      }
+
+      try {
+        const access = await authorizeGrokRequest(
+          message.guild.id,
+          message.channel.id
+        );
+        if (!access.allowed) {
+          await message.reply(access.message);
+          return;
+        }
+
+        const context = await getReplyContext(message, client.user.id);
+        await message.channel.sendTyping();
+        const answer = await askGrok(
+          getChatSystemPrompt(getConfiguredOwnerIds().includes(message.author.id)),
+          prompt,
+          0.7,
+          context
+        );
+
+        const chunks = splitGrokResponse(neutralizeDiscordPings(answer));
+        for (const [index, content] of chunks.entries()) {
+          const payload = { content, allowedMentions: { parse: [] } };
+          if (index === 0) {
+            await message.reply(payload);
+          } else {
+            await message.channel.send(payload);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Grok reply failed:', error);
         await message.reply(
-          `❌ Error occurred while executing command\n\`${err.message || 'Unknown error'}\``
-        ).catch(() => {});
+          error.code === 'GROK_ACCESS_DENIED'
+            ? '❌ You do not have permission to use Grok in this channel.'
+            : error.code === 'GROK_CONTROLS_UNAVAILABLE'
+              ? '❌ Grok is temporarily unavailable because server settings could not be checked. Please try again later.'
+              : '❌ I could not get a reply right now. Please try again later.'
+        );
       }
 
       return;

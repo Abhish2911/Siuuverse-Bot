@@ -43,10 +43,11 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(interaction) {
-    const ownerIds = [
-      process.env.OWNER_ID,
-      process.env.BOT_OWNER_ID
-    ].filter(Boolean);
+    const ownerIds = String(process.env.OWNER_IDS || process.env.OWNER_ID || "")
+      .split(",")
+      .map(id => id.trim())
+      .filter(Boolean);
+
 
     if (!ownerIds.includes(interaction.user.id)) {
       return interaction.reply({

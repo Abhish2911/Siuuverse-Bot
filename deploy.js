@@ -7,6 +7,7 @@ const { REST, Routes } = require('discord.js');
 const commands = [];
 const slashCommandFolders = [
   path.join(__dirname, 'commands'),
+  path.join(__dirname, 'coop-commands'),
   path.join(__dirname, 'eco-commands')
 ];
 const prefixCommandsPath = path.join(__dirname, 'prefix-commands');

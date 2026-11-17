@@ -2,7 +2,9 @@
   "scripts": {
     "start": "node index.js",
     "deploy": "node deploy.js",
-    "dev": "npx nodemon index.js"
+    "dev": "npx nodemon index.js",
+    "coop:migrate:dry-run": "node scripts/migrateCoopSheets.js --dry-run",
+    "coop:migrate:apply": "node scripts/migrateCoopSheets.js --apply --confirm"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
