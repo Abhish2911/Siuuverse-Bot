@@ -1,5 +1,10 @@
 const { randomUUID } = require('crypto');
-const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const {
+  ActionRowBuilder,
+  AttachmentBuilder,
+  EmbedBuilder,
+  StringSelectMenuBuilder
+} = require('discord.js');
 const E = require('../utils/emojis');
 const { models } = require('../models/SclModels');
 const { target } = require('../utils/sclMongo');
@@ -438,8 +443,9 @@ async function approveRequest(message, args, config, modelsSet, reject = false) 
   return safeReply(message, `${E.success} Approved **${team.name}**. The captain and ${pending.players.length} requested player(s) were added; notifications are being sent.`);
 }
 
-async function collectPointsAnswer(message, prompt) {
-  await message.channel.send(prompt);
+async function collectPointsAnswer(message, prompt, flow) {
+  const promptMessage = await message.channel.send(`**${prompt}**`);
+  flow.prompts.push(promptMessage);
   return new Promise(resolve => {
     const collector = message.channel.createMessageCollector({
       filter: response => response.author.id === message.author.id,
@@ -447,6 +453,7 @@ async function collectPointsAnswer(message, prompt) {
       max: 1
     });
     collector.on('collect', response => {
+      flow.inputs.push(response);
       resolve(response.content.trim());
       collector.stop('answered');
     });
@@ -456,25 +463,104 @@ async function collectPointsAnswer(message, prompt) {
   });
 }
 
-async function collectPointsDetails(message, type, resolveTarget) {
-  const isTeam = type === 'team';
-  const targetPrompt = isTeam
-    ? 'Which team should receive the points? Enter the team name.'
-    : 'Which player should receive the points? Enter their registered name, Discord ID, or mention.';
-  const target = await collectPointsAnswer(message, targetPrompt);
-  if (!target) {
-    await safeReply(message, `${E.warning} Timed out or received an empty target. No points were changed.`);
+async function collectRegisteredTeam(message, Team, flow) {
+  const teams = await Team.find({ guildId: message.guild.id })
+    .select('name teamId')
+    .sort({ name: 1 })
+    .lean();
+  if (!teams.length) {
+    await safeReply(message, `${E.warning} No registered teams were found. No points were changed.`);
     return null;
   }
-  const resolvedTarget = await resolveTarget(target);
+
+  const pageSize = teams.length > 25 ? 23 : 25;
+  const pageCount = Math.ceil(teams.length / pageSize);
+  const selectId = `sclpoints_team_select_${randomUUID().replace(/-/g, '')}`;
+  let page = 0;
+  const buildPrompt = () => {
+    const options = teams.slice(page * pageSize, (page + 1) * pageSize).map(team => ({
+      label: team.name.slice(0, 100),
+      value: team.teamId
+    }));
+    if (page > 0) options.push({ label: '← Previous page', value: '__previous_page__' });
+    if (page < pageCount - 1) options.push({ label: 'Next page →', value: '__next_page__' });
+    return {
+      content: `**Which registered team should receive the points?** Select one below.${pageCount > 1 ? ` (Page ${page + 1}/${pageCount})` : ''}`,
+      components: [
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(selectId)
+            .setPlaceholder('Select a registered team')
+            .addOptions(options)
+        )
+      ]
+    };
+  };
+  const promptMessage = await message.channel.send(buildPrompt());
+  flow.prompts.push(promptMessage);
+
+  while (true) {
+    let interaction;
+    try {
+      interaction = await promptMessage.awaitMessageComponent({ time: 60000 });
+    } catch (error) {
+      if (error.code !== 'InteractionCollectorError') throw error;
+      await safeReply(message, `${E.warning} Timed out waiting for a team selection. No points were changed.`);
+      return null;
+    }
+    if (interaction.user.id !== message.author.id) {
+      await interaction.reply({
+        content: 'Only the referee who started this points adjustment can select a team.',
+        ephemeral: true
+      });
+      continue;
+    }
+    if (interaction.values[0] === '__previous_page__' || interaction.values[0] === '__next_page__') {
+      page += interaction.values[0] === '__next_page__' ? 1 : -1;
+      await interaction.update(buildPrompt());
+      continue;
+    }
+
+    await interaction.deferUpdate();
+    const selectedTeam = teams.find(team => team.teamId === interaction.values[0]);
+    if (!selectedTeam) {
+      await safeReply(message, `${E.error} That team is no longer registered. No points were changed.`);
+      return null;
+    }
+    const team = await Team.findOne({ guildId: message.guild.id, teamId: selectedTeam.teamId });
+    if (!team) {
+      await safeReply(message, `${E.error} That team is no longer registered. No points were changed.`);
+    }
+    return team;
+  }
+}
+
+async function collectPointsDetails(message, type, resolveTarget, Team, flow) {
+  const isTeam = type === 'team';
+  let resolvedTarget;
+  if (isTeam) {
+    resolvedTarget = await collectRegisteredTeam(message, Team, flow);
+  } else {
+    const target = await collectPointsAnswer(
+      message,
+      'Which player should receive the points? Enter their registered name, Discord ID, or mention.',
+      flow
+    );
+    if (!target) {
+      await safeReply(message, `${E.warning} Timed out or received an empty target. No points were changed.`);
+      return null;
+    }
+    resolvedTarget = await resolveTarget(target);
+  }
   if (!resolvedTarget) {
-    await safeReply(message, `${E.error} ${isTeam ? 'Team' : 'Player'} not found. No points were changed.`);
+    if (!isTeam) await safeReply(message, `${E.error} Player not found. No points were changed.`);
     return null;
   }
 
   const amountText = await collectPointsAnswer(
     message,
-    'How many points should be added? Use a negative number to subtract points.'
+    'How many points should be added? Use a negative number to subtract points.',
+    flow
   );
   const amount = number(amountText);
   if (!Number.isFinite(amount)) {
@@ -482,7 +568,11 @@ async function collectPointsDetails(message, type, resolveTarget) {
     return null;
   }
 
-  const reasonText = await collectPointsAnswer(message, 'Enter a reason for this adjustment, or type `none`.');
+  const reasonText = await collectPointsAnswer(
+    message,
+    'Enter a reason for this adjustment, or type `none`.',
+    flow
+  );
   if (!reasonText) {
     await safeReply(message, `${E.warning} Timed out waiting for a reason. No points were changed.`);
     return null;
@@ -493,6 +583,21 @@ async function collectPointsDetails(message, type, resolveTarget) {
     amount,
     reason: key(reasonText) === 'none' ? '' : reasonText
   };
+}
+
+async function cleanPointsFlow(flow) {
+  const messages = [...new Set([flow.command, ...flow.prompts, ...flow.inputs])];
+  const results = await Promise.all(messages.map(async item => {
+    try {
+      await item.delete();
+      return true;
+    } catch (error) {
+      if (Number(error?.code) === 10008) return true;
+      console.error('SCL points flow could not delete an interactive message:', error);
+      return false;
+    }
+  }));
+  return results.every(Boolean);
 }
 
 async function givePoints(message, args, config, modelsSet) {
@@ -530,37 +635,66 @@ async function givePoints(message, args, config, modelsSet) {
     ? await resolveTarget(beforeAmount)
     : null;
 
+  let flow = null;
   if (!target || !Number.isFinite(amount)) {
-    const details = await collectPointsDetails(message, type, resolveTarget);
-    if (!details) return;
+    flow = { command: message, prompts: [], inputs: [] };
+    let details;
+    try {
+      details = await collectPointsDetails(message, type, resolveTarget, Team, flow);
+    } catch (error) {
+      await cleanPointsFlow(flow);
+      throw error;
+    }
+    if (!details) {
+      await cleanPointsFlow(flow);
+      return;
+    }
     ({ target, amount, reason } = details);
   }
 
-  if (type === 'team') {
-    target.teamPoints += amount;
-    await target.save();
-    return safeReply(message, {
-      content: `${E.success} **${target.name}**: ${amount >= 0 ? '+' : ''}${amount} team points.${reason ? `\nReason: ${reason}` : ''}`,
-      allowedMentions: { parse: [] }
-    });
+  let cleanupFailed = false;
+  try {
+    if (type === 'team') {
+      target.teamPoints += amount;
+      await target.save();
+    } else {
+      target.individualPoints += amount;
+      await target.save();
+    }
+  } finally {
+    if (flow) cleanupFailed = !(await cleanPointsFlow(flow));
   }
-  target.individualPoints += amount;
-  await target.save();
+
+  const cleanupWarning = cleanupFailed
+    ? '\n⚠️ I could not delete all prompts and inputs. Check that I have Manage Messages permission.'
+    : '';
   return safeReply(message, {
-    content: `${E.success} **${target.displayName}**: ${amount >= 0 ? '+' : ''}${amount} individual points.${reason ? `\nReason: ${reason}` : ''}`,
+    content: `${E.success} **${type === 'team' ? target.name : target.displayName}**: ${amount >= 0 ? '+' : ''}${amount} ${type === 'team' ? 'team' : 'individual'} points.${reason ? `\nReason: ${reason}` : ''}${cleanupWarning}`,
     allowedMentions: { parse: [] }
   });
+}
+
+function buildIndividualStandingsRows(players) {
+  return [...players]
+    .sort((a, b) => b.individualPoints - a.individualPoints || a.displayName.localeCompare(b.displayName))
+    .slice(0, 10)
+    .map((player, index) => ({
+      rank: index + 1,
+      name: player.displayName,
+      points: player.individualPoints
+    }));
 }
 
 async function tables(message, modelsSet, individual = false) {
   const { Team, Player } = modelsSet; const guildId = message.guild.id;
   if (individual) {
-    const rows = (await Player.find({ guildId }).select('displayName individualPoints').lean()).sort((a, b) => b.individualPoints - a.individualPoints || a.displayName.localeCompare(b.displayName)).map((player, index) => ({ rank: index + 1, name: player.displayName, points: player.individualPoints }));
-    const buffer = buildSclTableImage({ title: 'SCL Individual Points', subtitle: `${rows.length} registered players`, headers: [{ key: 'rank', label: '#', width: 85 }, { key: 'name', label: 'PLAYER', width: 700 }, { key: 'points', label: 'POINTS', width: 259 }], rows });
+    const players = await Player.find({ guildId }).select('displayName individualPoints').lean();
+    const rows = buildIndividualStandingsRows(players);
+    const buffer = buildSclTableImage({ title: 'Siuuverse Champions League', subtitle: 'Individual Standings • Top 10', headers: [{ key: 'rank', label: '#', width: 85 }, { key: 'name', label: 'PLAYER', width: 700 }, { key: 'points', label: 'POINTS', width: 259 }], rows });
     return safeReply(message, { files: [new AttachmentBuilder(buffer, { name: 'scl-individual-points.png' })] });
   }
   const rows = (await Team.find({ guildId }).select('name captainName roster teamPoints').lean()).sort((a, b) => b.teamPoints - a.teamPoints || a.name.localeCompare(b.name)).map((team, index) => ({ rank: index + 1, name: team.name, captain: team.captainName, players: team.roster.length, points: team.teamPoints }));
-  const buffer = buildSclTableImage({ title: 'SCL Team Standings', subtitle: `${rows.length} approved teams`, headers: [{ key: 'rank', label: '#', width: 75 }, { key: 'name', label: 'TEAM', width: 380 }, { key: 'captain', label: 'CAPTAIN', width: 240 }, { key: 'players', label: 'PLAYERS', width: 160 }, { key: 'points', label: 'POINTS', width: 189 }], rows, accent: '#fbbf24' });
+  const buffer = buildSclTableImage({ title: 'Siuuverse Champions League', subtitle: 'Team Standings', headers: [{ key: 'rank', label: '#', width: 75 }, { key: 'name', label: 'TEAM', width: 380 }, { key: 'captain', label: 'CAPTAIN', width: 240 }, { key: 'players', label: 'PLAYERS', width: 160 }, { key: 'points', label: 'POINTS', width: 189 }], rows, accent: '#fbbf24' });
   return safeReply(message, { files: [new AttachmentBuilder(buffer, { name: 'scl-team-standings.png' })] });
 }
 
@@ -898,6 +1032,7 @@ module.exports = {
   aliases: [],
   usesHFTournamentContext: false,
   buildTeamRoleSyncPlan,
+  buildIndividualStandingsRows,
   changeTeamName,
   givePoints,
   formatTeamRoster,
