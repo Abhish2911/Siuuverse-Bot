@@ -19,18 +19,9 @@ require('./models/HFTournament');
 const { restorePenaltyRoyaleTimers, handlePenaltyRoyaleDm } = require('./utils/penaltyRoyale');
 const { getGuildPrefix } = require('./utils/guildPrefix');
 const { executeModerationPrefix } = require('./utils/moderation');
-const { authorizeGrokRequest } = require('./utils/grokControls');
 const GrokGuildSettings = require('./models/GrokGuildSettings');
 const GuildModuleSettings = require('./models/GuildModuleSettings');
 const { isGuildModuleEnabled } = require('./utils/guildModules');
-const {
-  askGrok,
-  getReplyContext,
-  getChatSystemPrompt,
-  getConfiguredOwnerIds,
-  neutralizeDiscordPings,
-  splitGrokResponse
-} = require('./utils/grok');
 
 // Keep unexpected failures visible to the host logs without exposing internal
 // details (tokens, database errors, stack traces, etc.) to Discord users.
@@ -1017,59 +1008,6 @@ client.on('messageCreate', async message => {
           color: 0xED4245
         }).catch(error => console.error('❌ Prefix failure audit log failed:', error));
         await message.reply('❌ That command failed. Please try again later.').catch(() => {});
-      }
-
-      return;
-    }
-
-    if (client.user && message.mentions.users.has(client.user.id)) {
-      const prompt = message.content
-        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
-        .trim();
-
-      if (!prompt) {
-        await message.reply('Mention me with a question and I will try to help.');
-        return;
-      }
-
-      try {
-        const access = await authorizeGrokRequest(
-          message.guild.id,
-          message.channel.id
-        );
-        if (!access.allowed) {
-          if (access.code === 'GROK_DISABLED') return;
-          await message.reply(access.message);
-          return;
-        }
-
-        const context = await getReplyContext(message, client.user.id);
-        await message.channel.sendTyping();
-        const answer = await askGrok(
-          getChatSystemPrompt(getConfiguredOwnerIds().includes(message.author.id)),
-          prompt,
-          0.7,
-          context
-        );
-
-        const chunks = splitGrokResponse(neutralizeDiscordPings(answer));
-        for (const [index, content] of chunks.entries()) {
-          const payload = { content, allowedMentions: { parse: [] } };
-          if (index === 0) {
-            await message.reply(payload);
-          } else {
-            await message.channel.send(payload);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Grok reply failed:', error);
-        await message.reply(
-          error.code === 'GROK_ACCESS_DENIED'
-            ? '❌ You do not have permission to use Grok in this channel.'
-            : error.code === 'GROK_CONTROLS_UNAVAILABLE'
-              ? '❌ Grok is temporarily unavailable because server settings could not be checked. Please try again later.'
-              : '❌ I could not get a reply right now. Please try again later.'
-        );
       }
 
       return;
