@@ -1,0 +1,95 @@
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits
+} = require('discord.js');
+
+const { RoleCooldown } = require('../models/rolehandler');
+const E = require('../utils/emojis');
+const { safeEmoji } = require('../utils/helpers');
+
+function parseDuration(input) {
+  const match = input.match(/^(\d+)([smhd])$/i);
+  if (!match) return null;
+
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  const multipliers = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000
+  };
+
+  return value * multipliers[unit];
+}
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('setrolecooldown')
+    .setDescription('Set a cooldown for a role mention.')
+    .addRoleOption(option =>
+      option
+        .setName('role')
+        .setDescription('Role to configure')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('duration')
+        .setDescription('Examples: 30m, 12h, 1d')
+        .setRequired(true)
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+
+  async execute(interaction) {
+    const ownerIds = String(process.env.OWNER_IDS || process.env.OWNER_ID || "")
+      .split(",")
+      .map(id => id.trim())
+      .filter(Boolean);
+
+
+    if (!ownerIds.includes(interaction.user.id)) {
+      return interaction.reply({
+        content: `${safeEmoji(E.wrong, '❌')} Only the bot owner can use this command.`,
+        ephemeral: true
+      });
+    }
+
+    const role = interaction.options.getRole('role');
+    const duration = interaction.options.getString('duration');
+
+    const cooldownMs = parseDuration(duration);
+
+    if (!cooldownMs) {
+      return interaction.reply({
+        content: `${safeEmoji(E.wrong, '❌')} Invalid duration. Use formats like 30m, 12h, or 1d.`,
+        ephemeral: true
+      });
+    }
+
+    await RoleCooldown.findOneAndUpdate(
+      {
+        guildId: interaction.guild.id,
+        roleId: role.id
+      },
+      {
+        cooldownMs
+      },
+      {
+        upsert: true,
+        returnDocument: 'after'
+      }
+    );
+
+    if (interaction.deferred || interaction.replied) {
+      return interaction.followUp({
+        content: `${safeEmoji(E.correct, '✅')} Cooldown for ${role} set to ${duration}.`
+      });
+    }
+
+    return interaction.reply({
+      content: `${safeEmoji(E.correct, '✅')} Cooldown for ${role} set to ${duration}.`
+    });
+  }
+};
