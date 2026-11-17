@@ -13,13 +13,43 @@ const recentFormSchema = new mongoose.Schema({
   recordedAt: { type: Date, default: Date.now }
 }, { _id: false });
 
-module.exports = mongoose.model(
-  'TournamentStats',
-  new mongoose.Schema({
+const tournamentStatsSchema = new mongoose.Schema({
     userId: {
       type: String,
+      required: true
+    },
+
+    guildId: {
+      type: String,
       required: true,
-      unique: true
+      default: 'legacy'
+    },
+
+    // Legacy rows may remain unlinked until an admin assigns them to a tournament.
+    tournamentId: {
+      type: String,
+      default: null,
+      index: true
+    },
+
+    ratingAverage: {
+      type: Number,
+      default: null
+    },
+
+    ratingMatches: {
+      type: Number,
+      default: 0
+    },
+
+    trophies: {
+      type: Number,
+      default: 0
+    },
+
+    awards: {
+      type: Number,
+      default: 0
     },
 
     matches: {
@@ -68,5 +98,11 @@ module.exports = mongoose.model(
       type: [recentFormSchema],
       default: []
     }
-  })
+});
+
+tournamentStatsSchema.index(
+  { guildId: 1, tournamentId: 1, userId: 1 },
+  { unique: true, sparse: true }
 );
+
+module.exports = mongoose.model('TournamentStats', tournamentStatsSchema);
