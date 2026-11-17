@@ -1,7 +1,9 @@
 const TournamentStats = require('../models/TournamentStats');
+const HFTournament = require('../models/HFTournament');
 const { canSubmitHFResult } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
-const { sendStatsSummaryDMs } = require('../utils/hfStatsSummary');
+const { sendStatsSummaryToChannel } = require('../utils/hfStatsSummary');
+const { calculateMatchRating } = require('../utils/hfStatsRating');
 const E = require('../utils/emojis');
 
 const STAT_PATTERN = /(^|[^\d])(\d{5,25})\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
@@ -125,13 +127,23 @@ module.exports = {
       );
     }
 
+    const tournament = await HFTournament.findOne({
+      guildId: message.guild.id,
+      status: { $in: ['registration', 'active'] }
+    }).sort({ createdAt: -1 });
+    if (!tournament) {
+      return message.reply(`${E.missing} Create or activate a Mongo HF tournament before recording stats.`);
+    }
+
+    const statsScope = { guildId: message.guild.id, tournamentId: tournament.tournamentId };
+
     const recordedAt = new Date();
     await TournamentStats.bulkWrite(
       rows.map(row => ({
         updateOne: {
-          filter: { userId: row.userId },
+          filter: { ...statsScope, userId: row.userId },
           update: {
-            $setOnInsert: { userId: row.userId },
+            $setOnInsert: { ...statsScope, userId: row.userId },
             $inc: {
               matches: row.matches,
               goals: row.goals,
@@ -154,12 +166,24 @@ module.exports = {
       { ordered: false }
     );
 
+    const updatedStats = await TournamentStats.find({ ...statsScope, userId: { $in: rows.map(row => row.userId) } });
+    await Promise.all(updatedStats.map(async stats => {
+      const entries = (stats.recentForm || []).slice(-5);
+      const ratingAverage = entries.length >= 5
+        ? Number((entries.reduce((sum, entry) => sum + calculateMatchRating(entry), 0) / entries.length).toFixed(2))
+        : null;
+      await TournamentStats.updateOne(
+        { _id: stats._id },
+        { $set: { ratingMatches: stats.matches, ratingAverage } }
+      );
+    }));
+
     const sourceMessage = await getReferencedMessage(message);
     const summary = sourceMessage
-      ? await sendStatsSummaryDMs(message, rows, sourceMessage).catch(error => ({ error }))
+      ? await sendStatsSummaryToChannel(message, rows, sourceMessage, tournament.statsChannelId).catch(error => ({ error }))
       : null;
 
-    refreshAllHFLiveMessages(message.client, 'stats')
+    refreshAllHFLiveMessages(message.client, 'stats', message.guild.id)
       .catch(error => console.error('HF live stats refresh after .as failed:', error));
 
     if (summary?.error) {
@@ -169,8 +193,8 @@ module.exports = {
     const summaryText = summary?.error
       ? ' Summary DM failed; check the bot logs.'
       : summary
-        ? ` Summary DM sent to ${summary.sent}/${summary.attempted} result-role members.${summary.reason ? ` ${summary.reason}` : ''}`
-        : ' No source message was found, so no match summary was sent.';
+        ? ` Stats log sent to the tournament channel (${summary.sent}/${summary.attempted}).${summary.reason ? ` ${summary.reason}` : ''}`
+        : ' No source message was found, so no stats log was sent.';
 
     return message.reply(`${E.correct} Stats updated.${summaryText}`);
   }

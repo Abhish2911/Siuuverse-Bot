@@ -21,7 +21,7 @@ function parseState(input) {
 
 module.exports = {
   name: 'hfregistration',
-  aliases: ['hftournament', 'hfregtoggle'],
+  aliases: ['hfregtoggle'],
 
   async execute(message, args) {
     if (!isBotOwner(message)) {

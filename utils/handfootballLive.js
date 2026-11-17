@@ -4,6 +4,7 @@ const TournamentStats = require('../models/TournamentStats');
 const E = require('./emojis');
 const { buildHFStandingsImage } = require('./hfStandingsImage');
 const { calculatePerformanceRating } = require('./hfStatsRating');
+const { getHFStatsScope, getActiveHFTournament, runWithHFTournament } = require('./hfTournamentConfig');
 const {
   findPlayerByUserId,
   getTeamRecord,
@@ -101,7 +102,7 @@ function getStatsRows(data, statsDocs) {
 async function buildHFStatsEmbed() {
   const [data, statsDocs] = await Promise.all([
     loadHandFootballData(),
-    TournamentStats.find({}).lean()
+    TournamentStats.find(getHFStatsScope()).lean()
   ]);
   const rows = getStatsRows(data, statsDocs);
   const totalMatches = statsDocs.reduce((sum, stats) => sum + toNumber(stats.matches), 0);
@@ -204,7 +205,7 @@ async function buildHFStandingsEmbed() {
 async function buildHFStandingsPayload(edit = false) {
   const buffer = await buildHFStandingsImage();
   const attachment = new AttachmentBuilder(buffer, { name: 'hf-live-standings.png' });
-  const leagueName = process.env.HF_LEAGUE_NAME || 'HandFootball League';
+  const leagueName = getActiveHFTournament().leagueName || 'HandFootball League';
   const unix = Math.floor(Date.now() / 1000);
   const payload = {
     content: `**${leagueName} — HF LIVE STANDINGS**\nUpdated: <t:${unix}:R>`,
@@ -281,27 +282,32 @@ async function createHFLiveMessage({ client, guildId, channel, type, createdBy }
 }
 
 async function refreshHFLiveMessage(client, guildId, type) {
-  const liveType = normalizeLiveType(type);
-  if (!liveType) return { ok: false, reason: 'Invalid live message type' };
+  return runWithHFTournament(guildId, async () => {
+    const liveType = normalizeLiveType(type);
+    if (!liveType) return { ok: false, reason: 'Invalid live message type' };
 
-  const liveConfig = await HFLiveMessage.findOne({ guildId, type: liveType }).lean();
-  if (!liveConfig) return { ok: false, reason: `No saved HF ${liveType} message` };
+    const liveConfig = await HFLiveMessage.findOne({ guildId, type: liveType }).lean();
+    if (!liveConfig) return { ok: false, reason: `No saved HF ${liveType} message` };
 
-  const message = await fetchSavedMessage(client, liveConfig);
-  if (!message) return { ok: false, reason: 'Saved message could not be fetched' };
+    const message = await fetchSavedMessage(client, liveConfig);
+    if (!message) return { ok: false, reason: 'Saved message could not be fetched' };
 
-  const payload = await buildHFLivePayload(liveType, { edit: true });
-  await message.edit(payload);
-  await HFLiveMessage.updateOne(
-    { guildId, type: liveType },
-    { updatedAt: new Date() }
-  );
+    const payload = await buildHFLivePayload(liveType, { edit: true });
+    await message.edit(payload);
+    await HFLiveMessage.updateOne(
+      { guildId, type: liveType },
+      { updatedAt: new Date() }
+    );
 
-  return { ok: true, reason: `HF ${liveType} message refreshed` };
+    return { ok: true, reason: `HF ${liveType} message refreshed` };
+  });
 }
 
-async function refreshAllHFLiveMessages(client, type = '') {
-  const query = normalizeLiveType(type) ? { type: normalizeLiveType(type) } : {};
+async function refreshAllHFLiveMessages(client, type = '', guildId = '') {
+  const query = {
+    ...(normalizeLiveType(type) ? { type: normalizeLiveType(type) } : {}),
+    ...(guildId ? { guildId } : {})
+  };
   const configs = await HFLiveMessage.find(query).lean();
   const results = [];
 

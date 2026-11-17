@@ -11,6 +11,8 @@ const {
   getFirstIdArg,
   getSearchText
 } = require('../utils/handfootball');
+const { getActiveHFTournament } = require('../utils/hfTournamentConfig');
+const { getActiveTournament } = require('../utils/hfTournamentLogging');
 
 const ZERO_STATS = {
   matches: 0,
@@ -68,7 +70,7 @@ async function getAvatarUrl(client, userId, fallbackUser) {
 
 module.exports = {
   name: 'myhfstats',
-  aliases: ['hfstats', 'hfprofile', 'mystats'],
+  aliases: ['hfstats'],
 
   async execute(message, args, client) {
     const data = await loadHandFootballData();
@@ -78,7 +80,13 @@ module.exports = {
       return message.reply(`${E.missing} HandFootball player not found.`);
     }
 
+    const activeTournament = await getActiveTournament(message.guild.id);
+    if (!activeTournament) {
+      return message.reply(`${E.missing} No open Mongo HF tournament is configured for this server.`);
+    }
     const savedStats = await TournamentStats.findOne({
+      guildId: message.guild.id,
+      tournamentId: activeTournament.tournamentId,
       userId: player.userId
     }).lean();
 
@@ -91,7 +99,7 @@ module.exports = {
     const assists = toNumber(stats.assists);
     const rating = calculatePerformanceRating(stats);
     const avatarUrl = await getAvatarUrl(client, player.userId, message.author);
-    const leagueName = process.env.HF_LEAGUE_NAME || 'Siuuverse HandFootball League';
+    const leagueName = activeTournament.name || getActiveHFTournament().leagueName || 'Siuuverse HandFootball League';
 
     const embed = new EmbedBuilder()
       .setTitle(`${safeEmoji(E.profile, '👤')} ${player.player}'s Player Stats`)

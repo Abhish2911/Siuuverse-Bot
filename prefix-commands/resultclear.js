@@ -6,6 +6,7 @@ const {
 } = require('../utils/handfootball');
 const { findFixture } = require('../utils/hfReservations');
 const { refreshHFStandings } = require('../utils/hfResultHelpers');
+const { clearMongoResult } = require('../utils/hfMongoResults');
 
 module.exports = {
   name: 'resultclear',
@@ -26,10 +27,13 @@ module.exports = {
     if (!fixture) return message.reply(`${E.missing} Match **#${matchNo}** was not found.`);
     if (!fixture.played) return message.reply(`${E.warning} Match **#${fixture.matchNo}** has no result to clear.`);
 
-    const cleared = await clearHFFixtureResult(fixture.matchNo);
-    if (!cleared) return message.reply(`${E.wrong} Could not clear match **#${fixture.matchNo}** in the Fixtures sheet.`);
+    const mongoCleared = await clearMongoResult(message.guild.id, fixture.matchNo);
+    if (!mongoCleared) {
+      const cleared = await clearHFFixtureResult(fixture.matchNo);
+      if (!cleared) return message.reply(`${E.wrong} Could not clear match **#${fixture.matchNo}**.`);
+    }
 
-    const standingsStatus = await refreshHFStandings(message.client);
+    const standingsStatus = await refreshHFStandings(message.client, message.guild.id);
     return message.reply([
       `${E.correct} Result cleared for match **#${fixture.matchNo}**.`,
       `**Fixture:** ${fixture.home} ${E.vs} ${fixture.away}`,

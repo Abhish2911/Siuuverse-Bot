@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const HFStatsSummary = require('../models/HFStatsSummary');
 const E = require('./emojis');
 const { findPlayerByUserId, loadHandFootballData } = require('./handfootball');
+const { getActiveHFTournament } = require('./hfTournamentConfig');
 
 const STAT_FIELDS = [
   ['goals', E.goal, 'Goals'],
@@ -14,10 +15,7 @@ const STAT_FIELDS = [
 ];
 
 function getResultRoleIds() {
-  return [...new Set([
-    ...String(process.env.HF_RESULT_ROLE_ID || '').split(','),
-    ...String(process.env.HF_RESULT_ROLE_IDS || '').split(',')
-  ].map(value => value.replace(/[<@&>]/g, '').trim()).filter(Boolean))];
+  return getActiveHFTournament().resultRoleIds;
 }
 
 function totalFor(rows, field) {
@@ -120,6 +118,23 @@ async function sendStatsSummaryDMs(message, rows, sourceMessage) {
   };
 }
 
+async function sendStatsSummaryToChannel(message, rows, sourceMessage, channelId) {
+  if (!channelId) return { sent: 0, attempted: 0, reason: 'No stats logging channel is configured.' };
+
+  const channel = message.guild.channels.cache.get(channelId)
+    || await message.guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.send) return { sent: 0, attempted: 0, reason: 'The configured stats logging channel was not found.' };
+
+  const data = await loadHandFootballData().catch(() => ({ players: [] }));
+  const embed = buildStatsSummaryEmbed(rows, sourceMessage, data.players || []);
+  const sent = await channel.send({ embeds: [embed] }).catch(() => null);
+  return {
+    sent: sent ? 1 : 0,
+    attempted: 1,
+    reason: sent ? '' : 'The bot could not send to the configured stats logging channel.'
+  };
+}
+
 async function deleteStatsSummaryDMs(message, sourceMessageId) {
   if (!sourceMessageId) return 0;
   const summary = await HFStatsSummary.findOne({
@@ -143,5 +158,6 @@ async function deleteStatsSummaryDMs(message, sourceMessageId) {
 
 module.exports = {
   sendStatsSummaryDMs,
+  sendStatsSummaryToChannel,
   deleteStatsSummaryDMs
 };

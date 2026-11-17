@@ -1,6 +1,7 @@
 const { AttachmentBuilder } = require('discord.js');
 const { buildHFStandingsImage } = require('../utils/hfStandingsImage');
 const E = require('../utils/emojis');
+const { getActiveHFTournament } = require('../utils/hfTournamentConfig');
 
 module.exports = {
   name: 'hfstandings',
@@ -9,7 +10,7 @@ module.exports = {
   async execute(message) {
     const buffer = await buildHFStandingsImage();
     const attachment = new AttachmentBuilder(buffer, { name: 'hf-standings.png' });
-    const leagueName = process.env.HF_LEAGUE_NAME || 'HandFootball League';
+    const leagueName = getActiveHFTournament().leagueName || 'HandFootball League';
     const unix = Math.floor(Date.now() / 1000);
 
     return message.reply({

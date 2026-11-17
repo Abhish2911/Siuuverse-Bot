@@ -82,8 +82,8 @@ async function buildLiveStandings2Image(type = 'standings2') {
     console.log('[LiveStandings2] Building image:', normalizedType);
 
     const modulePath = normalizedType === 'uclstandings2'
-      ? '../commands/uclstandings2'
-      : '../commands/standings2';
+      ? './coopUclStandingsImage'
+      : './coopStandingsImage';
 
     const imageModule = require(modulePath);
 

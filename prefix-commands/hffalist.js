@@ -10,16 +10,14 @@ const {
   mentionUser,
   truncateField
 } = require('../utils/handfootball');
+const { getActiveHFTournament } = require('../utils/hfTournamentConfig');
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
 }
 
 function getConfiguredRoleIds() {
-  return Array.from(new Set([
-    ...String(process.env.HF_FREE_AGENT_ROLE_ID || '').split(','),
-    ...String(process.env.HF_FREE_AGENT_ROLE_IDS || '').split(',')
-  ].map(cleanId).filter(Boolean)));
+  return getActiveHFTournament().freeAgentRoleIds;
 }
 
 async function resolveRoleNames(guild, roleIds) {

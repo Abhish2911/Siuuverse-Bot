@@ -2,6 +2,7 @@ const TournamentStats = require('../models/TournamentStats');
 const { canSubmitHFResult } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
 const { deleteStatsSummaryDMs } = require('../utils/hfStatsSummary');
+const { getHFStatsScope } = require('../utils/hfTournamentConfig');
 const E = require('../utils/emojis');
 
 const STAT_PATTERN = /(^|[^\d])(\d{5,25})\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
@@ -154,6 +155,7 @@ module.exports = {
     }
 
     const savedStats = await TournamentStats.find({
+      ...getHFStatsScope(),
       userId: { $in: rows.map(row => row.userId) }
     });
     const savedStatsByUser = new Map(savedStats.map(stats => [stats.userId, stats]));
@@ -182,7 +184,7 @@ module.exports = {
       return 0;
     });
 
-    refreshAllHFLiveMessages(message.client, 'stats')
+    refreshAllHFLiveMessages(message.client, 'stats', message.guild.id)
       .catch(error => console.error('HF live stats refresh after .rs failed:', error));
 
     return message.reply(

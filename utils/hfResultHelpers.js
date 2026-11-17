@@ -12,13 +12,13 @@ function parseScore(value) {
   };
 }
 
-async function refreshHFStandings(client) {
+async function refreshHFStandings(client, guildId = '') {
   if (mongoose.connection.readyState !== 1) {
     return 'MongoDB not connected';
   }
 
   try {
-    const results = await refreshAllHFLiveMessages(client, 'standings');
+    const results = await refreshAllHFLiveMessages(client, 'standings', guildId);
     return Array.isArray(results) && results.length ? 'Updated' : 'No live standings message configured';
   } catch (error) {
     console.error('❌ HF standings refresh after result failed:', error);

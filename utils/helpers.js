@@ -116,8 +116,9 @@ async function cachedGetData(range, options = {}) {
   const spreadsheetId = typeof options === 'object'
     ? options.spreadsheetId
     : undefined;
+  const source = typeof options === 'object' ? options.source : undefined;
 
-  const key = `${spreadsheetId || 'default'}:${range}`;
+  const key = `${range}:${source || 'default'}:${spreadsheetId || 'default'}`;
   const now = Date.now();
   const hit = sheetCache.get(key);
 
@@ -127,7 +128,8 @@ async function cachedGetData(range, options = {}) {
 
   const data = await getData(range, {
     cache: false,
-    spreadsheetId
+    spreadsheetId,
+    source
   });
 
   const snapshot = cloneSheetValues(data);

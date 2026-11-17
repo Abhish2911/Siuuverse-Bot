@@ -1,6 +1,6 @@
 
 
-const { cachedGetData } = require('./helpers');
+const { cachedGetData } = require('./coopHelpers');
 
 function normalize(str) {
   return String(str || '')

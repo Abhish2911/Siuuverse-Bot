@@ -15,6 +15,7 @@ const {
   upsertHFPlayer
 } = require('../utils/handfootball');
 const E = require('../utils/emojis');
+const HFTournament = require('../models/HFTournament');
 
 async function grantConfiguredRole(guild, userId, roleId, roleName) {
 
@@ -103,9 +104,25 @@ function parseRegisterArgs(message, args, captainPlayer) {
 
 module.exports = {
   name: 'hfregister',
-  aliases: ['hfreg', 'addhfplayer'],
+  aliases: ['hfreg', 'addhfplayer', 'hfaddplayer'],
 
   async execute(message, args) {
+    const mongoTournament = await HFTournament.findOne({ guildId: message.guild.id, status: { $in: ['registration', 'active'] } }).sort({ createdAt: -1 });
+    if (mongoTournament && (message.mentions.users.first() || args.some(arg => /^\d{15,25}$/.test(arg)))) {
+      const targetId = message.mentions.users.first()?.id || args.find(arg => /^\d{15,25}$/.test(arg));
+      const callerTeam = mongoTournament.teams.find(team => team.captainUserId === message.author.id || team.viceCaptainUserId === message.author.id);
+      if (!callerTeam && !isBotOwner(message)) return message.reply(`${E.wrong} Only a team captain, vice-captain, or bot owner can add players.`);
+      const playerName = args.filter(arg => !/<@!?\d+>/.test(arg) && !/^\d{15,25}$/.test(arg)).join(' ').trim();
+      if (!playerName) return message.reply(`${E.profile} Usage: .addhfplayer @user Player Name`);
+      if (mongoTournament.teams.some(team => team.playerUserIds.includes(targetId))) return message.reply(`${E.warning} This player is already registered in this tournament.`);
+      const team = callerTeam || mongoTournament.teams.find(item => item.name.toLowerCase() === playerName.toLowerCase());
+      if (!team) return message.reply(`${E.missing} Your Mongo tournament team was not found.`);
+      team.playerUserIds.push(targetId);
+      await mongoTournament.save();
+      if (mongoTournament.playerRoleId) await message.guild.members.fetch(targetId).then(member => member.roles.add(mongoTournament.playerRoleId)).catch(() => null);
+      return message.reply(`${E.correct} Registered **${playerName}** for **${team.name}** as <@${targetId}>.`);
+    }
+
     const owner = isBotOwner(message);
     const data = await loadHandFootballData();
     const captainTeams = [...new Set(

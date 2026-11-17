@@ -6,12 +6,14 @@ const {
   addSheetIfMissing,
   clearCacheByPrefixes
 } = require('./sheets');
+const { getActiveHFTournament } = require('./hfTournamentConfig');
+const { getOpenTournament, toMongoData } = require('./hfMongoData');
 
 function getHFSpreadsheetId() {
-  const spreadsheetId = String(process.env.HF_SHEET_ID || '').trim();
+  const spreadsheetId = getActiveHFTournament().sheetId;
 
   if (!spreadsheetId) {
-    throw new Error('HF_SHEET_ID is missing in .env');
+    throw new Error('This server has no HandFootball sheet configured.');
   }
 
   return spreadsheetId;
@@ -209,6 +211,12 @@ async function clearHFFixtureResult(matchNo) {
 }
 
 async function loadHandFootballData() {
+  const guildId = getActiveHFTournament().guildId;
+  const mongoTournament = await getOpenTournament(guildId).catch(() => null);
+  if (mongoTournament) {
+    return toMongoData(mongoTournament);
+  }
+
   const spreadsheetId = getHFSpreadsheetId();
   const [playerRows, teamRows, fixtureRows] = await Promise.all([
     getData('Team_Data!A:D', { spreadsheetId }),
@@ -360,6 +368,14 @@ function isBotOwner(message) {
 }
 
 function getRoleIdsFromEnv(...names) {
+  const tournament = getActiveHFTournament();
+  const requested = new Set(names);
+  if (requested.has('HF_RESULT_ROLE_ID') || requested.has('HF_RESULT_ROLE_IDS')) {
+    return tournament.resultRoleIds;
+  }
+  if (requested.has('HF_CAPTAIN_ROLE_ID') || requested.has('HF_CAPTAIN_ROLE_IDS')) {
+    return tournament.captainRoleIds;
+  }
   return names
     .flatMap(name => String(process.env[name] || '').split(','))
     .map(cleanId)
@@ -438,11 +454,10 @@ async function upsertHFPlayer({ team, player, userId, isCaptain }) {
     ['TEAM', 'PLAYER', 'USER ID', 'Captain']
   );
   const cleanUserId = cleanId(userId);
-  const nextRows = rows.map(row => [...row]);
-  const rowIndex = nextRows
+  const rowIndex = rows
     .slice(1)
     .findIndex(row => cleanId(row[2]) === cleanUserId);
-  const nextRow = [
+  const newRow = [
     String(team || '').trim(),
     String(player || '').trim(),
     cleanUserId,
@@ -450,10 +465,18 @@ async function upsertHFPlayer({ team, player, userId, isCaptain }) {
   ];
 
   if (rowIndex === -1) {
-    await appendData('Team_Data!A:D', [nextRow], { spreadsheetId });
+    await appendData('Team_Data!A:D', [newRow], { spreadsheetId });
   } else {
-    nextRows[rowIndex + 1] = nextRow;
-    await updateData('Team_Data!A:D', nextRows, { spreadsheetId });
+    const existingRow = rows[rowIndex + 1] || [];
+    // Adding/editing a player must never silently revoke an existing captain
+    // flag. Captaincy is changed only by setHFCaptain below.
+    const nextRow = [
+      String(team || '').trim(),
+      String(player || '').trim(),
+      cleanUserId,
+      isCaptain ? 'Yes' : String(existingRow[3] || '')
+    ];
+    await updateData(`Team_Data!A${rowIndex + 2}:D${rowIndex + 2}`, [nextRow], { spreadsheetId });
   }
 
   clearCacheByPrefixes(['Team_Data']);
@@ -470,14 +493,11 @@ async function removeHFPlayer(userId) {
 
   if (rowIndex === -1) return null;
 
-  const nextRows = rows
-    .filter((_, index) => index !== rowIndex + 1)
-    .map(row => [...row]);
-
-  // Keep the old range length so the removed final row is cleared in Sheets.
-  nextRows.push(['', '', '', '']);
-
-  await updateData('Team_Data!A:D', nextRows, { spreadsheetId });
+  // Clear just the removed player. Rewriting the entire roster shifts rows and
+  // has previously caused Captain-column values to be assigned to the wrong
+  // players in Sheets.
+  const sheetRow = rowIndex + 2;
+  await updateData(`Team_Data!A${sheetRow}:D${sheetRow}`, [['', '', '', '']], { spreadsheetId });
   clearCacheByPrefixes(['Team_Data']);
   return true;
 }
@@ -541,24 +561,30 @@ async function setHFCaptain(teamName, userId) {
     await getData('Team_Data!A:D', { spreadsheetId, cache: false }),
     ['TEAM', 'PLAYER', 'USER ID', 'Captain']
   );
-  const nextRows = rows.map(row => [...row]);
   const cleanUserId = cleanId(userId);
-  const targetRow = nextRows
+  const targetRow = rows
     .slice(1)
     .find(row => cleanId(row[2]) === cleanUserId);
   const targetTeam = String(teamName || targetRow?.[0] || '').trim();
 
-  if (!targetTeam || !targetRow) {
+  if (!targetTeam || !targetRow || !sameTeam(targetRow[0], targetTeam)) {
     return false;
   }
 
-  for (const row of nextRows.slice(1)) {
-    if (sameTeam(row[0], targetTeam)) {
-      row[3] = cleanId(row[2]) === cleanUserId ? 'Yes' : '';
-    }
-  }
+  const teamRows = rows
+    .slice(1)
+    .map((row, index) => ({ row, sheetRow: index + 2 }))
+    .filter(({ row }) => sameTeam(row[0], targetTeam));
 
-  await updateData('Team_Data!A:D', nextRows, { spreadsheetId });
+  // Touch only column D for this team. Team/player/user-ID cells and every
+  // other team's captain values are left untouched.
+  for (const { row, sheetRow } of teamRows) {
+    await updateData(
+      `Team_Data!D${sheetRow}`,
+      [[cleanId(row[2]) === cleanUserId ? 'Yes' : '']],
+      { spreadsheetId }
+    );
+  }
   clearCacheByPrefixes(['Team_Data']);
   return true;
 }
@@ -607,7 +633,8 @@ async function getHFConfigValue(key, fallback = '') {
 }
 
 async function getHFTournamentRoleId() {
-  return cleanId(await getHFConfigValue('Tournament Role ID'));
+  const configuredRoleId = await getHFConfigValue('Tournament Role ID');
+  return cleanId(configuredRoleId || getActiveHFTournament().playerRoleId);
 }
 
 async function setHFRegistrationOpen(isOpen) {
@@ -650,6 +677,10 @@ module.exports = {
   hasHFResultRole,
   canUseHFCaptainCommands,
   getHFCaptainRoleId,
+  getHFResultRoleIds: () => getActiveHFTournament().resultRoleIds,
+  getHFLeagueName: () => getActiveHFTournament().leagueName,
+  getHFFixturesRoleId: () => getActiveHFTournament().fixturesRoleId,
+  getHFFreeAgentRoleIds: () => getActiveHFTournament().freeAgentRoleIds,
   canManageHandFootball,
   upsertHFPlayer,
   removeHFPlayer,

@@ -4,10 +4,8 @@ const {
   loadHandFootballData,
   findTeamMeta,
 } = require('../utils/handfootball');
+const { getActiveHFTournament } = require('../utils/hfTournamentConfig');
 const { isReserved } = require('../utils/hfReservations');
-
-const HF_RESULT_ROLE_ID = String(process.env.HF_RESULT_ROLE_ID || '').replace(/[<@&>]/g, '').trim();
-const HF_FIXTURES_ROLE_ID = String(process.env.HF_FIXTURES_ROLE_ID || '').replace(/[<@&>]/g, '').trim();
 
 function parseMatchday(args = []) {
   const input = args.map(value => String(value || '').trim()).filter(Boolean);
@@ -90,6 +88,9 @@ module.exports = {
   aliases: ['postfixtures', 'hffixturepost'],
 
   async execute(message, args) {
+    const tournament = getActiveHFTournament();
+    const HF_RESULT_ROLE_ID = tournament.resultRoleIds[0] || '';
+    const HF_FIXTURES_ROLE_ID = tournament.fixturesRoleId;
     if (!hasHFResultRole(message)) {
       return message.reply(`${E.wrong} Only members with the configured HF result role can post HandFootball fixtures.`);
     }

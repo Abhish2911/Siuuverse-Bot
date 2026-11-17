@@ -10,6 +10,8 @@ const {
   setHFCaptain
 } = require('../utils/handfootball');
 const E = require('../utils/emojis');
+const HFTournament = require('../models/HFTournament');
+const { hasHFPermission } = require('../utils/hfPermissions');
 
 function stripUserArgs(args, userId) {
   return args
@@ -22,6 +24,30 @@ module.exports = {
   aliases: ['sethfcaptain', 'hfcaptain'],
 
   async execute(message, args) {
+    const mongoTournament = await HFTournament.findOne({
+      guildId: message.guild.id,
+      status: { $in: ['registration', 'active'] }
+    }).sort({ createdAt: -1 });
+    if (mongoTournament) {
+      if (!(await hasHFPermission(message, 'manageRegistration'))) {
+        return message.reply(`${E.wrong} You need HF registration access to set captains.`);
+      }
+      const userId = getMentionedUserId(message) || getFirstIdArg(args);
+      const teamName = args.filter(arg => !/<@!?\d+>/.test(arg) && !/^\d{15,25}$/.test(arg)).join(' ').trim();
+      const team = mongoTournament.teams.find(item => item.name.toLowerCase() === teamName.toLowerCase());
+      if (!team || !userId) return message.reply(`${E.missing} Usage: .hfsetcaptain @user Team Name`);
+      if (mongoTournament.teams.some(item => item.captainUserId === userId && item.teamId !== team.teamId)) {
+        return message.reply(`${E.warning} That user is already captain of another team in this tournament.`);
+      }
+      team.captainUserId = userId;
+      if (!team.playerUserIds.includes(userId)) team.playerUserIds.push(userId);
+      await mongoTournament.save();
+      if (mongoTournament.captainRoleId) {
+        await message.guild.members.fetch(userId).then(member => member.roles.add(mongoTournament.captainRoleId)).catch(() => null);
+      }
+      return message.reply(`${E.captain} Set <@${userId}> as captain of **${team.name}**.`);
+    }
+
     if (!isBotOwner(message)) {
       return message.reply(`${E.wrong} Only the bot owner can set HandFootball captains.`);
     }

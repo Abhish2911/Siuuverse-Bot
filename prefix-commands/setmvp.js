@@ -9,6 +9,7 @@ const {
   mentionUser
 } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
+const { getHFStatsScope } = require('../utils/hfTournamentConfig');
 const E = require('../utils/emojis');
 const MOTM_BOT_ID = '1370319982470365224';
 
@@ -120,9 +121,9 @@ module.exports = {
     }
 
     const updated = await TournamentStats.findOneAndUpdate(
-      { userId },
+      { ...getHFStatsScope(), userId },
       {
-        $setOnInsert: { userId },
+        $setOnInsert: { ...getHFStatsScope(), userId },
         $inc: { mvps: 1 }
       },
       {
@@ -140,7 +141,7 @@ module.exports = {
       await updated.save();
     }
 
-    refreshAllHFLiveMessages(message.client, 'stats')
+    refreshAllHFLiveMessages(message.client, 'stats', message.guild.id)
       .catch(error => console.error('HF live stats refresh after .setmvp failed:', error));
 
     const data = await loadHandFootballData().catch(() => ({ players: [] }));

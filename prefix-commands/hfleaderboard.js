@@ -15,6 +15,7 @@ const {
   toNumber,
   truncateField
 } = require('../utils/handfootball');
+const { getActiveTournament } = require('../utils/hfTournamentLogging');
 
 const STAT_DEFS = {
   matches: {
@@ -126,17 +127,35 @@ function buildControls(statKey, page, totalPages, ownerId) {
 
   return [
     new ActionRowBuilder().addComponents(statSelect),
-    new ActionRowBuilder().addComponents(previous, next)
+    new ActionRowBuilder().addComponents(previous, next),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`hfleaderboard_mode_current_${ownerId}`).setLabel('Current tournament').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`hfleaderboard_mode_alltime_${ownerId}`).setLabel('All-time guild').setStyle(ButtonStyle.Secondary)
+    )
   ];
 }
 
-async function buildLeaderboardPayload({ statInput, page = 0, ownerId }) {
+async function buildLeaderboardPayload({ statInput, page = 0, ownerId, guildId, mode = 'current' }) {
   const stat = getStatDef(statInput);
+  const activeTournament = mode === 'current' ? await getActiveTournament(guildId) : null;
+  if (mode === 'current' && !activeTournament) return { content: `${safeEmoji(E.missing, '⚠️')} No open Mongo HF tournament is configured for this server.`, components: [] };
   const [data, statsRows] = await Promise.all([
     loadHandFootballData(),
-    TournamentStats.find({}).lean()
+    TournamentStats.find(mode === 'current'
+      ? { guildId, tournamentId: activeTournament.tournamentId }
+      : { guildId }).lean()
   ]);
-  const ranked = statsRows
+  const rows = mode === 'alltime'
+    ? [...statsRows.reduce((map, row) => {
+      const current = map.get(row.userId) || { userId: row.userId };
+      Object.keys(row).forEach(key => {
+        if (['matches', 'goals', 'assists', 'mvps', 'hattricks', 'interceptions', 'tackles', 'saves'].includes(key)) current[key] = toNumber(current[key]) + toNumber(row[key]);
+      });
+      map.set(row.userId, current);
+      return map;
+    }, new Map()).values()]
+    : statsRows;
+  const ranked = rows
     .map(stats => ({
       stats,
       player: findPlayerByUserId(data.players, stats.userId),
@@ -177,7 +196,7 @@ async function buildLeaderboardPayload({ statInput, page = 0, ownerId }) {
     .setDescription(truncateField(lines.join('\n'), 4096))
     .setColor(0xF1C40F)
     .setFooter({
-      text: `Page ${currentPage + 1}/${totalPages} • ${ranked.length} players • Use the menu to change stats`
+      text: `${mode === 'current' ? 'Current tournament' : 'All-time guild'} • Page ${currentPage + 1}/${totalPages} • ${ranked.length} players`
     })
     .setTimestamp();
 
@@ -194,7 +213,8 @@ module.exports = {
   async execute(message, args) {
     return message.reply(await buildLeaderboardPayload({
       statInput: args[0],
-      ownerId: message.author.id
+      ownerId: message.author.id,
+      guildId: message.guild.id
     }));
   },
 
@@ -205,15 +225,24 @@ module.exports = {
     return buildLeaderboardPayload({
       statInput: statKey,
       page: nextPage,
-      ownerId
+      ownerId,
+      guildId: interaction.guild.id,
+      mode: 'current'
     });
+  },
+
+  async modeButtonHandler(interaction, mode, ownerId) {
+    if (ownerId !== interaction.user.id) return { content: 'Only the user who opened this leaderboard can use these controls.', components: [] };
+    return buildLeaderboardPayload({ statInput: 'goals', page: 0, ownerId, guildId: interaction.guild.id, mode });
   },
 
   async selectHandler(interaction, statKey, ownerId) {
     return buildLeaderboardPayload({
       statInput: statKey,
       page: 0,
-      ownerId
+      ownerId,
+      guildId: interaction.guild.id,
+      mode: 'current'
     });
   }
 };

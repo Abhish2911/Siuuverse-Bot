@@ -28,6 +28,13 @@ function getSpreadsheetId(options = {}) {
   return options?.spreadsheetId || SPREADSHEET_ID;
 }
 
+async function shouldUseCoopMongo(options) {
+  if (typeof options === 'string') return false;
+  if (options?.source === 'sheets') return false;
+  if (options?.source !== 'coop' || options?.spreadsheetId) return false;
+  return require('./coopMongo').isCoopMongoActivated();
+}
+
 function assertSpreadsheetId(spreadsheetId) {
   if (!spreadsheetId) {
     throw new Error('SHEET_ID is missing in .env');
@@ -178,6 +185,10 @@ function clearCacheByPrefixes(prefixes = []) {
 }
 
 async function getData(range, options = {}) {
+  if (await shouldUseCoopMongo(options)) {
+    return require('./coopStore').getData(range);
+  }
+
   const spreadsheetId = getSpreadsheetId(options);
   assertSpreadsheetId(spreadsheetId);
 
@@ -201,6 +212,12 @@ async function getData(range, options = {}) {
 }
 
 async function appendData(range, values, options = {}) {
+  if (await shouldUseCoopMongo(options)) {
+    const result = await require('./coopStore').appendData(range, values);
+    clearCache();
+    return result;
+  }
+
   const spreadsheetId = getSpreadsheetId(options);
   assertSpreadsheetId(spreadsheetId);
 
@@ -224,6 +241,12 @@ async function appendData(range, values, options = {}) {
 }
 
 async function updateData(range, values, options = {}) {
+  if (await shouldUseCoopMongo(options)) {
+    const result = await require('./coopStore').updateData(range, values);
+    clearCache();
+    return result;
+  }
+
   const spreadsheetId = getSpreadsheetId(options);
   assertSpreadsheetId(spreadsheetId);
 
@@ -243,6 +266,11 @@ async function updateData(range, values, options = {}) {
 }
 
 async function addSheetIfMissing(title, options = {}) {
+  if (await shouldUseCoopMongo(options)) {
+    await require('./coopStore').addTableIfMissing(title);
+    return false;
+  }
+
   const spreadsheetId = getSpreadsheetId(options);
   assertSpreadsheetId(spreadsheetId);
 
@@ -279,11 +307,26 @@ async function addSheetIfMissing(title, options = {}) {
   return res;
 }
 
+async function getSheetNames(options = {}) {
+  const spreadsheetId = getSpreadsheetId(options);
+  assertSpreadsheetId(spreadsheetId);
+  const meta = await withRetry('metadata', spreadsheetId, () =>
+    sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties.title'
+    })
+  );
+  return (meta?.data?.sheets || [])
+    .map(sheet => sheet.properties?.title)
+    .filter(Boolean);
+}
+
 module.exports = {
   getData,
   appendData,
   updateData,
   addSheetIfMissing,
+  getSheetNames,
   getSpreadsheetId,
   assertSpreadsheetId,
   clearCache,

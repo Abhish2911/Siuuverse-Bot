@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 const E = require('./emojis');
-const { getData } = require('./sheets');
+const { getData } = require('./coopSheets');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'liveStandings.json');

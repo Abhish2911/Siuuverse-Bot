@@ -9,6 +9,7 @@ const {
 } = require('../utils/handfootball');
 const { refreshAllHFLiveMessages } = require('../utils/handfootballLive');
 const { getReferenceContext, getExplicitCommandUserId } = require('./setmvp');
+const { getHFStatsScope } = require('../utils/hfTournamentConfig');
 const E = require('../utils/emojis');
 
 module.exports = {
@@ -28,7 +29,7 @@ module.exports = {
     }
 
     const updated = await TournamentStats.findOneAndUpdate(
-      { userId, mvps: { $gt: 0 } },
+      { ...getHFStatsScope(), userId, mvps: { $gt: 0 } },
       { $inc: { mvps: -1 } },
       { returnDocument: 'after' }
     );
@@ -46,7 +47,7 @@ module.exports = {
       await updated.save();
     }
 
-    refreshAllHFLiveMessages(message.client, 'stats')
+    refreshAllHFLiveMessages(message.client, 'stats', message.guild.id)
       .catch(error => console.error('HF live stats refresh after .unsetmvp failed:', error));
 
     const data = await loadHandFootballData().catch(() => ({ players: [] }));

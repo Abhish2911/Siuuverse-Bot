@@ -5,6 +5,7 @@ const {
   loadHandFootballData,
   sameTeam
 } = require('../utils/handfootball');
+const { getActiveHFTournament } = require('./hfTournamentConfig');
 
 const dejavuFontPath = path.join(__dirname, '../assets/fonts/DejaVuSansMono.ttf');
 GlobalFonts.registerFromPath(dejavuFontPath, 'DejaVuSansMono');
@@ -90,6 +91,29 @@ function truncateText(ctx, text, maxWidth) {
 }
 
 function buildStandingsRows(data) {
+  if (Array.isArray(data.standings) && data.standings.length) {
+    return data.standings
+      .map(row => {
+        const meta = getTeamMeta(data, row.team);
+        return {
+          name: row.team,
+          short: getShortName(row.team),
+          color: parseHexColor(meta.color),
+          p: row.played,
+          w: row.wins,
+          d: row.draws,
+          l: row.losses,
+          gf: row.goalsFor,
+          ga: row.goalsAgainst,
+          gd: row.goalsFor - row.goalsAgainst,
+          pts: row.points,
+          form: []
+        };
+      })
+      .sort((left, right) => right.pts - left.pts || right.gd - left.gd || right.gf - left.gf || left.name.localeCompare(right.name))
+      .map((team, index) => ({ ...team, rank: index + 1 }));
+  }
+
   return getAllTeamNames(data)
     .map(teamName => {
       const record = getTeamRecord(data.fixtures, teamName);
@@ -185,7 +209,7 @@ async function buildHFStandingsImage() {
   ctx.fillStyle = '#00f5a0';
   ctx.fillRect(cardX, cardY + headerHeight - 4, cardWidth, 4);
 
-  const leagueName = process.env.HF_LEAGUE_NAME || 'HAND FOOTBALL LEAGUE';
+  const leagueName = getActiveHFTournament().leagueName || 'HAND FOOTBALL LEAGUE';
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 26px DejaVuSansMono';
   ctx.fillText(String(leagueName).toUpperCase(), cardX + 35, cardY + 46);

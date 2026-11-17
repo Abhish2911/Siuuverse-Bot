@@ -24,6 +24,7 @@ const {
 } = require('../utils/handfootball');
 
 const PER_PAGE = 4;
+const autoPageState = new Map();
 
 function safeEmoji(value, fallback = '') {
   return value || fallback;
@@ -54,7 +55,7 @@ function splitPageArg(args) {
     nextArgs.pop();
   }
 
-  return { args: nextArgs, page };
+  return { args: nextArgs, page, explicitPage: nextArgs.length !== args.length };
 }
 
 function resolveTeam(data, message, args) {
@@ -206,14 +207,25 @@ module.exports = {
       return message.reply(`${E.missing} No Fixtures sheet data found yet.`);
     }
 
-    return message.reply(buildFixturePayload({
+    const pageKey = `${message.guild.id}:${message.author.id}:${teamName}`;
+    const requestedPage = parsed.explicitPage
+      ? parsed.page
+      : (autoPageState.get(pageKey) || 0);
+    const payload = buildFixturePayload({
       data,
       guild: message.guild,
       user: message.author,
       teamName,
-      page: parsed.page,
+      page: requestedPage,
       ownerId: message.author.id
-    }));
+    });
+    if (parsed.explicitPage) {
+      autoPageState.delete(pageKey);
+    } else {
+      const totalPages = Math.max(1, Math.ceil(getTeamFixtures(data.fixtures, teamName).length / PER_PAGE));
+      autoPageState.set(pageKey, (requestedPage + 1) % totalPages);
+    }
+    return message.reply(payload);
   },
 
   async buttonHandler(interaction, action, page, targetType, targetValue, ownerId) {
