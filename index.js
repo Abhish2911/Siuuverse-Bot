@@ -342,6 +342,16 @@ client.once('clientReady', async () => {
     }
   }
 
+  try {
+    const command = client.prefixCommands.get('sclsetlive');
+    if (command && typeof command.restore === 'function') {
+      const restored = await command.restore(client);
+      console.log(`${restored ? '✅' : '⚠️'} Restore sclsetlive: ${restored ? 'active' : 'not configured'}`);
+    }
+  } catch (error) {
+    console.error('❌ Restore error in sclsetlive:', error);
+  }
+
   // Restore role mentionability after bot restarts
   try {
     const cooldowns = await RoleCooldown.find({});
