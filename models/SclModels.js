@@ -57,14 +57,25 @@ const pendingTeamSchema = new mongoose.Schema({
 pendingTeamSchema.index({ guildId: 1, requestId: 1 }, { unique: true });
 pendingTeamSchema.index({ guildId: 1, nameKey: 1, status: 1 });
 
+const liveMessageSchema = new mongoose.Schema({
+  guildId: { type: String, required: true },
+  type: { type: String, required: true, enum: ['team', 'individual'] },
+  channelId: { type: String, required: true },
+  messageId: { type: String, required: true },
+  createdBy: { type: String, default: '' },
+  updatedAt: { type: Date, default: Date.now }
+});
+liveMessageSchema.index({ guildId: 1, type: 1 }, { unique: true });
+
 async function models() {
-  const [Config, Player, Team, PendingTeam] = await Promise.all([
+  const [Config, Player, Team, PendingTeam, LiveMessage] = await Promise.all([
     getSclModel('SclConfig', configSchema, 'scl_configs'),
     getSclModel('SclPlayer', playerSchema, 'scl_players'),
     getSclModel('SclTeam', teamSchema, 'scl_teams'),
-    getSclModel('SclPendingTeam', pendingTeamSchema, 'scl_pending_teams')
+    getSclModel('SclPendingTeam', pendingTeamSchema, 'scl_pending_teams'),
+    getSclModel('SclLiveMessage', liveMessageSchema, 'scl_live_messages')
   ]);
-  return { Config, Player, Team, PendingTeam };
+  return { Config, Player, Team, PendingTeam, LiveMessage };
 }
 
 module.exports = { models };
