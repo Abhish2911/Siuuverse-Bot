@@ -9,7 +9,7 @@ const CONTROL_ACTIONS = new Set(['help', 'setup', 'toggle', 'status']);
 const ROUTES = {
   scl: 'help', sclhelp: 'help', sclsetup: 'setup', scltoggle: 'toggle', sclregistration: 'registration',
   sclcreateteam: 'teamcreate', sclteam: 'team', sclteams: 'teams',
-  sclprofile: 'profile', sclmyteam: 'myteam', sclsetplayername: 'setplayername', sclapprove: 'approve',
+  ctn: 'changeteamname', sclprofile: 'profile', sclmyteam: 'myteam', sclsetplayername: 'setplayername', sclapprove: 'approve',
   sclreject: 'reject', sclpoints: 'points', sclstandings: 'standings', sclindividuals: 'individuals', sclstatus: 'status',
   sclsetteamrole: 'setteamrole', sclsyncroles: 'syncroles'
 };
@@ -69,7 +69,7 @@ async function requireRef(message, config) {
   return true;
 }
 function commandGroup(action) {
-  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', setplayername: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
+  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', changeteamname: 'team', setplayername: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
 }
 function disabled(config, action) {
   const group = commandGroup(action);
@@ -150,9 +150,9 @@ function helpPayload(prefix = '.') {
     .setDescription('Everything you need to manage your player profile, team, and league.')
     .addFields(
       { name: `${E.profile} Player profile`, value: `\`${prefix}sclprofile\` · View team and points`, inline: true },
-      { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player\n\`${prefix}sclmyteam\` · View your team roster`, inline: true },
+      { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player\n\`${prefix}ctn <new name>\` · Rename your team\n\`${prefix}sclmyteam\` · View your team roster`, inline: true },
       { name: `${E.Stats} League tables`, value: `\`${prefix}sclstandings\` · Team standings\n\`${prefix}sclindividuals\` · Player points\n\`${prefix}sclteams\` · Approved teams`, inline: true },
-      { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetplayername @player <name>\` · Rename a player (captain: own team; referee: any team)\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
+      { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetplayername @player <name>\` · Rename a player (captain: own team; referee: any team)\n\`${prefix}ctn @captain <new name>\` · Rename any team (referee)\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
     )
     .setFooter({ text: 'SCL profiles are created when a captain requests a player for a team.' });
 }
@@ -473,6 +473,64 @@ async function registration(message, args, config) {
   config.registrationOpen = value === 'open'; await config.save(); return safeReply(message, `${E.success} SCL team registration is now **${value.toUpperCase()}**.`);
 }
 
+async function changeTeamName(message, args, config, Team, PendingTeam) {
+  const mentionedCaptainId = message.mentions?.users?.first()?.id || '';
+  const referee = isRef(message, config);
+  if (mentionedCaptainId && !referee) {
+    return safeReply(message, `${E.error} Only an SCL referee or the bot owner can rename another captain's team. Use \`.ctn New Team Name\` for your own team.`);
+  }
+
+  const guildId = message.guild.id;
+  const team = await Team.findOne({
+    guildId,
+    captainUserId: mentionedCaptainId || message.author.id
+  });
+  if (!team) {
+    return safeReply(message, mentionedCaptainId
+      ? `${E.error} No approved SCL team was found for that captain.`
+      : `${E.error} You do not captain an approved SCL team. Referees can target one with \`.ctn @Captain New Team Name\`.`);
+  }
+
+  const newName = mentionedCaptainId
+    ? requestedPlayerName(args, mentionedCaptainId)
+    : args.join(' ').trim();
+  if (newName.length < 2 || newName.length > 50) {
+    return safeReply(message, `${E.warning} Use \`.ctn New Team Name\` (2–50 characters), or for referees \`.ctn @Captain New Team Name\`.`);
+  }
+
+  const newNameKey = key(newName);
+  const duplicate = await Team.findOne({
+    guildId,
+    nameKey: newNameKey,
+    teamId: { $ne: team.teamId }
+  }).select('name').lean();
+  if (duplicate) return safeReply(message, `${E.error} An approved team named **${duplicate.name}** already exists.`);
+
+  const oldName = team.name;
+  team.name = newName;
+  team.nameKey = newNameKey;
+  await team.save();
+
+  const pendingRequests = await PendingTeam.find({
+    guildId,
+    captainUserId: team.captainUserId,
+    requestType: 'players',
+    status: 'pending'
+  });
+  let refreshedReviews = 0;
+  for (const pending of pendingRequests) {
+    pending.name = newName;
+    pending.nameKey = newNameKey;
+    await pending.save();
+    if (await postReview(message, config, pending, { PendingTeam })) refreshedReviews += 1;
+  }
+
+  const pendingNotice = pendingRequests.length
+    ? ` Updated ${pendingRequests.length} pending roster request(s)${refreshedReviews ? `; refreshed ${refreshedReviews} review notice(s)` : ''}.`
+    : '';
+  return safeReply(message, `${E.success} Renamed **${oldName}** to **${newName}**.${pendingNotice}`);
+}
+
 async function setPlayerName(message, args, config, Player, Team) {
   const userId = mentionId(message, args);
   const displayName = requestedPlayerName(args, userId);
@@ -655,6 +713,7 @@ async function run(message, rawArgs, client, invokedName) {
       teams: 'teams',
       individual: 'individuals',
       table: 'standings',
+      ctn: 'changeteamname',
       sclsetnick: 'setplayername',
       sclnetnick: 'setplayername'
     };
@@ -666,6 +725,7 @@ async function run(message, rawArgs, client, invokedName) {
     if (action === 'setup') return setup(message, args, config);
     if (action === 'toggle') return toggle(message, args, config);
     if (action === 'registration') return registration(message, args, config);
+    if (action === 'changeteamname') return changeTeamName(message, args, config, Team, PendingTeam);
     if (action === 'setplayername') return setPlayerName(message, args, config, Player, Team);
     if (action === 'setteamrole') return setTeamRole(message, args, config, Team);
     if (action === 'syncroles') return syncTeamRoles(message, config, Team);
@@ -687,6 +747,7 @@ module.exports = {
   aliases: [],
   usesHFTournamentContext: false,
   buildTeamRoleSyncPlan,
+  changeTeamName,
   formatTeamRoster,
   myTeam,
   setPlayerName,
