@@ -8,7 +8,11 @@ const {
 const E = require('../utils/emojis');
 const { models } = require('../models/SclModels');
 const { target } = require('../utils/sclMongo');
-const { buildSclTableImage } = require('../utils/sclTablesImage');
+const { buildSclStandingsImage } = require('../utils/sclStandings');
+const {
+  createSclLiveMessage,
+  refreshSclLiveMessage
+} = require('../utils/sclLiveStandings');
 
 const CONTROL_ACTIONS = new Set(['help', 'setup', 'toggle', 'status']);
 const ROUTES = {
@@ -16,7 +20,7 @@ const ROUTES = {
   sclcreateteam: 'teamcreate', sclteam: 'team', sclteams: 'teams',
   ctn: 'changeteamname', sclprofile: 'profile', sclmyteam: 'myteam', sclsetplayername: 'setplayername', sclapprove: 'approve',
   sclreject: 'reject', sclpoints: 'points', sclstandings: 'standings', sclindividuals: 'individuals', sclstatus: 'status',
-  sclsetteamrole: 'setteamrole', sclsyncroles: 'syncroles'
+  sclsetteamrole: 'setteamrole', sclsyncroles: 'syncroles', sclsetlive: 'setlive'
 };
 
 function key(value) { return String(value || '').trim().toLowerCase().replace(/\s+/g, ' '); }
@@ -74,7 +78,7 @@ async function requireRef(message, config) {
   return true;
 }
 function commandGroup(action) {
-  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', changeteamname: 'team', setplayername: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
+  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', changeteamname: 'team', setplayername: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team', setlive: 'standings' })[action] || action;
 }
 function disabled(config, action) {
   const group = commandGroup(action);
@@ -156,7 +160,7 @@ function helpPayload(prefix = '.') {
     .addFields(
       { name: `${E.profile} Player profile`, value: `\`${prefix}sclprofile\` · View team and points`, inline: true },
       { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player\n\`${prefix}ctn <new name>\` · Rename your team\n\`${prefix}sclmyteam\` · View your team roster`, inline: true },
-      { name: `${E.Stats} League tables`, value: `\`${prefix}sclstandings\` · Team standings\n\`${prefix}sclindividuals\` · Player points\n\`${prefix}sclteams\` · Approved teams`, inline: true },
+      { name: `${E.Stats} League tables`, value: `\`${prefix}sclstandings\` · Team standings\n\`${prefix}sclindividuals\` · Player points\n\`${prefix}sclsetlive team|individual\` · Auto-updating standings\n\`${prefix}sclteams\` · Approved teams`, inline: true },
       { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetplayername @player <name>\` · Rename a player (captain: own team; referee: any team)\n\`${prefix}ctn @captain <new name>\` · Rename any team (referee)\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
     )
     .setFooter({ text: 'SCL profiles are created when a captain requests a player for a team.' });
@@ -661,6 +665,22 @@ async function givePoints(message, args, config, modelsSet) {
       target.individualPoints += amount;
       await target.save();
     }
+    if (message.client) {
+      const liveType = type === 'team' ? 'team' : 'individual';
+      try {
+        const refresh = await refreshSclLiveMessage(
+          message.client,
+          message.guild.id,
+          liveType,
+          modelsSet
+        );
+        if (!refresh.ok && !refresh.reason.startsWith('No saved SCL')) {
+          console.error(`SCL ${liveType} standings were not refreshed: ${refresh.reason}`);
+        }
+      } catch (error) {
+        console.error(`SCL ${liveType} standings refresh after points update failed:`, error);
+      }
+    }
   } finally {
     if (flow) cleanupFailed = !(await cleanPointsFlow(flow));
   }
@@ -674,28 +694,36 @@ async function givePoints(message, args, config, modelsSet) {
   });
 }
 
-function buildIndividualStandingsRows(players) {
-  return [...players]
-    .sort((a, b) => b.individualPoints - a.individualPoints || a.displayName.localeCompare(b.displayName))
-    .slice(0, 10)
-    .map((player, index) => ({
-      rank: index + 1,
-      name: player.displayName,
-      points: player.individualPoints
-    }));
-}
-
 async function tables(message, modelsSet, individual = false) {
   const { Team, Player } = modelsSet; const guildId = message.guild.id;
-  if (individual) {
-    const players = await Player.find({ guildId }).select('displayName individualPoints').lean();
-    const rows = buildIndividualStandingsRows(players);
-    const buffer = buildSclTableImage({ title: 'Siuuverse Champions League', subtitle: 'Individual Standings • Top 10', headers: [{ key: 'rank', label: '#', width: 85 }, { key: 'name', label: 'PLAYER', width: 700 }, { key: 'points', label: 'POINTS', width: 259 }], rows });
-    return safeReply(message, { files: [new AttachmentBuilder(buffer, { name: 'scl-individual-points.png' })] });
+  const type = individual ? 'individual' : 'team';
+  const buffer = await buildSclStandingsImage({ guildId, type, Team, Player });
+  return safeReply(message, {
+    files: [new AttachmentBuilder(buffer, {
+      name: individual ? 'scl-individual-points.png' : 'scl-team-standings.png'
+    })]
+  });
+}
+
+async function setLiveStandings(message, args, config, modelsSet) {
+  if (!await requireRef(message, config)) return;
+  const type = key(args.shift());
+  if (!['team', 'individual'].includes(type)) {
+    return safeReply(message, `${E.warning} Usage: \`.sclsetlive team\` or \`.sclsetlive individual\`.`);
   }
-  const rows = (await Team.find({ guildId }).select('name captainName roster teamPoints').lean()).sort((a, b) => b.teamPoints - a.teamPoints || a.name.localeCompare(b.name)).map((team, index) => ({ rank: index + 1, name: team.name, captain: team.captainName, players: team.roster.length, points: team.teamPoints }));
-  const buffer = buildSclTableImage({ title: 'Siuuverse Champions League', subtitle: 'Team Standings', headers: [{ key: 'rank', label: '#', width: 75 }, { key: 'name', label: 'TEAM', width: 380 }, { key: 'captain', label: 'CAPTAIN', width: 240 }, { key: 'players', label: 'PLAYERS', width: 160 }, { key: 'points', label: 'POINTS', width: 189 }], rows, accent: '#fbbf24' });
-  return safeReply(message, { files: [new AttachmentBuilder(buffer, { name: 'scl-team-standings.png' })] });
+
+  const sent = await createSclLiveMessage({
+    client: message.client,
+    guildId: message.guild.id,
+    channel: message.channel,
+    type,
+    createdBy: message.author.id,
+    modelsSet
+  });
+  return safeReply(
+    message,
+    `${E.success} Live ${type} standings are set in <#${message.channel.id}> and will refresh automatically. Message ID: \`${sent.id}\`.`
+  );
 }
 
 async function registration(message, args, config) {
@@ -989,7 +1017,7 @@ async function toggle(message, args, config) {
 
 async function run(message, rawArgs, client, invokedName) {
     if (!message.guild) return safeReply(message, `${E.error} SCL commands can only be used in a server.`);
-    const { Config, Player, Team, PendingTeam } = await models();
+    const { Config, Player, Team, PendingTeam, LiveMessage } = await models();
     const config = await getConfig(Config, message.guild.id);
     const { action: suppliedAction, args } = route(message, [...rawArgs], invokedName);
     const actionAliases = {
@@ -1004,7 +1032,7 @@ async function run(message, rawArgs, client, invokedName) {
     };
     const action = actionAliases[suppliedAction] || suppliedAction;
     if (disabled(config, action)) return safeReply(message, `${E.locked} That SCL command group is currently disabled by the bot owner.`);
-    const modelSet = { Config, Player, Team, PendingTeam };
+    const modelSet = { Config, Player, Team, PendingTeam, LiveMessage };
     if (action === 'help') return safeReply(message, { embeds: [helpPayload(process.env.PREFIX || '.')] });
     if (action === 'status') return setup(message, ['status'], config);
     if (action === 'setup') return setup(message, args, config);
@@ -1024,6 +1052,7 @@ async function run(message, rawArgs, client, invokedName) {
     if (action === 'points') return givePoints(message, args, config, modelSet);
     if (action === 'standings') return tables(message, modelSet);
     if (action === 'individuals') return tables(message, modelSet, true);
+    if (action === 'setlive') return setLiveStandings(message, args, config, modelSet);
     return safeReply(message, { embeds: [helpPayload(process.env.PREFIX || '.')] });
 }
 
@@ -1032,13 +1061,13 @@ module.exports = {
   aliases: [],
   usesHFTournamentContext: false,
   buildTeamRoleSyncPlan,
-  buildIndividualStandingsRows,
   changeTeamName,
   givePoints,
   formatTeamRoster,
   myTeam,
   setPlayerName,
   requestedPlayerName,
+  setLiveStandings,
   syncTeamRoles,
   safeReply,
   execute: run,
