@@ -43,6 +43,12 @@ module.exports = {
       }
     } catch (error) {
       console.error('❌ Grok slash translation failed:', error);
+      if (error.code === 'GROK_DISABLED') {
+        await interaction.deleteReply().catch(deleteError => {
+          console.error('❌ Could not remove disabled Grok response:', deleteError);
+        });
+        return;
+      }
       if (error.code === 'GROK_ACCESS_DENIED') return { content: error.message };
       if (error.code === 'GROK_CONTROLS_UNAVAILABLE') {
         return { content: '❌ Grok is temporarily unavailable because server settings could not be checked. Please try again later.' };
