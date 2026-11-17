@@ -90,13 +90,13 @@ function profilePayload(player, team, user) {
     .setFooter({ text: 'SCL Player Profile' });
   return { embeds: [embed] };
 }
-async function findDocumentByText(Model, guildId, text) {
+async function findDocumentByText(Model, guildId, text, field = 'displayName') {
   const value = key(text);
   if (!value) return null;
   const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const exact = await Model.findOne({ guildId, displayName: { $regex: `^${escaped}$`, $options: 'i' } });
+  const exact = await Model.findOne({ guildId, [field]: { $regex: `^${escaped}$`, $options: 'i' } });
   if (exact) return exact;
-  return Model.findOne({ guildId, displayName: { $regex: escaped, $options: 'i' } });
+  return Model.findOne({ guildId, [field]: { $regex: escaped, $options: 'i' } });
 }
 async function dm(client, userId, content) {
   if (!userId) return;
@@ -438,20 +438,118 @@ async function approveRequest(message, args, config, modelsSet, reject = false) 
   return safeReply(message, `${E.success} Approved **${team.name}**. The captain and ${pending.players.length} requested player(s) were added; notifications are being sent.`);
 }
 
+async function collectPointsAnswer(message, prompt) {
+  await message.channel.send(prompt);
+  return new Promise(resolve => {
+    const collector = message.channel.createMessageCollector({
+      filter: response => response.author.id === message.author.id,
+      time: 60000,
+      max: 1
+    });
+    collector.on('collect', response => {
+      resolve(response.content.trim());
+      collector.stop('answered');
+    });
+    collector.on('end', (_, reason) => {
+      if (reason === 'time') resolve('');
+    });
+  });
+}
+
+async function collectPointsDetails(message, type, resolveTarget) {
+  const isTeam = type === 'team';
+  const targetPrompt = isTeam
+    ? 'Which team should receive the points? Enter the team name.'
+    : 'Which player should receive the points? Enter their registered name, Discord ID, or mention.';
+  const target = await collectPointsAnswer(message, targetPrompt);
+  if (!target) {
+    await safeReply(message, `${E.warning} Timed out or received an empty target. No points were changed.`);
+    return null;
+  }
+  const resolvedTarget = await resolveTarget(target);
+  if (!resolvedTarget) {
+    await safeReply(message, `${E.error} ${isTeam ? 'Team' : 'Player'} not found. No points were changed.`);
+    return null;
+  }
+
+  const amountText = await collectPointsAnswer(
+    message,
+    'How many points should be added? Use a negative number to subtract points.'
+  );
+  const amount = number(amountText);
+  if (!Number.isFinite(amount)) {
+    await safeReply(message, `${E.warning} Invalid points amount. No points were changed.`);
+    return null;
+  }
+
+  const reasonText = await collectPointsAnswer(message, 'Enter a reason for this adjustment, or type `none`.');
+  if (!reasonText) {
+    await safeReply(message, `${E.warning} Timed out waiting for a reason. No points were changed.`);
+    return null;
+  }
+
+  return {
+    target: resolvedTarget,
+    amount,
+    reason: key(reasonText) === 'none' ? '' : reasonText
+  };
+}
+
 async function givePoints(message, args, config, modelsSet) {
   if (!await requireRef(message, config)) return;
-  const { Player, Team } = modelsSet; const type = key(args.shift());
-  const amountIndex = args.findIndex(arg => Number.isFinite(number(arg)));
-  const amount = amountIndex === -1 ? NaN : number(args[amountIndex]);
-  const beforeAmount = amountIndex === -1 ? [] : args.slice(0, amountIndex);
-  if (!['team', 'player', 'individual'].includes(type) || !Number.isFinite(amount)) return safeReply(message, `${E.warning} Usage: \`.sclpoints team <team name> <points> [reason]\` or \`.sclpoints individual @user <points> [reason]\`.`);
-  if (type === 'team') {
-    const team = await findDocumentByText(Team, message.guild.id, beforeAmount.join(' ')); if (!team) return safeReply(message, `${E.error} Team not found.`);
-    team.teamPoints += amount; await team.save(); return safeReply(message, `${E.success} **${team.name}**: ${amount >= 0 ? '+' : ''}${amount} team points.`);
+  const { Player, Team } = modelsSet;
+  const type = key(args.shift());
+  if (!['team', 'player', 'individual'].includes(type)) {
+    return safeReply(message, `${E.warning} Use \`.sclpoints team\` or \`.sclpoints individual\` to start an interactive adjustment, or include the target, points, and optional reason.`);
   }
-  const userId = mentionId(message, beforeAmount); const search = beforeAmount.filter(arg => !/<@!?(\d+)>/.test(arg) && !/^\d{15,25}$/.test(arg)).join(' ');
-  const player = userId ? await Player.findOne({ guildId: message.guild.id, userId }) : await findDocumentByText(Player, message.guild.id, search);
-  if (!player) return safeReply(message, `${E.error} Player not found.`); player.individualPoints += amount; await player.save(); return safeReply(message, `${E.success} **${player.displayName}**: ${amount >= 0 ? '+' : ''}${amount} individual points.`);
+
+  const amountIndex = args.findIndex(arg => Number.isFinite(number(arg)));
+  let amount = amountIndex === -1 ? NaN : number(args[amountIndex]);
+  let beforeAmount = amountIndex === -1 ? [] : args.slice(0, amountIndex);
+  let reason = amountIndex === -1 ? '' : args.slice(amountIndex + 1).join(' ').trim();
+  const resolveTarget = async value => {
+    if (type === 'team') {
+      return findDocumentByText(
+        Team,
+        message.guild.id,
+        Array.isArray(value) ? value.join(' ') : value,
+        'name'
+      );
+    }
+    const userId = typeof value === 'string'
+      ? value.match(/\d{15,25}/)?.[0]
+      : mentionId(message, value);
+    const search = Array.isArray(value)
+      ? value.filter(arg => !/<@!?(\d+)>/.test(arg) && !/^\d{15,25}$/.test(arg)).join(' ')
+      : value.replace(/<@!?\d+>/g, '').replace(/\d{15,25}/g, '').trim();
+    return userId
+      ? Player.findOne({ guildId: message.guild.id, userId })
+      : findDocumentByText(Player, message.guild.id, search);
+  };
+  let target = Number.isFinite(amount) && beforeAmount.length
+    ? await resolveTarget(beforeAmount)
+    : null;
+
+  if (!target || !Number.isFinite(amount)) {
+    const details = await collectPointsDetails(message, type, resolveTarget);
+    if (!details) return;
+    ({ target, amount, reason } = details);
+  }
+
+  if (type === 'team') {
+    target.teamPoints += amount;
+    await target.save();
+    return safeReply(message, {
+      content: `${E.success} **${target.name}**: ${amount >= 0 ? '+' : ''}${amount} team points.${reason ? `\nReason: ${reason}` : ''}`,
+      allowedMentions: { parse: [] }
+    });
+  }
+  target.individualPoints += amount;
+  await target.save();
+  return safeReply(message, {
+    content: `${E.success} **${target.displayName}**: ${amount >= 0 ? '+' : ''}${amount} individual points.${reason ? `\nReason: ${reason}` : ''}`,
+    allowedMentions: { parse: [] }
+  });
 }
 
 async function tables(message, modelsSet, individual = false) {
@@ -801,6 +899,7 @@ module.exports = {
   usesHFTournamentContext: false,
   buildTeamRoleSyncPlan,
   changeTeamName,
+  givePoints,
   formatTeamRoster,
   myTeam,
   setPlayerName,
