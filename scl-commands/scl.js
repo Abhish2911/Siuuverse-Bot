@@ -9,7 +9,7 @@ const CONTROL_ACTIONS = new Set(['help', 'setup', 'toggle', 'status']);
 const ROUTES = {
   scl: 'help', sclhelp: 'help', sclsetup: 'setup', scltoggle: 'toggle', sclregistration: 'registration',
   sclcreateteam: 'teamcreate', sclteam: 'team', sclteams: 'teams',
-  sclprofile: 'profile', sclmyteam: 'myteam', sclapprove: 'approve',
+  sclprofile: 'profile', sclmyteam: 'myteam', sclsetplayername: 'setplayername', sclapprove: 'approve',
   sclreject: 'reject', sclpoints: 'points', sclstandings: 'standings', sclindividuals: 'individuals', sclstatus: 'status',
   sclsetteamrole: 'setteamrole', sclsyncroles: 'syncroles'
 };
@@ -69,7 +69,7 @@ async function requireRef(message, config) {
   return true;
 }
 function commandGroup(action) {
-  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
+  return ({ teamcreate: 'team', teams: 'team', myteam: 'team', setplayername: 'team', individuals: 'standings', setteamrole: 'team', syncroles: 'team' })[action] || action;
 }
 function disabled(config, action) {
   const group = commandGroup(action);
@@ -152,7 +152,7 @@ function helpPayload(prefix = '.') {
       { name: `${E.profile} Player profile`, value: `\`${prefix}sclprofile\` · View team and points`, inline: true },
       { name: `${E.team} Captain`, value: `\`${prefix}sclcreateteam <name>\` · Register a team\n\`${prefix}sclteam add @player [name]\` · Request a roster addition\n\`${prefix}sclteam remove @player\` · Remove a player\n\`${prefix}sclmyteam\` · View your team roster`, inline: true },
       { name: `${E.Stats} League tables`, value: `\`${prefix}sclstandings\` · Team standings\n\`${prefix}sclindividuals\` · Player points\n\`${prefix}sclteams\` · Approved teams`, inline: true },
-      { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
+      { name: `${E.captain} Referees & setup`, value: `\`${prefix}sclapprove <id>\` / \`${prefix}sclreject <id> <reason>\`\n\`${prefix}sclsetplayername @player <name>\` · Rename a player (captain: own team; referee: any team)\n\`${prefix}sclsetup\` · Server configuration\n\`${prefix}sclregistration open|close\` · Team registration\n\`${prefix}sclsetteamrole <team> @role\` · Link a team role\n\`${prefix}sclsyncroles\` · Sync mapped team roles`, inline: false },
     )
     .setFooter({ text: 'SCL profiles are created when a captain requests a player for a team.' });
 }
@@ -473,6 +473,35 @@ async function registration(message, args, config) {
   config.registrationOpen = value === 'open'; await config.save(); return safeReply(message, `${E.success} SCL team registration is now **${value.toUpperCase()}**.`);
 }
 
+async function setPlayerName(message, args, config, Player, Team) {
+  const userId = mentionId(message, args);
+  const displayName = requestedPlayerName(args, userId);
+  if (!userId || !displayName || displayName.length > 50) {
+    return safeReply(message, `${E.warning} Usage: \`.sclsetplayername @player New Display Name\` (maximum 50 characters).`);
+  }
+
+  const guildId = message.guild.id;
+  const player = await Player.findOne({ guildId, userId });
+  if (!player?.teamId) return safeReply(message, `${E.error} That player is not on an approved SCL team.`);
+
+  const team = await Team.findOne({ guildId, teamId: player.teamId });
+  if (!team) return safeReply(message, `${E.error} The player's approved SCL team could not be found.`);
+  if (!isRef(message, config) && team.captainUserId !== message.author.id) {
+    return safeReply(message, `${E.error} Only a captain of **${team.name}**, an SCL referee, or the bot owner can rename this player.`);
+  }
+  const rosterEntries = team.roster.filter(entry => entry.userId === userId || entry.playerId === player.playerId);
+  if (!rosterEntries.length) {
+    return safeReply(message, `${E.error} The player's team roster is inconsistent; no name was changed.`);
+  }
+
+  player.displayName = displayName;
+  rosterEntries.forEach(entry => { entry.displayName = displayName; });
+  if (team.captainUserId === userId) team.captainName = displayName;
+  await team.save();
+  await player.save();
+  return safeReply(message, `${E.success} Updated <@${userId}>'s SCL display name to **${displayName}** on **${team.name}**.`);
+}
+
 async function setTeamRole(message, args, config, Team) {
   if (!await requireRef(message, config)) return;
 
@@ -620,7 +649,15 @@ async function run(message, rawArgs, client, invokedName) {
     const { Config, Player, Team, PendingTeam } = await models();
     const config = await getConfig(Config, message.guild.id);
     const { action: suppliedAction, args } = route(message, [...rawArgs], invokedName);
-    const actionAliases = { create: 'teamcreate', createteam: 'teamcreate', teams: 'teams', individual: 'individuals', table: 'standings' };
+    const actionAliases = {
+      create: 'teamcreate',
+      createteam: 'teamcreate',
+      teams: 'teams',
+      individual: 'individuals',
+      table: 'standings',
+      sclsetnick: 'setplayername',
+      sclnetnick: 'setplayername'
+    };
     const action = actionAliases[suppliedAction] || suppliedAction;
     if (disabled(config, action)) return safeReply(message, `${E.locked} That SCL command group is currently disabled by the bot owner.`);
     const modelSet = { Config, Player, Team, PendingTeam };
@@ -629,6 +666,7 @@ async function run(message, rawArgs, client, invokedName) {
     if (action === 'setup') return setup(message, args, config);
     if (action === 'toggle') return toggle(message, args, config);
     if (action === 'registration') return registration(message, args, config);
+    if (action === 'setplayername') return setPlayerName(message, args, config, Player, Team);
     if (action === 'setteamrole') return setTeamRole(message, args, config, Team);
     if (action === 'syncroles') return syncTeamRoles(message, config, Team);
     if (action === 'profile') return profiles(message, args, Player, Team);
@@ -651,6 +689,7 @@ module.exports = {
   buildTeamRoleSyncPlan,
   formatTeamRoster,
   myTeam,
+  setPlayerName,
   requestedPlayerName,
   syncTeamRoles,
   safeReply,
