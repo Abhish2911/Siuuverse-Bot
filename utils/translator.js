@@ -32,7 +32,7 @@ async function translate(text, targetLanguage = 'English', requestContext) {
   );
   if (!access.allowed) {
     const error = new Error(access.message);
-    error.code = 'GROK_ACCESS_DENIED';
+    error.code = access.code || 'GROK_ACCESS_DENIED';
     throw error;
   }
 

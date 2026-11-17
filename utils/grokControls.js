@@ -23,7 +23,11 @@ async function authorizeGrokRequest(guildId, channelId) {
   try {
     const settings = await getGrokSettings(guildId);
     if (!settings.enabled) {
-      return { allowed: false, message: 'Grok is disabled in this server.' };
+      return {
+        allowed: false,
+        code: 'GROK_DISABLED',
+        message: 'Grok is disabled in this server.'
+      };
     }
     if (
       settings.channelMode === 'selected' &&
