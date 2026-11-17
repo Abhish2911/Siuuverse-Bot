@@ -59,6 +59,7 @@ module.exports = {
       }
     } catch (error) {
       console.error('❌ Grok translation failed:', error);
+      if (error.code === 'GROK_DISABLED') return;
       if (['GROK_ACCESS_DENIED', 'GROK_CONTROLS_UNAVAILABLE'].includes(error.code)) {
         return message.reply(
           error.code === 'GROK_CONTROLS_UNAVAILABLE'
