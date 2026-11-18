@@ -607,9 +607,10 @@ async function cleanPointsFlow(flow) {
 async function givePoints(message, args, config, modelsSet) {
   if (!await requireRef(message, config)) return;
   const { Player, Team } = modelsSet;
-  const type = key(args.shift());
-  if (!['team', 'player', 'individual'].includes(type)) {
-    return safeReply(message, `${E.warning} Use \`.sclpoints team\` or \`.sclpoints individual\` to start an interactive adjustment, or include the target, points, and optional reason.`);
+  const requestedType = key(args.shift());
+  const type = ['individual', 'player'].includes(requestedType) ? 'players' : requestedType;
+  if (!['team', 'players'].includes(type)) {
+    return safeReply(message, `${E.warning} Use \`.sclpoints team\` or \`.sclpoints players\` to start an interactive adjustment, or include the target, points, and optional reason.`);
   }
 
   const amountIndex = args.findIndex(arg => Number.isFinite(number(arg)));
