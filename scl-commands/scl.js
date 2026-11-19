@@ -658,28 +658,43 @@ async function givePoints(message, args, config, modelsSet) {
   }
 
   let cleanupFailed = false;
+  let creditedTeam = null;
   try {
     if (type === 'team') {
       target.teamPoints += amount;
       await target.save();
     } else {
+      if (target.teamId) {
+        creditedTeam = await Team.findOne({
+          guildId: message.guild.id,
+          teamId: target.teamId
+        });
+      }
       target.individualPoints += amount;
       await target.save();
+      if (creditedTeam) {
+        creditedTeam.teamPoints += amount;
+        await creditedTeam.save();
+      }
     }
     if (message.client) {
-      const liveType = type === 'team' ? 'team' : 'individual';
-      try {
-        const refresh = await refreshSclLiveMessage(
-          message.client,
-          message.guild.id,
-          liveType,
-          modelsSet
-        );
-        if (!refresh.ok && !refresh.reason.startsWith('No saved SCL')) {
-          console.error(`SCL ${liveType} standings were not refreshed: ${refresh.reason}`);
+      const liveTypes = type === 'team'
+        ? ['team']
+        : ['individual', ...(creditedTeam ? ['team'] : [])];
+      for (const liveType of liveTypes) {
+        try {
+          const refresh = await refreshSclLiveMessage(
+            message.client,
+            message.guild.id,
+            liveType,
+            modelsSet
+          );
+          if (!refresh.ok && !refresh.reason.startsWith('No saved SCL')) {
+            console.error(`SCL ${liveType} standings were not refreshed: ${refresh.reason}`);
+          }
+        } catch (error) {
+          console.error(`SCL ${liveType} standings refresh after points update failed:`, error);
         }
-      } catch (error) {
-        console.error(`SCL ${liveType} standings refresh after points update failed:`, error);
       }
     }
   } finally {
@@ -689,8 +704,14 @@ async function givePoints(message, args, config, modelsSet) {
   const cleanupWarning = cleanupFailed
     ? '\n⚠️ I could not delete all prompts and inputs. Check that I have Manage Messages permission.'
     : '';
+  const teamPointsText = creditedTeam
+    ? `\n**${creditedTeam.name}** also received ${amount >= 0 ? '+' : ''}${amount} team points.`
+    : '';
+  const missingTeamWarning = type === 'players' && target.teamId && !creditedTeam
+    ? '\n⚠️ No matching team was found for this player, so only individual points were awarded.'
+    : '';
   return safeReply(message, {
-    content: `${E.success} **${type === 'team' ? target.name : target.displayName}**: ${amount >= 0 ? '+' : ''}${amount} ${type === 'team' ? 'team' : 'individual'} points.${reason ? `\nReason: ${reason}` : ''}${cleanupWarning}`,
+    content: `${E.success} **${type === 'team' ? target.name : target.displayName}**: ${amount >= 0 ? '+' : ''}${amount} ${type === 'team' ? 'team' : 'individual'} points.${teamPointsText}${missingTeamWarning}${reason ? `\nReason: ${reason}` : ''}${cleanupWarning}`,
     allowedMentions: { parse: [] }
   });
 }
